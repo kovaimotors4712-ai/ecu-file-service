@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+!.env.production.example
+pricing.local.json
+node_modules/
+/TEST_ECU_FILE.*
+/private-ecu-fixtures/

@@ -1,0 +1,13 @@
+{
+  "name": "ecu-file-service-india",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "checkout:test": "node dev-checkout.js",
+    "test": "node --test"
+  }
+}
