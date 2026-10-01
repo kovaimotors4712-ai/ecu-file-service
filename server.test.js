@@ -38,6 +38,19 @@ function upstreamResponse(status, payload) {
   };
 }
 
+function upstreamBinaryResponse(status, value) {
+  const bytes = Buffer.from(value);
+  return {
+    status,
+    ok: status >= 200 && status < 300,
+    headers: { get: name => name.toLowerCase() === 'content-type' ? 'application/octet-stream' : null },
+    body: { cancel: async () => {} },
+    json: async () => { throw new Error('Binary upstream response is not JSON.'); },
+    text: async () => bytes.toString('utf8'),
+    arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+  };
+}
+
 function hash(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
@@ -56,11 +69,28 @@ function paymentFixture(configuration = {}) {
     originalName: 'test-ecu.bin', originalMime: 'application/octet-stream',
     originalSize: file.length, originalSha256: hash(file)
   };
-  const calls = { orderCreate: null, razorpayOrderRead: 0, paymentRead: 0, rpc: null, storageUpload: 0 };
+  const calls = { orderCreate: null, razorpayOrderRead: 0, paymentRead: 0, rpc: null, rpcCount: 0, storageUpload: 0 };
+  const localDatabase = { orders: new Map(), orderFiles: new Map(), objects: new Map() };
+  const adminId = '20000000-0000-4000-8000-000000000001';
+  const otherCustomerId = '30000000-0000-4000-8000-000000000001';
+  const identity = options => {
+    const authorization = options?.headers?.Authorization || options?.headers?.authorization || '';
+    const token = String(authorization).replace(/^Bearer\s+/i, '');
+    if (token === 'test-admin-token') return { id: adminId, role: 'admin' };
+    if (token === 'test-other-customer-token') return { id: otherCustomerId, role: 'customer' };
+    if (token === 'test-customer-token') return { id: customerId, role: 'customer' };
+    return null;
+  };
+  const orderFilesFor = orderId => [...localDatabase.orderFiles.values()].filter(file => file.order_id === orderId);
   const upstream = async (urlValue, options = {}) => {
     const url = new URL(urlValue);
     const method = options.method || 'GET';
-    if (url.pathname === '/auth/v1/user') return upstreamResponse(200, { id: customerId });
+    if (url.pathname === '/auth/v1/user') {
+      const user = identity(options);
+      return user
+        ? upstreamResponse(200, { id: user.id, app_metadata: user.role === 'admin' ? { role: 'admin' } : {} })
+        : upstreamResponse(401, { message: 'Invalid test session.' });
+    }
     if (url.hostname === 'api.razorpay.com' && url.pathname === '/v1/orders' && method === 'POST') {
       calls.orderCreate = JSON.parse(options.body);
       return upstreamResponse(200, {
@@ -85,8 +115,114 @@ function paymentFixture(configuration = {}) {
       });
     }
     if (url.pathname === '/rest/v1/rpc/efsi_create_paid_order') {
+      calls.rpcCount += 1;
       calls.rpc = { body: JSON.parse(options.body), authorization: options.headers.Authorization };
+      if (configuration.fullOrderStore) {
+        const user = identity(options);
+        const rpc = calls.rpc.body;
+        if (!user || user.role !== 'customer' || user.id !== customerId) return upstreamResponse(401, { code: '42501', message: 'Authentication required.' });
+        if (hash(rpc.p_order_json) !== rpc.p_request_sha256) return upstreamResponse(400, { code: '22023', message: 'Request hash mismatch.' });
+        const proofPayload = ['EFSI_PAYMENT_CONFIRMATION_V1', user.id, rpc.p_order_id, rpc.p_payment_order_id, rpc.p_payment_id, rpc.p_amount_paise, rpc.p_request_sha256].join('|');
+        const expectedProof = crypto.createHmac('sha256', process.env.PAYMENT_GATE_PROOF_SECRET).update(proofPayload).digest('hex');
+        if (rpc.p_payment_proof !== expectedProof) return upstreamResponse(403, { code: '42501', message: 'Payment server proof is invalid.' });
+        const existing = localDatabase.orders.get(rpc.p_order_id);
+        if (existing) {
+          if (existing.customer_id === user.id && existing.razorpay_order_id === rpc.p_payment_order_id && existing.razorpay_payment_id === rpc.p_payment_id && existing.payment_request_sha256 === rpc.p_request_sha256) return upstreamResponse(200, rpc.p_order_id);
+          return upstreamResponse(409, { code: '23505', message: 'Order reference already exists.' });
+        }
+        if ([...localDatabase.orders.values()].some(order => order.razorpay_order_id === rpc.p_payment_order_id || order.razorpay_payment_id === rpc.p_payment_id)) return upstreamResponse(409, { code: '23505', message: 'Payment reference already used.' });
+        const request = JSON.parse(rpc.p_order_json);
+        const notes = [
+          request.notes,
+          `[EFSI_PRICE_SNAPSHOT_V1]\nfile_verification_paise=${rpc.p_amount_paise}`,
+          `[EFSI_PAYMENT_V1]\npayment_status=PAID\npayment_provider=razorpay\nrazorpay_order_id=${rpc.p_payment_order_id}\nrazorpay_payment_id=${rpc.p_payment_id}\nrequest_sha256=${rpc.p_request_sha256}\npayment_proof=${expectedProof}`
+        ].filter(Boolean).join('\n\n');
+        localDatabase.orders.set(rpc.p_order_id, {
+          id: rpc.p_order_id, customer_id: user.id, status: 'New', category: request.category,
+          vehicle_brand: request.vehicleBrand, vehicle_type: request.vehicleType,
+          vehicle_model: request.vehicleModel, vehicle_year: request.vehicleYear,
+          ecu_manufacturer: request.ecuManufacturer, ecu_model: request.ecuModel,
+          reading_tool: request.readingTool, selected_services: request.selectedServices,
+          notes, contact_name: request.contactName, contact_phone: request.contactPhone,
+          contact_email: request.contactEmail, payment_status: 'PAID',
+          razorpay_order_id: rpc.p_payment_order_id, razorpay_payment_id: rpc.p_payment_id,
+          verification_amount_paise: rpc.p_amount_paise, payment_request_sha256: rpc.p_request_sha256,
+          paid_at: new Date().toISOString(), created_at: new Date().toISOString()
+        });
+        return upstreamResponse(200, rpc.p_order_id);
+      }
       return upstreamResponse(configuration.rpcStatus ?? 200, configuration.rpcPayload ?? calls.rpc.body.p_order_id);
+    }
+    if (configuration.fullOrderStore && url.pathname === '/rest/v1/orders') {
+      const user = identity(options);
+      if (!user) return upstreamResponse(401, { message: 'Authentication required.' });
+      if (method === 'GET') {
+        let rows = [...localDatabase.orders.values()].filter(order => user.role === 'admin' || order.customer_id === user.id);
+        const customerFilter = url.searchParams.get('customer_id');
+        if (customerFilter?.startsWith('eq.')) rows = rows.filter(order => order.customer_id === customerFilter.slice(3));
+        const idFilter = url.searchParams.get('id');
+        if (idFilter?.startsWith('eq.')) rows = rows.filter(order => order.id === idFilter.slice(3));
+        if (idFilter?.startsWith('in.(')) {
+          const ids = idFilter.slice(4, -1).split(',');
+          rows = rows.filter(order => ids.includes(order.id));
+        }
+        return upstreamResponse(200, rows.map(order => ({ ...order, order_files: orderFilesFor(order.id) })));
+      }
+      if (method === 'PATCH') {
+        if (user.role !== 'admin') return upstreamResponse(403, { message: 'Row-level security denied order update.' });
+        const idFilter = url.searchParams.get('id') || '';
+        const order = localDatabase.orders.get(idFilter.replace(/^eq\./, ''));
+        if (!order) return upstreamResponse(404, { message: 'Order not found.' });
+        const next = JSON.parse(options.body).status;
+        const allowed = ({ New: 'File Review', 'File Review': 'Processing', Processing: 'Completed' })[order.status];
+        if (next !== allowed || (next === 'Completed' && !orderFilesFor(order.id).some(file => file.kind === 'processed'))) return upstreamResponse(400, { code: '23514', message: 'Invalid order status transition.' });
+        order.status = next;
+        return upstreamResponse(204, null);
+      }
+    }
+    if (configuration.fullOrderStore && url.pathname === '/rest/v1/order_files') {
+      const user = identity(options);
+      if (!user) return upstreamResponse(401, { message: 'Authentication required.' });
+      if (method === 'GET') {
+        let rows = [...localDatabase.orderFiles.values()].filter(file => user.role === 'admin' || file.owner_id === user.id);
+        const objectPathFilter = url.searchParams.get('object_path');
+        if (objectPathFilter?.startsWith('eq.')) rows = rows.filter(file => file.object_path === objectPathFilter.slice(3));
+        return upstreamResponse(200, rows);
+      }
+      if (method === 'POST') {
+        const file = JSON.parse(options.body);
+        const order = localDatabase.orders.get(file.order_id);
+        const isOriginalOwner = user.role === 'customer' && order?.customer_id === user.id && order.payment_status === 'PAID' && file.kind === 'original' && file.owner_id === user.id && file.uploaded_by === user.id && file.object_path.startsWith(`${user.id}/${file.order_id}/original/`);
+        const isAuthorizedAdmin = user.role === 'admin' && order && order.customer_id === file.owner_id && file.uploaded_by === user.id && file.kind === 'processed' && file.object_path.startsWith(`${order.customer_id}/${file.order_id}/processed/`);
+        if (!isOriginalOwner && !isAuthorizedAdmin) return upstreamResponse(403, { message: 'Row-level security denied order-file registration.' });
+        if ([...localDatabase.orderFiles.values()].some(existing => existing.object_path === file.object_path)) return upstreamResponse(409, { code: '23505', message: 'Object path already registered.' });
+        const stored = { ...file, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+        localDatabase.orderFiles.set(stored.id, stored);
+        return upstreamResponse(201, stored);
+      }
+    }
+    if (configuration.fullOrderStore && url.pathname.startsWith('/storage/v1/object/private-ecu-files/')) {
+      const user = identity(options);
+      if (!user) return upstreamResponse(401, { message: 'Authentication required.' });
+      const objectPath = url.pathname.split('/').slice(5).map(decodeURIComponent).join('/');
+      const parts = objectPath.split('/');
+      const order = localDatabase.orders.get(parts[1]);
+      if (!order) return upstreamResponse(404, { message: 'Object not found.' });
+      if (method === 'GET') {
+        const file = [...localDatabase.orderFiles.values()].find(item => item.object_path === objectPath);
+        if (!file || (user.role !== 'admin' && order.customer_id !== user.id)) return upstreamResponse(404, { message: 'Object not found.' });
+        const object = localDatabase.objects.get(objectPath);
+        return object ? upstreamBinaryResponse(200, object) : upstreamResponse(404, { message: 'Object not found.' });
+      }
+      if (method === 'POST') {
+        const isOriginalOwner = user.role === 'customer' && user.id === order.customer_id && order.status === 'New' && order.payment_status === 'PAID' && parts[0] === user.id && parts[2] === 'original';
+        const isAuthorizedAdmin = user.role === 'admin' && parts[0] === order.customer_id && (parts[2] === 'original' || parts[2] === 'processed');
+        if (!isOriginalOwner && !isAuthorizedAdmin) return upstreamResponse(403, { message: 'Storage row-level security denied upload.' });
+        if (localDatabase.objects.has(objectPath)) return upstreamResponse(409, { message: 'Object already exists.' });
+        localDatabase.objects.set(objectPath, Buffer.from(options.body));
+        calls.storageUpload += 1;
+        return upstreamResponse(200, {});
+      }
     }
     if (url.pathname.startsWith('/rest/v1/order_files')) {
       return upstreamResponse(method === 'GET' ? 200 : 201, method === 'GET' ? [] : {});
@@ -98,7 +234,7 @@ function paymentFixture(configuration = {}) {
     }
     throw new Error(`Unexpected mocked upstream request: ${method} ${url.pathname}`);
   };
-  return { customerId, razorpayOrderId, razorpayPaymentId, file, request, calls, upstream };
+  return { customerId, adminId, otherCustomerId, razorpayOrderId, razorpayPaymentId, file, request, calls, localDatabase, upstream };
 }
 
 async function startPaymentTestServer(fixture) {
@@ -343,6 +479,119 @@ test('verified payment calls the paid-order RPC with the exact normalized contra
   } finally { await stopPaymentTestServer(local.instance); }
 });
 
+test('full mocked payment-to-delivery lifecycle keeps the order private and idempotent', async () => {
+  const fixture = paymentFixture({ fullOrderStore: true });
+  fixture.file = await fs.readFile(path.join(__dirname, 'TEST_ECU_FILE.bin'));
+  fixture.request.originalName = 'TEST_ECU_FILE.bin';
+  fixture.request.originalSize = fixture.file.length;
+  fixture.request.originalSha256 = hash(fixture.file);
+  const local = await startPaymentTestServer(fixture);
+  const customerHeaders = { Authorization: 'Bearer test-customer-token' };
+  const adminHeaders = { Authorization: 'Bearer test-admin-token' };
+  const customerOrders = id => `${local.url}/api/supabase/rest/v1/orders?select=*,order_files!order_files_order_id_fkey(*)&customer_id=eq.${encodeURIComponent(id)}&order=created_at.desc&limit=50`;
+  const orderFiles = `${local.url}/api/supabase/rest/v1/order_files`;
+  const storageUrl = objectPath => `${local.url}/api/supabase/storage/v1/object/private-ecu-files/${objectPath.split('/').map(encodeURIComponent).join('/')}`;
+  try {
+    const first = await createAndVerify(fixture, local.url);
+    assert.equal(first.response.status, 200);
+    assert.deepEqual(first.result, { status: 'PAID', orderId: fixture.calls.orderCreate.notes.supabase_order_id });
+    assert.equal(fixture.calls.paymentRead, 1);
+    assert.equal(fixture.calls.rpcCount, 1);
+    assert.equal(fixture.localDatabase.orders.size, 1);
+
+    const orderId = first.result.orderId;
+    const order = fixture.localDatabase.orders.get(orderId);
+    assert.equal(order.customer_id, fixture.customerId);
+    assert.equal(order.status, 'New');
+    assert.equal(order.payment_status, 'PAID');
+    assert.equal(order.verification_amount_paise, 9900);
+    assert.equal(order.razorpay_order_id, fixture.razorpayOrderId);
+    assert.equal(order.razorpay_payment_id, fixture.razorpayPaymentId);
+    assert.equal(order.payment_request_sha256, fixture.calls.orderCreate.notes.request_sha256);
+
+    const adminVerification = await fetch(`${local.url}/api/admin/payment-status`, {
+      method: 'POST',
+      headers: { ...adminHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderIds: [orderId] })
+    });
+    assert.equal(adminVerification.status, 200);
+    assert.deepEqual(await adminVerification.json(), { verified: { [orderId]: true } });
+
+    const adminOrderResponse = await fetch(`${local.url}/api/supabase/rest/v1/orders?select=*,order_files!order_files_order_id_fkey(*)&order=created_at.desc`, { headers: adminHeaders });
+    assert.equal(adminOrderResponse.status, 200);
+    const adminOrders = await adminOrderResponse.json();
+    assert.equal(adminOrders.length, 1);
+    const originalRecord = adminOrders[0].order_files.find(file => file.kind === 'original');
+    assert.ok(originalRecord);
+    const originalDownload = await fetch(storageUrl(originalRecord.object_path), { headers: adminHeaders });
+    assert.equal(originalDownload.status, 200);
+    assert.deepEqual(Buffer.from(await originalDownload.arrayBuffer()), fixture.file);
+
+    const processedBytes = Buffer.from('FINAL TEST ECU FILE - NOT MODIFIED');
+    const processedPath = `${fixture.customerId}/${orderId}/processed/final-test-output.bin`;
+    const finalUpload = await fetch(storageUrl(processedPath), {
+      method: 'POST', headers: { ...adminHeaders, 'Content-Type': 'application/octet-stream' }, body: processedBytes
+    });
+    assert.equal(finalUpload.status, 200);
+    const finalRecordResponse = await fetch(orderFiles, {
+      method: 'POST', headers: { ...adminHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: orderId, owner_id: fixture.customerId, kind: 'processed', bucket_id: 'private-ecu-files',
+        object_path: processedPath, original_name: 'final-test-output.bin',
+        mime_type: 'application/octet-stream', size_bytes: processedBytes.length, uploaded_by: fixture.adminId
+      })
+    });
+    assert.equal(finalRecordResponse.status, 201);
+    assert.notEqual(processedPath, originalRecord.object_path);
+    assert.deepEqual(fixture.localDatabase.objects.get(originalRecord.object_path), fixture.file);
+
+    const duplicateFinalUpload = await fetch(storageUrl(processedPath), {
+      method: 'POST', headers: { ...adminHeaders, 'Content-Type': 'application/octet-stream' }, body: Buffer.from('OVERWRITE MUST FAIL')
+    });
+    assert.equal(duplicateFinalUpload.status, 409);
+    assert.deepEqual(fixture.localDatabase.objects.get(processedPath), processedBytes);
+
+    for (const status of ['File Review', 'Processing', 'Completed']) {
+      const updated = await fetch(`${local.url}/api/supabase/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}`, {
+        method: 'PATCH', headers: { ...adminHeaders, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ status })
+      });
+      assert.equal(updated.status, 204);
+    }
+    assert.equal(fixture.localDatabase.orders.get(orderId).status, 'Completed');
+
+    const customerOrderResponse = await fetch(customerOrders(fixture.customerId), { headers: customerHeaders });
+    assert.equal(customerOrderResponse.status, 200);
+    const visibleOrders = await customerOrderResponse.json();
+    assert.equal(visibleOrders.length, 1);
+    assert.equal(visibleOrders[0].id, orderId);
+    assert.equal(visibleOrders[0].payment_status, 'PAID');
+    assert.equal(visibleOrders[0].status, 'Completed');
+    assert.ok(visibleOrders[0].order_files.some(file => file.kind === 'processed' && file.object_path === processedPath));
+
+    const finalDownload = await fetch(storageUrl(processedPath), { headers: customerHeaders });
+    assert.equal(finalDownload.status, 200);
+    const downloadedFinalBytes = Buffer.from(await finalDownload.arrayBuffer());
+    assert.deepEqual(downloadedFinalBytes, processedBytes);
+    assert.notDeepEqual(downloadedFinalBytes, fixture.file);
+
+    const otherCustomerOrders = await fetch(customerOrders(fixture.otherCustomerId), { headers: { Authorization: 'Bearer test-other-customer-token' } });
+    assert.equal(otherCustomerOrders.status, 200);
+    assert.deepEqual(await otherCustomerOrders.json(), []);
+    const unauthorizedOriginal = await fetch(storageUrl(originalRecord.object_path), { headers: { Authorization: 'Bearer test-other-customer-token' } });
+    assert.equal(unauthorizedOriginal.status, 404);
+    const unauthorizedFinal = await fetch(storageUrl(processedPath), { headers: { Authorization: 'Bearer test-other-customer-token' } });
+    assert.equal(unauthorizedFinal.status, 404);
+
+    const duplicateVerification = await createAndVerify(fixture, local.url, { skipCreate: true });
+    assert.equal(duplicateVerification.response.status, 200);
+    assert.deepEqual(duplicateVerification.result, { status: 'PAID', orderId });
+    assert.equal(fixture.calls.paymentRead, 1);
+    assert.equal(fixture.calls.rpcCount, 1);
+    assert.equal(fixture.localDatabase.orders.size, 1);
+  } finally { await stopPaymentTestServer(local.instance); }
+});
+
 test('recovers a paid callback after local payment state is lost', async () => {
   const fixture = paymentFixture();
   const local = await startPaymentTestServer(fixture);
@@ -446,6 +695,17 @@ test('rejects an invalid payment signature before looking up payment status', as
 
 test('rejects a captured payment with the wrong amount', async () => {
   const fixture = paymentFixture({ paymentAmount: 1 });
+  const local = await startPaymentTestServer(fixture);
+  try {
+    const { response, result } = await createAndVerify(fixture, local.url);
+    assert.equal(response.status, 402);
+    assert.match(result.error, /not confirmed as captured/i);
+    assert.equal(fixture.calls.rpc, null);
+  } finally { await stopPaymentTestServer(local.instance); }
+});
+
+test('rejects a captured payment with the wrong currency', async () => {
+  const fixture = paymentFixture({ paymentCurrency: 'USD' });
   const local = await startPaymentTestServer(fixture);
   try {
     const { response, result } = await createAndVerify(fixture, local.url);
