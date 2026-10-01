@@ -6,6 +6,10 @@
   const verificationPriceLabel = document.querySelector('#verification-price');
   const brandInput = document.querySelector('#brand');
   const brandResults = document.querySelector('#brand-results');
+  const paymentRecovery = document.createElement('details');
+  paymentRecovery.className = 'payment-recovery';
+  paymentRecovery.innerHTML = '<summary>Already paid? Recover this request</summary><p>Enter the Razorpay references for this payment. Your request details and original file must match what you submitted before checkout.</p><div class="field-row"><div class="field"><label for="recovery-order-id">Razorpay order ID</label><input id="recovery-order-id" autocomplete="off" spellcheck="false" placeholder="order_…"></div><div class="field"><label for="recovery-payment-id">Razorpay payment ID</label><input id="recovery-payment-id" autocomplete="off" spellcheck="false" placeholder="pay_…"></div></div><button class="button button-dark recovery-submit" type="button">Verify existing payment</button>';
+  document.querySelector('.verification-status').after(paymentRecovery);
   const maxFileSize = 50 * 1024 * 1024;
   let currentPage = 0;
   let activeBrandOption = -1;
@@ -15,6 +19,7 @@
   let paymentReady = false;
   let razorpayScriptPromise = null;
   let checkoutStarting = false;
+  let reconciliationStarting = false;
 
   function loadRazorpayCheckout(timeoutMs = 12000) {
     if (typeof window.Razorpay === 'function') return Promise.resolve(window.Razorpay);
@@ -182,7 +187,7 @@
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (!validatePage(5)) return;
-    if (checkoutStarting) return;
+    if (checkoutStarting || reconciliationStarting) return;
     if (capturedPayment) {
       await finishVerifiedPayment(capturedPayment);
       return;
@@ -288,6 +293,57 @@
       console.error('[payment] checkout initialization failed', { stage: checkoutStage, errorType: error.name || 'Error' });
     }
   });
+
+  paymentRecovery.querySelector('.recovery-submit').addEventListener('click', reconcileCapturedPayment);
+
+  async function reconcileCapturedPayment() {
+    if (reconciliationStarting || checkoutStarting) return;
+    if (!validatePage(5)) return;
+    const orderId = paymentRecovery.querySelector('#recovery-order-id').value.trim();
+    const paymentId = paymentRecovery.querySelector('#recovery-payment-id').value.trim();
+    const button = paymentRecovery.querySelector('.recovery-submit');
+    const submitButton = document.querySelector('.verification-submit');
+    const submitWasDisabled = submitButton.disabled;
+    const status = document.querySelector('.verification-status');
+    const backend = window.EfsiSupabase;
+    const session = backend?.getSession();
+    if (!session?.user?.id) { showError(5, 'Sign in to the customer account that made this payment before recovering the request.'); return; }
+    if (!/^order_[A-Za-z0-9]+$/.test(orderId) || !/^pay_[A-Za-z0-9]+$/.test(paymentId)) {
+      showError(5, 'Enter the Razorpay order ID and payment ID from your existing payment.'); return;
+    }
+    button.disabled = true;
+    submitButton.disabled = true;
+    reconciliationStarting = true;
+    status.textContent = 'Checking the existing Razorpay payment securely…';
+    try {
+      const token = await withTimeout(backend.getAccessToken(), 12000, 'Your sign-in session check timed out. Retry or sign in again.');
+      if (!token) throw new Error('Sign in to the customer account that made this payment before recovering the request.');
+      const file = fileInput.files[0];
+      if (!file) throw new Error('Re-select the exact original file submitted before checkout.');
+      const requestData = getPaymentRequestData(file);
+      requestData.originalSha256 = await withTimeout(hashFile(file), 20000, 'Preparing the original file took too long. Try again.');
+      const { response, result } = await fetchJsonWithTimeout('/api/payment/reconcile', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          razorpay_order_id: orderId, razorpay_payment_id: paymentId,
+          request: requestData, fileBase64: await fileToBase64(file)
+        })
+      }, 90000, 'Payment reconciliation is taking longer than expected. Keep this page open and retry; do not pay again.');
+      if (!response.ok || result.status !== 'PAID' || !result.orderId) throw new Error(result.error || 'The existing payment could not be reconciled. No order was submitted.');
+      savedOrderId = result.orderId;
+      status.textContent = 'Payment verified. Your original file is securely stored and your order is available to our service team.';
+      document.querySelector('.success-state > p').textContent = `Payment verified successfully. Your File Verification & Support Fee is ${formatINR(fileVerificationPricePaise)}. Order ${savedOrderId} and your original file are now securely available to our service team.`;
+      document.querySelector('.paid-order-reference').textContent = `Order reference: ${savedOrderId}`;
+      setPage(6);
+    } catch (error) {
+      status.textContent = 'Your request is not submitted yet. Use Verify existing payment to retry securely; do not pay again.';
+      showError(5, error.message);
+    } finally {
+      button.disabled = false;
+      submitButton.disabled = submitWasDisabled;
+      reconciliationStarting = false;
+    }
+  }
 
   function waitForRazorpayFrame(timeoutMs) {
     return new Promise(resolve => {

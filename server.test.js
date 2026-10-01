@@ -69,7 +69,7 @@ function paymentFixture(configuration = {}) {
     originalName: 'test-ecu.bin', originalMime: 'application/octet-stream',
     originalSize: file.length, originalSha256: hash(file)
   };
-  const calls = { orderCreate: null, razorpayOrderRead: 0, paymentRead: 0, rpc: null, rpcCount: 0, storageUpload: 0 };
+  const calls = { orderCreate: null, orderCreateCount: 0, razorpayOrderRead: 0, paymentRead: 0, rpc: null, rpcCount: 0, storageUpload: 0 };
   const localDatabase = { orders: new Map(), orderFiles: new Map(), objects: new Map() };
   const adminId = '20000000-0000-4000-8000-000000000001';
   const otherCustomerId = '30000000-0000-4000-8000-000000000001';
@@ -92,6 +92,7 @@ function paymentFixture(configuration = {}) {
         : upstreamResponse(401, { message: 'Invalid test session.' });
     }
     if (url.hostname === 'api.razorpay.com' && url.pathname === '/v1/orders' && method === 'POST') {
+      calls.orderCreateCount += 1;
       calls.orderCreate = JSON.parse(options.body);
       return upstreamResponse(200, {
         id: razorpayOrderId, amount: calls.orderCreate.amount, currency: calls.orderCreate.currency,
@@ -101,14 +102,14 @@ function paymentFixture(configuration = {}) {
     if (url.hostname === 'api.razorpay.com' && url.pathname === `/v1/orders/${razorpayOrderId}`) {
       calls.razorpayOrderRead += 1;
       return upstreamResponse(200, {
-        id: razorpayOrderId, amount: calls.orderCreate.amount, currency: calls.orderCreate.currency,
+        id: razorpayOrderId, amount: configuration.orderAmount ?? calls.orderCreate.amount, currency: configuration.orderCurrency || calls.orderCreate.currency,
         notes: calls.orderCreate.notes
       });
     }
     if (url.hostname === 'api.razorpay.com' && url.pathname === `/v1/payments/${razorpayPaymentId}`) {
       calls.paymentRead += 1;
       return upstreamResponse(200, {
-        order_id: razorpayOrderId,
+        order_id: configuration.paymentOrderId || razorpayOrderId,
         status: configuration.paymentStatus || 'captured',
         amount: configuration.paymentAmount ?? calls.orderCreate.amount,
         currency: configuration.paymentCurrency || 'INR'
@@ -282,6 +283,28 @@ async function createAndVerify(fixture, base, { signature, request = fixture.req
     })
   });
   return { response, result: await response.json(), createResponse, createResult, validSignature };
+}
+
+async function createAndReconcile(fixture, base, { token = 'test-customer-token', request = fixture.request } = {}) {
+  const createResponse = await fetch(`${base}/api/payment/create-order`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-customer-token' },
+    body: JSON.stringify({ request: fixture.request })
+  });
+  const createResult = await createResponse.json();
+  if (!createResponse.ok) return { response: createResponse, result: createResult };
+  await fs.rm(path.join(paymentStateDir, `${fixture.razorpayOrderId}.json`), { force: true });
+  const response = await fetch(`${base}/api/payment/reconcile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      razorpay_order_id: fixture.razorpayOrderId,
+      razorpay_payment_id: fixture.razorpayPaymentId,
+      request,
+      fileBase64: fixture.file.toString('base64')
+    })
+  });
+  return { response, result: await response.json(), createResult };
 }
 
 async function startIsolatedServer(overrides) {
@@ -498,6 +521,7 @@ test('full mocked payment-to-delivery lifecycle keeps the order private and idem
     assert.equal(fixture.calls.paymentRead, 1);
     assert.equal(fixture.calls.rpcCount, 1);
     assert.equal(fixture.localDatabase.orders.size, 1);
+    assert.equal(fixture.calls.orderCreateCount, 1);
 
     const orderId = first.result.orderId;
     const order = fixture.localDatabase.orders.get(orderId);
@@ -589,6 +613,7 @@ test('full mocked payment-to-delivery lifecycle keeps the order private and idem
     assert.equal(fixture.calls.paymentRead, 1);
     assert.equal(fixture.calls.rpcCount, 1);
     assert.equal(fixture.localDatabase.orders.size, 1);
+    assert.equal(fixture.calls.orderCreateCount, 1);
   } finally { await stopPaymentTestServer(local.instance); }
 });
 
@@ -608,6 +633,107 @@ test('recovers a paid callback after local payment state is lost', async () => {
     assert.equal(result.status, 'PAID');
     assert.equal(fixture.calls.razorpayOrderRead, 1);
     assert.equal(fixture.calls.rpc.body.p_order_id, fixture.calls.orderCreate.notes.supabase_order_id);
+  } finally { await stopPaymentTestServer(local.instance); }
+});
+
+test('reconciles an existing captured payment without a browser signature and remains idempotent', async () => {
+  const fixture = paymentFixture({ fullOrderStore: true });
+  const local = await startPaymentTestServer(fixture);
+  try {
+    const first = await createAndReconcile(fixture, local.url);
+    assert.equal(first.response.status, 200);
+    assert.equal(first.result.status, 'PAID');
+    assert.equal(first.result.orderId, fixture.calls.orderCreate.notes.supabase_order_id);
+    assert.equal(fixture.calls.razorpayOrderRead, 1);
+    assert.equal(fixture.calls.paymentRead, 1);
+    assert.equal(fixture.calls.rpcCount, 1);
+    assert.equal(fixture.localDatabase.orders.size, 1);
+    assert.equal(fixture.calls.orderCreateCount, 1);
+    const second = await fetch(`${local.url}/api/payment/reconcile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-customer-token' },
+      body: JSON.stringify({
+        razorpay_order_id: fixture.razorpayOrderId,
+        razorpay_payment_id: fixture.razorpayPaymentId,
+        request: fixture.request,
+        fileBase64: fixture.file.toString('base64')
+      })
+    });
+    assert.equal(second.status, 200);
+    assert.deepEqual(await second.json(), first.result);
+    assert.equal(fixture.calls.rpcCount, 1);
+    assert.equal(fixture.localDatabase.orders.size, 1);
+    assert.equal(fixture.calls.orderCreateCount, 1);
+    assert.equal(fixture.calls.orderCreate.notes.verification_amount_paise, '9900');
+  } finally { await stopPaymentTestServer(local.instance); }
+});
+
+test('rejects reconciliation by a different authenticated customer', async () => {
+  const fixture = paymentFixture();
+  const local = await startPaymentTestServer(fixture);
+  try {
+    const { response, result } = await createAndReconcile(fixture, local.url, { token: 'test-other-customer-token' });
+    assert.equal(response.status, 404);
+    assert.match(result.error, /could not be recovered/i);
+    assert.equal(fixture.calls.paymentRead, 0);
+    assert.equal(fixture.calls.rpc, null);
+  } finally { await stopPaymentTestServer(local.instance); }
+});
+
+test('rejects reconciliation when captured payment amount differs from the Razorpay order', async () => {
+  const fixture = paymentFixture({ paymentAmount: 1 });
+  const local = await startPaymentTestServer(fixture);
+  try {
+    const { response, result } = await createAndReconcile(fixture, local.url);
+    assert.equal(response.status, 402);
+    assert.match(result.error, /not confirmed as captured/i);
+    assert.equal(fixture.calls.rpc, null);
+  } finally { await stopPaymentTestServer(local.instance); }
+});
+
+test('rejects reconciliation when Razorpay order amount differs from the application snapshot', async () => {
+  const fixture = paymentFixture({ orderAmount: 10000 });
+  const local = await startPaymentTestServer(fixture);
+  try {
+    const { response, result } = await createAndReconcile(fixture, local.url);
+    assert.equal(response.status, 404);
+    assert.match(result.error, /could not be recovered/i);
+    assert.equal(fixture.calls.rpc, null);
+  } finally { await stopPaymentTestServer(local.instance); }
+});
+
+test('rejects reconciliation when captured payment currency differs from the order', async () => {
+  const fixture = paymentFixture({ paymentCurrency: 'USD' });
+  const local = await startPaymentTestServer(fixture);
+  try {
+    const { response, result } = await createAndReconcile(fixture, local.url);
+    assert.equal(response.status, 402);
+    assert.match(result.error, /not confirmed as captured/i);
+    assert.equal(fixture.calls.rpc, null);
+  } finally { await stopPaymentTestServer(local.instance); }
+});
+
+test('rejects reconciliation when the Razorpay payment belongs to a different order', async () => {
+  const fixture = paymentFixture({ paymentOrderId: 'order_DifferentLocal' });
+  const local = await startPaymentTestServer(fixture);
+  try {
+    const { response, result } = await createAndReconcile(fixture, local.url);
+    assert.equal(response.status, 402);
+    assert.match(result.error, /not confirmed as captured/i);
+    assert.equal(fixture.calls.rpc, null);
+  } finally { await stopPaymentTestServer(local.instance); }
+});
+
+test('rejects reconciliation when submitted request metadata differs from Razorpay notes', async () => {
+  const fixture = paymentFixture();
+  const local = await startPaymentTestServer(fixture);
+  try {
+    const { response, result } = await createAndReconcile(fixture, local.url, {
+      request: { ...fixture.request, notes: 'Changed after checkout' }
+    });
+    assert.equal(response.status, 400);
+    assert.match(result.error, /details changed/i);
+    assert.equal(fixture.calls.rpc, null);
   } finally { await stopPaymentTestServer(local.instance); }
 });
 

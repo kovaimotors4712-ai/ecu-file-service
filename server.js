@@ -389,9 +389,9 @@ async function handleCreatePaymentOrder(request, response) {
     const supabaseOrderId = crypto.randomUUID();
     const razorOrder = await razorpayApi('orders', { method: 'POST', body: {
       amount: price, currency: 'INR', receipt: `efsi_${crypto.randomUUID().replaceAll('-', '').slice(0, 32)}`,
-      notes: { customer_id: customer.id, request_sha256: expectedHash, supabase_order_id: supabaseOrderId, service: 'File Verification & Support Fee' }
+      notes: { customer_id: customer.id, request_sha256: expectedHash, supabase_order_id: supabaseOrderId, verification_amount_paise: String(price), service: 'File Verification & Support Fee' }
     } });
-    const notesMatch = razorOrder?.notes?.customer_id === customer.id && razorOrder.notes.request_sha256 === expectedHash && razorOrder.notes.supabase_order_id === supabaseOrderId;
+    const notesMatch = razorOrder?.notes?.customer_id === customer.id && razorOrder.notes.request_sha256 === expectedHash && razorOrder.notes.supabase_order_id === supabaseOrderId && razorOrder.notes.verification_amount_paise === String(price);
     if (!/^order_[A-Za-z0-9]+$/.test(String(razorOrder?.id || '')) || razorOrder.amount !== price || razorOrder.currency !== 'INR' || !notesMatch) {
       console.error('[payment] Razorpay order response failed safe validation.', { orderIdReceived: Boolean(razorOrder?.id), amountMatches: razorOrder?.amount === price, currencyMatches: razorOrder?.currency === 'INR', notesMatch });
       jsonResponse(response, 502, { error: 'Razorpay returned an invalid checkout order. Your file was not submitted; please retry.' }); return true;
@@ -490,6 +490,29 @@ async function createPaidSupabaseOrder(customer, state, order, payment) {
 
 const completingPayments = new Map();
 
+async function recoverPaymentState(razorOrderId, customer, previousState) {
+  const razorOrder = await razorpayApi(`orders/${encodeURIComponent(razorOrderId)}`);
+  const notes = razorOrder?.notes || {};
+  const notedOrderId = String(notes.supabase_order_id || '');
+  const supabaseOrderId = notedOrderId
+    ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(notedOrderId) ? notedOrderId : null
+    : recoveredSupabaseOrderId(razorOrderId);
+  const notedAmount = notes.verification_amount_paise === undefined ? razorOrder?.amount : Number(notes.verification_amount_paise);
+  if (razorOrder?.id !== razorOrderId || notes.customer_id !== customer.id || !supabaseOrderId ||
+      !/^[a-f0-9]{64}$/i.test(String(notes.request_sha256 || '')) ||
+      !Number.isSafeInteger(notedAmount) || notedAmount < 1 || notedAmount > maxFileVerificationPricePaise ||
+      razorOrder.amount !== notedAmount || razorOrder.currency !== 'INR') return null;
+  if (previousState && (previousState.userId !== customer.id || previousState.requestSha256 !== notes.request_sha256.toLowerCase() ||
+      previousState.amountPaise !== razorOrder.amount || previousState.currency !== razorOrder.currency || previousState.supabaseOrderId !== supabaseOrderId)) return null;
+  return {
+    ...(previousState || {}), userId: customer.id,
+    requestSha256: notes.request_sha256.toLowerCase(), amountPaise: razorOrder.amount,
+    currency: razorOrder.currency, status: previousState?.status || 'CREATED',
+    createdAt: previousState?.createdAt || new Date().toISOString(),
+    supabaseOrderId, originalPath: previousState?.originalPath || null
+  };
+}
+
 function verifyStoredPaymentProof(order) {
   const value = String(order.notes || '');
   const amount = value.match(/\[EFSI_PRICE_SNAPSHOT_V1\]\r?\nfile_verification_paise=(\d+)/);
@@ -525,7 +548,7 @@ async function handleAdminPaymentStatus(request, response) {
   return true;
 }
 
-async function handleCompletePayment(request, response) {
+async function handleCompletePayment(request, response, { reconcile = false } = {}) {
   if (request.method !== 'POST') { response.writeHead(405, { Allow: 'POST' }).end(); return true; }
   if (!String(request.headers['content-type'] || '').toLowerCase().startsWith('application/json')) { jsonResponse(response, 415, { error: 'Send the payment verification request as JSON.' }); return true; }
   if (!hasSafeSupabaseConfig || !hasRazorpayConfig()) { jsonResponse(response, 503, { error: 'Payment is not configured on this server.' }); return true; }
@@ -536,32 +559,21 @@ async function handleCompletePayment(request, response) {
     const razorOrderId = String(body?.razorpay_order_id || '');
     const paymentId = String(body?.razorpay_payment_id || '');
     const signature = String(body?.razorpay_signature || '');
+    if (!/^order_[A-Za-z0-9]+$/.test(razorOrderId) || !/^pay_[A-Za-z0-9]+$/.test(paymentId)) {
+      jsonResponse(response, 400, { error: 'Valid Razorpay order and payment references are required.' }); return true;
+    }
     let state = await readPaymentState(razorOrderId);
     if (state && state.userId !== customer.id) { jsonResponse(response, 404, { error: 'This payment request could not be found for your account.' }); return true; }
-    if (state?.status === 'PAID' && state.uploaded && state.orderId) {
+    if (!reconcile && state?.status === 'PAID' && state.uploaded && state.orderId) {
       jsonResponse(response, 200, { status: 'PAID', orderId: state.orderId }); return true;
     }
-    const expectedSignature = crypto.createHmac('sha256', razorpayKeySecret).update(`${razorOrderId}|${paymentId}`).digest('hex');
-    if (!safeEqualHex(signature, expectedSignature)) { jsonResponse(response, 402, { error: 'Payment signature could not be verified. Your file was not submitted.' }); return true; }
-    if (!state) {
-      const razorOrder = await razorpayApi(`orders/${encodeURIComponent(razorOrderId)}`);
-      const notes = razorOrder?.notes || {};
-      const notedOrderId = String(notes.supabase_order_id || '');
-      const supabaseOrderId = notedOrderId
-        ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(notedOrderId) ? notedOrderId : null
-        : recoveredSupabaseOrderId(razorOrderId);
-      if (razorOrder?.id !== razorOrderId || notes.customer_id !== customer.id ||
-          !supabaseOrderId ||
-          !/^[a-f0-9]{64}$/i.test(String(notes.request_sha256 || '')) ||
-          !Number.isSafeInteger(razorOrder.amount) || razorOrder.amount < 1 || razorOrder.amount > maxFileVerificationPricePaise || razorOrder.currency !== 'INR') {
-        jsonResponse(response, 404, { error: 'This payment request could not be recovered for your account. Contact support and do not pay again.' }); return true;
-      }
-      state = {
-        userId: customer.id, requestSha256: notes.request_sha256.toLowerCase(),
-        amountPaise: razorOrder.amount, currency: razorOrder.currency,
-        status: 'CREATED', createdAt: new Date().toISOString(),
-        supabaseOrderId, originalPath: null
-      };
+    if (!reconcile) {
+      const expectedSignature = crypto.createHmac('sha256', razorpayKeySecret).update(`${razorOrderId}|${paymentId}`).digest('hex');
+      if (!safeEqualHex(signature, expectedSignature)) { jsonResponse(response, 402, { error: 'Payment signature could not be verified. Your file was not submitted.' }); return true; }
+    }
+    if (reconcile || !state) {
+      state = await recoverPaymentState(razorOrderId, customer, state);
+      if (!state) { jsonResponse(response, 404, { error: 'This payment request could not be recovered for your account. Contact support and do not pay again.' }); return true; }
     }
     const payment = await razorpayApi(`payments/${encodeURIComponent(paymentId)}`);
     if (payment.order_id !== razorOrderId || payment.status !== 'captured' || payment.amount !== state.amountPaise || payment.currency !== state.currency) {
@@ -572,6 +584,9 @@ async function handleCompletePayment(request, response) {
     const fileBytes = Buffer.from(String(body?.fileBase64 || ''), 'base64');
     if (fileBytes.length !== order.originalSize || fileBytes.toString('base64') !== body.fileBase64 || crypto.createHash('sha256').update(fileBytes).digest('hex') !== order.originalSha256) {
       jsonResponse(response, 400, { error: 'The original file did not match the file selected before checkout. Your file was not submitted.' }); return true;
+    }
+    if (state.status === 'PAID' && state.uploaded && state.orderId) {
+      jsonResponse(response, 200, { status: 'PAID', orderId: state.orderId }); return true;
     }
     const existingTask = completingPayments.get(razorOrderId);
     if (existingTask) {
@@ -716,6 +731,7 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/pricing') return handlePricing(request, response);
   if (url.pathname === '/api/payment/create-order' || url.pathname === '/api/payments/orders') return handleCreatePaymentOrder(request, response);
   if (url.pathname === '/api/payment/verify' || url.pathname === '/api/payments/complete') return handleCompletePayment(request, response);
+  if (url.pathname === '/api/payment/reconcile') return handleCompletePayment(request, response, { reconcile: true });
   if (url.pathname === '/api/admin/payment-status') return handleAdminPaymentStatus(request, response);
   if (url.pathname === '/api/health') {
     response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
