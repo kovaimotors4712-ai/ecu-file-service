@@ -60,6 +60,7 @@ const paymentOrderAttempts = new Map();
 // when inherited proxy variables point at a local development proxy.
 const outboundHttpsAgent = new https.Agent({ keepAlive: true, maxSockets: 32, rejectUnauthorized: true });
 const maxUpstreamResponseBytes = 75 * 1024 * 1024;
+let testUpstreamRequest = null;
 
 function isAllowedCorsOrigin(origin) {
   try {
@@ -71,6 +72,7 @@ function isAllowedCorsOrigin(origin) {
 }
 
 function requestHttps(urlValue, { method = 'GET', headers = {}, body, timeoutMs = 15000 } = {}) {
+  if (testUpstreamRequest) return testUpstreamRequest(urlValue, { method, headers, body, timeoutMs });
   const url = new URL(urlValue);
   if (url.protocol !== 'https:' || !(url.hostname === 'api.razorpay.com' || (supabaseHostname && url.hostname === supabaseHostname))) {
     return Promise.reject(new Error('Blocked unsupported upstream HTTPS destination.'));
@@ -140,6 +142,18 @@ function hasRazorpayConfig() {
   return validTestCredentials && paymentProofReady && !paymentStateDirInsideWebRoot && (paymentGateSchemaReady || developmentTestBypass);
 }
 
+function paymentReadinessChecks() {
+  return {
+    supabaseUrl: /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(supabaseUrl),
+    supabasePublicKey: isPublicClientKey(supabaseAnonKey),
+    razorpayTestKeyId: /^rzp_test_[A-Za-z0-9]+$/.test(razorpayKeyId),
+    razorpayKeySecret: razorpayKeySecret.length >= 16,
+    paymentProofSecret: paymentGateProofSecret.length >= 32,
+    paymentStateDirectoryOutsideWebRoot: !paymentStateDirInsideWebRoot,
+    schemaReady: paymentGateSchemaReady
+  };
+}
+
 function allowPaymentOrder(userId) {
   const now = Date.now();
   const attempts = (paymentOrderAttempts.get(userId) || []).filter(time => now - time < 10 * 60 * 1000);
@@ -157,8 +171,65 @@ function safeEqualHex(left, right) {
   return crypto.timingSafeEqual(Buffer.from(left, 'hex'), Buffer.from(right, 'hex'));
 }
 
+function sanitizeRpcErrorMessage(value, category, code) {
+  const text = String(value || '').toLowerCase();
+  if (category === 'RPC_NOT_FOUND') return 'Paid-order RPC is not available.';
+  if (category === 'RPC_HASH_MISMATCH') return 'Payment request hash mismatch.';
+  if (category === 'RPC_PROOF_INVALID') return 'Payment proof was rejected.';
+  if (category === 'RPC_RLS_ERROR') return 'Database row-level security rejected the operation.';
+  if (category === 'RPC_AUTH_ERROR') return 'RPC authentication or execution permission was rejected.';
+  if (category === 'RPC_SCHEMA_ERROR') return 'The paid-order RPC schema contract is unavailable.';
+  if (category === 'RPC_ARGUMENT_ERROR') return 'The paid-order RPC rejected its arguments.';
+  if (category === 'RPC_CONFIGURATION_ERROR') return 'Payment verification configuration is unavailable.';
+  if (/request hash mismatch/.test(text)) return 'Payment request hash mismatch.';
+  if (/payment server proof is invalid/.test(text)) return 'Payment proof was rejected.';
+  return code ? `Supabase RPC returned an unclassified error (${code}).` : 'Supabase RPC returned an unclassified error.';
+}
+
+function classifyPaidOrderRpcError(code, message, status) {
+  const text = String(message || '').toLowerCase();
+  if (code === 'PGRST202' || code === '42883' || /function .*efsi_create_paid_order.*(not found|does not exist)/i.test(text)) return 'RPC_NOT_FOUND';
+  if (/request hash mismatch/.test(text)) return 'RPC_HASH_MISMATCH';
+  if (/payment server proof is invalid/.test(text)) return 'RPC_PROOF_INVALID';
+  if (/row-level security|row level security/.test(text)) return 'RPC_RLS_ERROR';
+  if (/payment verification is not configured|payment verification.*not configured/.test(text)) return 'RPC_CONFIGURATION_ERROR';
+  if (code === 'PGRST301' || code === '28000' || status === 401 || status === 403 || code === '42501') return 'RPC_AUTH_ERROR';
+  if (/^PGRST20[45]$/.test(code || '') || /^42/.test(code || '')) return 'RPC_SCHEMA_ERROR';
+  if (code === '22023' || /invalid verified payment data|invalid order data|invalid input syntax|argument/i.test(text)) return 'RPC_ARGUMENT_ERROR';
+  return 'RPC_UNKNOWN_ERROR';
+}
+
+function paidOrderRpcFailure({ status, payload, fallbackMessage = 'Supabase RPC returned an unreadable error.' }) {
+  const code = typeof payload?.code === 'string' && /^[A-Z0-9]{4,10}$/.test(payload.code) ? payload.code : null;
+  const upstreamMessage = typeof payload?.message === 'string' ? payload.message : fallbackMessage;
+  const category = classifyPaidOrderRpcError(code, upstreamMessage, status);
+  const safeMessage = sanitizeRpcErrorMessage(upstreamMessage, category, code);
+  console.error('[payment] paid-order RPC failed', {
+    endpoint: '/api/payment/verify',
+    operation: 'create_paid_order',
+    rpcFunction: 'public.efsi_create_paid_order',
+    httpStatus: Number.isInteger(status) ? status : null,
+    supabaseErrorCode: code,
+    errorCategory: category,
+    errorMessage: safeMessage
+  });
+  const error = new Error('Payment was verified, but your request could not be completed. Keep this page open and retry confirmation; do not pay again.');
+  error.code = 'PAID_ORDER_RPC_FAILURE';
+  error.rpcCategory = category;
+  error.statusCode = 502;
+  return error;
+}
+
 function orderHash(order) {
   return crypto.createHash('sha256').update(JSON.stringify(order)).digest('hex');
+}
+
+function recoveredSupabaseOrderId(razorpayOrderId) {
+  const bytes = crypto.createHash('sha256').update(`EFSI_PAYMENT_ORDER_ID_V1|${razorpayOrderId}`).digest().subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x80;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function normalizePaymentRequest(value) {
@@ -315,19 +386,21 @@ async function handleCreatePaymentOrder(request, response) {
     const price = readPricing().fileVerificationPricePaise;
     if (!Number.isSafeInteger(price) || price < 1) { jsonResponse(response, 503, { error: 'The verification fee is unavailable.' }); return true; }
     console.info('[payment] creating Razorpay Test Mode order', { amountPaise: price, currency: 'INR' });
+    const supabaseOrderId = crypto.randomUUID();
     const razorOrder = await razorpayApi('orders', { method: 'POST', body: {
       amount: price, currency: 'INR', receipt: `efsi_${crypto.randomUUID().replaceAll('-', '').slice(0, 32)}`,
-      notes: { customer_id: customer.id, request_sha256: expectedHash, service: 'File Verification & Support Fee' }
+      notes: { customer_id: customer.id, request_sha256: expectedHash, supabase_order_id: supabaseOrderId, service: 'File Verification & Support Fee' }
     } });
-    if (!/^order_[A-Za-z0-9]+$/.test(String(razorOrder?.id || '')) || razorOrder.amount !== price || razorOrder.currency !== 'INR') {
-      console.error('[payment] Razorpay order response failed safe validation.', { orderIdReceived: Boolean(razorOrder?.id), amountMatches: razorOrder?.amount === price, currencyMatches: razorOrder?.currency === 'INR' });
+    const notesMatch = razorOrder?.notes?.customer_id === customer.id && razorOrder.notes.request_sha256 === expectedHash && razorOrder.notes.supabase_order_id === supabaseOrderId;
+    if (!/^order_[A-Za-z0-9]+$/.test(String(razorOrder?.id || '')) || razorOrder.amount !== price || razorOrder.currency !== 'INR' || !notesMatch) {
+      console.error('[payment] Razorpay order response failed safe validation.', { orderIdReceived: Boolean(razorOrder?.id), amountMatches: razorOrder?.amount === price, currencyMatches: razorOrder?.currency === 'INR', notesMatch });
       jsonResponse(response, 502, { error: 'Razorpay returned an invalid checkout order. Your file was not submitted; please retry.' }); return true;
     }
     console.info('[payment] Razorpay order response validated.', { orderIdReceived: true, amountPaise: razorOrder.amount, currency: razorOrder.currency });
     const state = {
       userId: customer.id, requestSha256: expectedHash, amountPaise: price,
       currency: 'INR', status: 'CREATED', createdAt: new Date().toISOString(),
-      supabaseOrderId: crypto.randomUUID(), originalPath: null
+      supabaseOrderId, originalPath: null
     };
     try { await writePaymentState(razorOrder.id, state); }
     catch { jsonResponse(response, 503, { error: 'The secure payment request could not be saved. No file request was submitted.' }); return true; }
@@ -355,24 +428,37 @@ async function supabaseCustomerRequest(customer, route, options = {}) {
 async function createPaidSupabaseOrder(customer, state, order, payment) {
   const proofPayload = ['EFSI_PAYMENT_CONFIRMATION_V1', customer.id, state.supabaseOrderId, payment.orderId, payment.paymentId, state.amountPaise, state.requestSha256].join('|');
   const paymentProof = crypto.createHmac('sha256', paymentGateProofSecret).update(proofPayload).digest('hex');
-  const rpcResponse = await supabaseCustomerRequest(customer, 'rest/v1/rpc/efsi_create_paid_order', { method: 'POST', body: {
-    p_order_id: state.supabaseOrderId,
-    p_payment_order_id: payment.orderId,
-    p_payment_id: payment.paymentId,
-    p_amount_paise: state.amountPaise,
-    p_request_sha256: state.requestSha256,
-    p_payment_proof: paymentProof,
-    p_order_json: JSON.stringify({
-      category: order.category, vehicleBrand: order.vehicleBrand, vehicleType: order.vehicleType,
-      vehicleModel: order.vehicleModel, vehicleYear: order.vehicleYear, ecuManufacturer: order.ecuManufacturer,
-      ecuModel: order.ecuModel, readingTool: order.readingTool, selectedServices: order.selectedServices,
-      notes: order.notes, contactName: order.contactName, contactPhone: order.contactPhone, contactEmail: order.contactEmail,
-      originalName: order.originalName, originalMime: order.originalMime, originalSize: order.originalSize, originalSha256: order.originalSha256
-    })
-  } });
-  if (!rpcResponse.ok) throw new Error('Payment was verified, but the secure paid-order database function is not installed or rejected the request. Contact support with the payment reference.');
-  const rpcResult = await rpcResponse.json();
-  if (rpcResult !== state.supabaseOrderId && rpcResult?.id !== state.supabaseOrderId) throw new Error('The paid order could not be confirmed by the database. Contact support with the payment reference.');
+  let rpcResponse;
+  try {
+    rpcResponse = await supabaseCustomerRequest(customer, 'rest/v1/rpc/efsi_create_paid_order', { method: 'POST', body: {
+      p_order_id: state.supabaseOrderId,
+      p_payment_order_id: payment.orderId,
+      p_payment_id: payment.paymentId,
+      p_amount_paise: state.amountPaise,
+      p_request_sha256: state.requestSha256,
+      p_payment_proof: paymentProof,
+      p_order_json: JSON.stringify({
+        category: order.category, vehicleBrand: order.vehicleBrand, vehicleType: order.vehicleType,
+        vehicleModel: order.vehicleModel, vehicleYear: order.vehicleYear, ecuManufacturer: order.ecuManufacturer,
+        ecuModel: order.ecuModel, readingTool: order.readingTool, selectedServices: order.selectedServices,
+        notes: order.notes, contactName: order.contactName, contactPhone: order.contactPhone, contactEmail: order.contactEmail,
+        originalName: order.originalName, originalMime: order.originalMime, originalSize: order.originalSize, originalSha256: order.originalSha256
+      })
+    } });
+  } catch (error) {
+    throw paidOrderRpcFailure({ status: null, payload: { message: error?.message }, fallbackMessage: 'Supabase RPC request failed before a response.' });
+  }
+  if (!rpcResponse.ok) {
+    let payload;
+    try { payload = await rpcResponse.json(); } catch {}
+    throw paidOrderRpcFailure({ status: rpcResponse.status, payload });
+  }
+  let rpcResult;
+  try { rpcResult = await rpcResponse.json(); }
+  catch { throw paidOrderRpcFailure({ status: rpcResponse.status, fallbackMessage: 'RPC returned an unreadable response.' }); }
+  if (rpcResult !== state.supabaseOrderId && rpcResult?.id !== state.supabaseOrderId) {
+    throw paidOrderRpcFailure({ status: rpcResponse.status, fallbackMessage: 'RPC returned an unexpected order reference.' });
+  }
 
   const safeName = order.originalName.normalize('NFKD').replace(/[^\w.-]+/g, '_').slice(-180) || 'original.bin';
   const objectPath = state.originalPath || `${customer.id}/${state.supabaseOrderId}/original/${order.originalSha256}_${safeName}`;
@@ -450,13 +536,33 @@ async function handleCompletePayment(request, response) {
     const razorOrderId = String(body?.razorpay_order_id || '');
     const paymentId = String(body?.razorpay_payment_id || '');
     const signature = String(body?.razorpay_signature || '');
-    const state = await readPaymentState(razorOrderId);
-    if (!state || state.userId !== customer.id) { jsonResponse(response, 404, { error: 'This payment request could not be found for your account.' }); return true; }
-    if (state.status === 'PAID' && state.uploaded && state.orderId) {
+    let state = await readPaymentState(razorOrderId);
+    if (state && state.userId !== customer.id) { jsonResponse(response, 404, { error: 'This payment request could not be found for your account.' }); return true; }
+    if (state?.status === 'PAID' && state.uploaded && state.orderId) {
       jsonResponse(response, 200, { status: 'PAID', orderId: state.orderId }); return true;
     }
     const expectedSignature = crypto.createHmac('sha256', razorpayKeySecret).update(`${razorOrderId}|${paymentId}`).digest('hex');
     if (!safeEqualHex(signature, expectedSignature)) { jsonResponse(response, 402, { error: 'Payment signature could not be verified. Your file was not submitted.' }); return true; }
+    if (!state) {
+      const razorOrder = await razorpayApi(`orders/${encodeURIComponent(razorOrderId)}`);
+      const notes = razorOrder?.notes || {};
+      const notedOrderId = String(notes.supabase_order_id || '');
+      const supabaseOrderId = notedOrderId
+        ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(notedOrderId) ? notedOrderId : null
+        : recoveredSupabaseOrderId(razorOrderId);
+      if (razorOrder?.id !== razorOrderId || notes.customer_id !== customer.id ||
+          !supabaseOrderId ||
+          !/^[a-f0-9]{64}$/i.test(String(notes.request_sha256 || '')) ||
+          !Number.isSafeInteger(razorOrder.amount) || razorOrder.amount < 1 || razorOrder.amount > maxFileVerificationPricePaise || razorOrder.currency !== 'INR') {
+        jsonResponse(response, 404, { error: 'This payment request could not be recovered for your account. Contact support and do not pay again.' }); return true;
+      }
+      state = {
+        userId: customer.id, requestSha256: notes.request_sha256.toLowerCase(),
+        amountPaise: razorOrder.amount, currency: razorOrder.currency,
+        status: 'CREATED', createdAt: new Date().toISOString(),
+        supabaseOrderId, originalPath: null
+      };
+    }
     const payment = await razorpayApi(`payments/${encodeURIComponent(paymentId)}`);
     if (payment.order_id !== razorOrderId || payment.status !== 'captured' || payment.amount !== state.amountPaise || payment.currency !== state.currency) {
       jsonResponse(response, 402, { error: 'The payment is not confirmed as captured for the required amount. Your file was not submitted.' }); return true;
@@ -485,6 +591,9 @@ async function handleCompletePayment(request, response) {
       jsonResponse(response, 200, { status: 'PAID', orderId: result.id });
     } finally { completingPayments.delete(razorOrderId); }
   } catch (error) {
+    if (error.code === 'PAID_ORDER_RPC_FAILURE') {
+      jsonResponse(response, error.statusCode || 502, { error: error.message }); return true;
+    }
     jsonResponse(response, error.code === 'RAZORPAY_UPSTREAM' ? 502 : 400, { error: error.message || 'Payment could not be verified. The file was not submitted.' });
   }
   return true;
@@ -610,7 +719,7 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/admin/payment-status') return handleAdminPaymentStatus(request, response);
   if (url.pathname === '/api/health') {
     response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-    response.end(JSON.stringify({ configured: hasSafeSupabaseConfig, paymentConfigured: hasRazorpayConfig() }));
+    response.end(JSON.stringify({ configured: hasSafeSupabaseConfig, paymentConfigured: hasRazorpayConfig(), paymentReadiness: paymentReadinessChecks() }));
     return true;
   }
 
@@ -661,7 +770,8 @@ async function handleApi(request, response, url) {
   return true;
 }
 
-http.createServer((request, response) => {
+function createHttpServer() {
+  return http.createServer((request, response) => {
   const requestUrl = new URL(request.url, 'http://localhost');
   const origin = request.headers.origin;
   if (origin) {
@@ -701,6 +811,19 @@ http.createServer((request, response) => {
     response.writeHead(200, { 'Content-Type': mime[path.extname(target)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' });
     response.end(contents);
   });
-}).listen(port, '0.0.0.0', () => {
-  console.log(`ECU File Service India is listening on port ${port}`);
-});
+  });
+}
+
+if (require.main === module) {
+  createHttpServer().listen(port, '0.0.0.0', () => {
+    console.log(`ECU File Service India is listening on port ${port}`);
+  });
+} else if (process.env.NODE_ENV === 'test') {
+  module.exports = {
+    createHttpServer,
+    setTestUpstreamRequest(handler) {
+      if (handler !== null && typeof handler !== 'function') throw new TypeError('Test upstream must be a function or null.');
+      testUpstreamRequest = handler;
+    }
+  };
+}
