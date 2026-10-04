@@ -299,7 +299,11 @@ async function createCheckoutIntent(customer, order) {
     const retry = await supabaseRequest(token, `rest/v1/checkout_intents?select=id,status,amount_paise,currency,request_sha256,original_name,original_mime,original_size,original_sha256,storage_path,payment_provider,provider_order_id,provider_payment_id,payment_status,expires_at,order_id,created_at,updated_at&customer_id=eq.${encodeURIComponent(customer.id)}&request_sha256=eq.${expectedHash}&status=in.(DRAFT,FILE_STAGED,PAYMENT_PENDING)&order=created_at.desc&limit=1`, { timeoutMs: 15000 });
     if (retry.ok) { const rows = await retry.json(); if (rows?.[0]) return rows[0]; }
   }
-  if (!response.ok) throw new Error('The secure checkout could not be saved. Please retry.');
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    console.error('Diagnostic [Supabase Insert checkout_intents]:', response.status, JSON.stringify(errorData));
+    throw new Error(`The secure checkout could not be saved (Supabase ${response.status}: ${JSON.stringify(errorData)}). Please retry.`);
+  }
   const rows = await response.json();
   return rows?.[0] || payload;
 }
@@ -312,9 +316,18 @@ async function handleCreateCheckoutIntent(request, response) {
     if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error: 'Durable checkout storage is not configured on this server.' }); return true; }
     const body = await readJson(request);
     const order = normalizePaymentRequest(body?.request);
-    const intent = await createCheckoutIntent(customer, order);
+    console.log('Diagnostic [handleCreateCheckoutIntent] Request:', JSON.stringify(order));
+  const intent = await createCheckoutIntent(customer, order);
+  console.log('Diagnostic [handleCreateCheckoutIntent] Intent Created:', intent.id);
     jsonResponse(response, 200, { intentId: intent.id, status: intent.status, amount: intent.amount_paise, currency: intent.currency, storagePath: intent.storage_path, expiresAt: intent.expires_at, requestSha256: intent.request_sha256 });
-  } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Checkout could not be saved.' }); }
+  } catch (error) {
+    console.error('Diagnostic [handleCreateCheckoutIntent]:', error);
+    if (error.statusCode) {
+      jsonResponse(response, error.statusCode, { error: error.message });
+    } else {
+      jsonResponse(response, 400, { error: `Checkout save failed: ${error.message}` });
+    }
+  }
   return true;
 }
 
@@ -848,7 +861,7 @@ function createHttpServer() {
     const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
     if (!publicFiles.has(relative)) { response.writeHead(404).end('Not found'); return; }
     const target = path.join(root, relative);
-    fs.readFile(target, (error, contents) => { if (error) { response.writeHead(error.code === 'ENOENT' ? 404 : 500, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found'); return; } response.writeHead(200, { 'Content-Type': mime[path.extname(target)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' }); response.end(contents); });
+    fs.readFile(target, (error, contents) => { if (error) { response.writeHead(error.code === 'ENOENT' ? 404 : 500, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found'); return; } const cacheControl = relative.endsWith('.html') ? 'no-store' : 'no-cache, must-revalidate'; response.writeHead(200, { 'Content-Type': mime[path.extname(target)] || 'application/octet-stream', 'Cache-Control': cacheControl, 'X-Content-Type-Options': 'nosniff' }); response.end(contents); });
   });
   return server;
 }
