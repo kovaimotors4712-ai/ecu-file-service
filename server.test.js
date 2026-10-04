@@ -759,6 +759,20 @@ test('no legacy local payment state remains in the production server', () => {
   assert.doesNotMatch(serverSource,/paymentStateDir/i);
 });
 
+test('customer frontend declares payment readiness before initial summary rendering', () => {
+  const source = fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
+  assert.match(source,/let providerReadiness\s*=\s*\{\s*razorpay:\s*false,\s*paypal:\s*false\s*\}/);
+  assert.match(source,/next-button.*validatePage\(currentPage\).*setPage\(currentPage\+1\)/s);
+  assert.match(source,/input\[name=consent\]/);
+});
+
+test('customer review page keeps authorization consent visible with payment controls', () => {
+  const html = fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+  const consent = html.indexOf('name="consent"');
+  const gatewayActions = html.indexOf('class="payment-gateway-actions"');
+  assert.ok(consent >= 0 && gatewayActions >= 0 && consent < gatewayActions);
+});
+
 test('server JavaScript syntax is valid for every runtime file', () => {
   const { execFileSync } = require('node:child_process');
   for (const name of ['server.js','app.js','auth.js','admin.js','supabase.js','dev-checkout.js']) execFileSync(process.execPath,['--check',path.join(__dirname,name)]);

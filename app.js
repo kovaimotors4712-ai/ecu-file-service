@@ -13,6 +13,7 @@
   let activeBrandOption = -1;
   let fileVerificationPricePaise = null;
   let paymentReady = false;
+  let providerReadiness = { razorpay: false, paypal: false };
   let checkoutStarting = false;
   let activeIntent = null;
   let activeProvider = null;
@@ -24,7 +25,7 @@
   function formatINR(paise) { return new Intl.NumberFormat('en-IN', { style:'currency', currency:'INR', minimumFractionDigits:0, maximumFractionDigits:2 }).format(paise / 100); }
   function setError(index, text) { const box = pages[index]?.querySelector('.form-error'); if (box) { box.textContent = text; box.classList.toggle('visible', Boolean(text)); } }
   function clearError(index) { setError(index, ''); }
-  function setPage(index) { currentPage = index; pages.forEach((page,i)=>page.classList.toggle('active', i===index)); progress.forEach((step,i)=>step.classList.toggle('active', i<=Math.min(index,progress.length-1))); document.querySelector('.order-form')?.scrollIntoView({behavior:'smooth',block:'start'}); updateSummary(); }
+  function setPage(index) { clearError(index); currentPage = index; pages.forEach((page,i)=>page.classList.toggle('active', i===index)); progress.forEach((step,i)=>step.classList.toggle('active', i<=Math.min(index,progress.length-1))); document.querySelector('.order-form')?.scrollIntoView({behavior:'smooth',block:'start'}); updateSummary(); }
 
   function normalizeFormData({ includeFile = true } = {}) {
     const data = new FormData(form);
