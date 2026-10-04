@@ -53,8 +53,7 @@
       if (!fileInput.files[0] && !fileStagedInStorage) { setError(index, 'Select your original file before continuing.'); return false; }
       if (fileInput.files[0] && fileInput.files[0].size > maxFileSize) { setError(index, 'The original file must be 50 MB or smaller.'); return false; }
       if (!values.contactName || !values.contactPhone) { setError(index, 'Your name and phone are required.'); return false; }
-      const consent = form.querySelector('input[name="consent"]'); if (consent && !consent.checked) { setError(index, 'Please confirm you are authorised to request this service.'); return false; }
-    }
+          }
     if (index === 5) {
       if (!values.vehicleBrand || !values.vehicleType || !values.vehicleModel || !values.selectedServices.length) { setError(index, 'Complete the required request details before payment.'); return false; }
       if (!values.contactName || !values.contactPhone) { setError(index, 'Your name and phone are required before payment.'); return false; }
@@ -182,3 +181,4 @@
   updateSummary();
   resumePaypalReturn();
 })();
+
