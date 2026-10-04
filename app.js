@@ -1,544 +1,184 @@
 (() => {
   const form = document.querySelector('#order-form');
+  if (!form) return;
   const pages = [...document.querySelectorAll('.form-page')];
   const progress = [...document.querySelectorAll('.progress-step')];
   const fileInput = document.querySelector('#original-file');
   const verificationPriceLabel = document.querySelector('#verification-price');
   const brandInput = document.querySelector('#brand');
   const brandResults = document.querySelector('#brand-results');
-  const paymentRecovery = document.createElement('details');
-  paymentRecovery.className = 'payment-recovery';
-  paymentRecovery.innerHTML = '<summary>Already paid? Recover this request</summary><p>Enter the Razorpay references for this payment. Your request details and original file must match what you submitted before checkout.</p><div class="field-row"><div class="field"><label for="recovery-order-id">Razorpay order ID</label><input id="recovery-order-id" autocomplete="off" spellcheck="false" placeholder="order_…"></div><div class="field"><label for="recovery-payment-id">Razorpay payment ID</label><input id="recovery-payment-id" autocomplete="off" spellcheck="false" placeholder="pay_…"></div></div><button class="button button-dark recovery-submit" type="button">Verify existing payment</button>';
-  document.querySelector('.verification-status').after(paymentRecovery);
   const maxFileSize = 50 * 1024 * 1024;
+  const brands = ['Ather','Bajaj','BYD','Citroën','Daewoo','Datsun','Eicher','Force Motors','Honda','Hyundai','Isuzu','JCB','Jeep','Kia','Kubota','Land Rover','Mahindra','Mahindra Truck and Bus','Mahindra Tractors','Maruti Suzuki','Mercedes-Benz','MG Motor','Mitsubishi','Nissan','OLA Electric','Piaggio Commercial Vehicles','Porsche','Renault','Royal Enfield','Scania Industrial','Skoda','SML Isuzu','Sonalika','Suzuki','Tata Motors','Tata Motors Commercial Vehicles','TAFE','Toyota','TVS','Volkswagen','Volvo Construction Equipment','VST Tillers Tractors','Yanmar','Other / Not Listed'];
   let currentPage = 0;
   let activeBrandOption = -1;
-  let savedOrderId = null;
   let fileVerificationPricePaise = null;
-  let capturedPayment = null;
   let paymentReady = false;
-  let razorpayScriptPromise = null;
   let checkoutStarting = false;
-  let reconciliationStarting = false;
+  let activeIntent = null;
+  let activeProvider = null;
+  let razorpayScriptPromise = null;
+  let fileStagedInStorage = false;
+  let originalFileSha256 = '';
 
-  function loadRazorpayCheckout(timeoutMs = 12000) {
-    if (typeof window.Razorpay === 'function') return Promise.resolve(window.Razorpay);
-    if (razorpayScriptPromise) return razorpayScriptPromise;
-    razorpayScriptPromise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      let settled = false;
-      const finish = (error) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        script.onload = null;
-        script.onerror = null;
-        if (error) reject(error);
-        else if (typeof window.Razorpay === 'function') resolve(window.Razorpay);
-        else reject(new Error('Razorpay Checkout loaded without its checkout API. Reload the page and retry.'));
-      };
-      const timer = setTimeout(() => finish(new Error('Razorpay Checkout did not load in time. Check your connection and retry.')), timeoutMs);
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.async = true;
-      script.dataset.razorpayCheckout = 'true';
-      script.onload = () => finish();
-      script.onerror = () => finish(new Error('Razorpay Checkout could not load. Check your connection or content blocker and retry.'));
-      document.head.appendChild(script);
-    }).catch(error => {
-      razorpayScriptPromise = null;
-      throw error;
-    });
-    return razorpayScriptPromise;
-  }
+  function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  function formatINR(paise) { return new Intl.NumberFormat('en-IN', { style:'currency', currency:'INR', minimumFractionDigits:0, maximumFractionDigits:2 }).format(paise / 100); }
+  function setError(index, text) { const box = pages[index]?.querySelector('.form-error'); if (box) { box.textContent = text; box.classList.toggle('visible', Boolean(text)); } }
+  function clearError(index) { setError(index, ''); }
+  function setPage(index) { currentPage = index; pages.forEach((page,i)=>page.classList.toggle('active', i===index)); progress.forEach((step,i)=>step.classList.toggle('active', i<=Math.min(index,progress.length-1))); document.querySelector('.order-form')?.scrollIntoView({behavior:'smooth',block:'start'}); updateSummary(); }
 
-  async function fetchJsonWithTimeout(url, options, timeoutMs, timeoutMessage) {
-    let response;
-    try { response = await fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) }); }
-    catch (error) {
-      if (error.name === 'TimeoutError' || error.name === 'AbortError') throw new Error(timeoutMessage);
-      throw new Error('The secure payment server could not be reached. Your file was not submitted; please retry.');
-    }
-    let result;
-    try { result = await response.json(); }
-    catch { throw new Error(`The secure payment server returned an unreadable response (HTTP ${response.status}). Your file was not submitted.`); }
-    return { response, result };
-  }
-
-  function withTimeout(promise, timeoutMs, timeoutMessage) {
-    let timer;
-    return Promise.race([
-      Promise.resolve(promise),
-      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs); })
-    ]).finally(() => clearTimeout(timer));
-  }
-
-  const brandGroups = [
-    ['Indian passenger & EV', ['Ather', 'Bajaj', 'Bajaj Auto', 'BYD', 'Citroën', 'DC2', 'Hindustan Motors', 'Isuzu', 'Kinetic', 'LML', 'Mahindra', 'Mahindra Electric', 'Maruti Suzuki', 'MG Motor', 'Morris Garages', 'OLA Electric', 'Premier', 'Pravaig', 'Revolt', 'Royal Enfield', 'Strom Motors', 'Tata Motors', 'Tork Motors', 'TVS', 'VinFast']],
-    ['Indian commercial & bus', ['AMW', 'Ashok Leyland', 'Atul Auto', 'BharatBenz', 'Bharat Earth Movers (BEML)', 'Eicher', 'Force Motors', 'JBM Auto', 'Mahindra Truck and Bus', 'Olectra Greentech', 'Piaggio Commercial Vehicles', 'SML Isuzu', 'Tata Daewoo', 'Tata Motors Commercial Vehicles', 'VE Commercial Vehicles']],
-    ['Tractor & agricultural', ['ACE (Action Construction Equipment)', 'Captain Tractors', 'Eicher Tractors', 'Escorts Kubota', 'Farmtrac', 'Hindustan Tractors', 'John Deere', 'Kubota', 'Mahindra Tractors', 'New Holland Agriculture', 'Preet', 'Sonalika', 'Swaraj', 'TAFE', 'VST Tillers Tractors', 'Yanmar']],
-    ['Construction & off-road', ['Atlas Copco', 'BEML', 'Bobcat', 'Caterpillar', 'CASE Construction', 'Doosan', 'Eicher Construction', 'Hitachi', 'Hyundai Construction Equipment', 'JCB', 'Komatsu', 'Liebherr', 'LiuGong', 'Manitou', 'SANY', 'Scania Industrial', 'Tata Hitachi', 'Terex', 'Volvo Construction Equipment', 'Wirtgen']],
-    ['Japanese & Korean', ['Daewoo', 'Datsun', 'Genesis', 'Honda', 'Hyundai', 'Infiniti', 'Isuzu', 'Kia', 'Lexus', 'Mazda', 'Mitsubishi', 'Nissan', 'SsangYong / KGM', 'Subaru', 'Suzuki', 'Toyota']],
-    ['European', ['Abarth', 'Alfa Romeo', 'Aston Martin', 'Bentley', 'Bugatti', 'Citroën', 'Cupra', 'Dacia', 'DS Automobiles', 'Ferrari', 'Fiat', 'Jaguar', 'Lamborghini', 'Land Rover', 'Lotus', 'Maserati', 'McLaren', 'Mercedes-Benz', 'MINI', 'Opel', 'Peugeot', 'Porsche', 'Renault', 'Rolls-Royce', 'SEAT', 'Škoda', 'Smart', 'Volkswagen', 'Volvo']],
-    ['Other international & premium', ['Acura', 'Cadillac', 'Chevrolet', 'Chrysler', 'Dodge', 'GMC', 'Hummer', 'Jeep', 'Lucid', 'Polestar', 'Rivian', 'Tesla', 'Other / Not Listed']]
-  ];
-
-  document.querySelector('#year').textContent = new Date().getFullYear();
-
-  function formatINR(paise) {
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(paise / 100);
-  }
-
-  async function loadPricing() {
-    try {
-      const response = await fetch('/api/pricing', { cache: 'no-store', signal: AbortSignal.timeout(7000) });
-      if (!response.ok) throw new Error('Pricing unavailable');
-      const pricing = await response.json();
-      if (pricing.currency !== 'INR' || !Number.isSafeInteger(pricing.fileVerificationPricePaise) || pricing.fileVerificationPricePaise < 0) throw new Error('Invalid pricing');
-      fileVerificationPricePaise = pricing.fileVerificationPricePaise;
-      const formattedFee = formatINR(fileVerificationPricePaise);
-      verificationPriceLabel.textContent = formattedFee;
-      document.querySelectorAll('[data-fee-inline]').forEach(label => { label.textContent = formattedFee; });
-      const submitButton = document.querySelector('.verification-submit');
-      submitButton.disabled = true;
-      const [healthResult, checkoutResult] = await Promise.allSettled([
-        fetch('/api/health', { cache: 'no-store', signal: AbortSignal.timeout(7000) }).then(response => {
-          if (!response.ok) throw new Error(`Health check failed (HTTP ${response.status}).`);
-          return response.json();
-        }),
-        loadRazorpayCheckout()
-      ]);
-      paymentReady = healthResult.status === 'fulfilled' && Boolean(healthResult.value.paymentConfigured);
-      const checkoutLoaded = checkoutResult.status === 'fulfilled';
-      submitButton.disabled = fileVerificationPricePaise < 1 || !paymentReady || !checkoutLoaded;
-      const status = document.querySelector('.verification-status');
-      status.textContent = !paymentReady
-        ? 'Secure payment is not configured or the payment server did not respond. Your file will not be submitted.'
-        : !checkoutLoaded
-          ? checkoutResult.reason?.message || 'Razorpay Checkout could not load. Your file will not be submitted.'
-          : 'Secure checkout verifies your payment before your order or file is submitted.';
-      if (!paymentReady) status.dataset.error = 'true';
-      else if (!checkoutLoaded) status.dataset.error = 'true';
-      else delete status.dataset.error;
-      updateSummary();
-    } catch {
-      verificationPriceLabel.textContent = 'Price unavailable';
-      document.querySelectorAll('[data-fee-inline]').forEach(label => { label.textContent = 'Price unavailable'; });
-      document.querySelector('.verification-submit').disabled = true;
-      paymentReady = false;
-      document.querySelector('.verification-status').textContent = 'The verification fee or payment service could not be loaded. Reload the page or contact support; your file will not be submitted.';
-      document.querySelector('.verification-status').dataset.error = 'true';
-      updateSummary();
-    }
-  }
-
-  function setPage(index) {
-    currentPage = index;
-    pages.forEach((page, i) => page.classList.toggle('active', i === index));
-    progress.forEach((step, i) => step.classList.toggle('active', i <= Math.min(index, progress.length - 1)));
-    document.querySelector('.order-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    if (index === 5) updateSummary();
-    if (index === 6) updateWhatsAppLink();
-  }
-
-  function showError(pageIndex, message) {
-    const box = pages[pageIndex].querySelector('.form-error');
-    box.textContent = message;
-    box.classList.add('visible');
-  }
-
-  function clearError(pageIndex) {
-    const box = pages[pageIndex]?.querySelector('.form-error');
-    if (box) { box.textContent = ''; box.classList.remove('visible'); }
+  function normalizeFormData({ includeFile = true } = {}) {
+    const data = new FormData(form);
+    const category = String(data.get('category') || 'ECU');
+    const isEcu = category === 'ECU';
+    return {
+      category,
+      vehicleBrand: String(data.get('brand') || '').trim(), vehicleType: String(data.get('vehicleType') || '').trim(), vehicleModel: String(data.get('vehicleModel') || '').trim(), vehicleYear: String(data.get('year') || '').trim(),
+      ecuManufacturer: isEcu ? String(data.get('ecuManufacturer') || '').trim() : '', ecuModel: isEcu ? String(data.get('ecuModel') || '').trim() : '', readingTool: isEcu ? String(data.get('readingTool') || '').trim() : '',
+      selectedServices: data.getAll('service'), notes: String(data.get('notes') || '').trim(), contactName: String(data.get('name') || '').trim(), contactPhone: String(data.get('phone') || '').trim(), contactEmail: String(data.get('email') || '').trim()
+    };
   }
 
   function validatePage(index) {
     clearError(index);
+    const values = normalizeFormData({ includeFile: false });
     if (index === 1) {
-      const missing = ['#brand', '#vehicle-type', '#vehicle-model'].some(selector => !form.querySelector(selector).value.trim());
-      if (missing) { showError(index, 'Please choose or enter a brand, vehicle type, and model or variant.'); return false; }
+      const year = values.vehicleYear;
+      if (!values.vehicleBrand || !values.vehicleType || !values.vehicleModel) { setError(index, 'Brand, vehicle type and model are required.'); return false; }
+      if (values.category !== 'ECU' && !year) { setError(index, 'Year is required for Airbag and Dashboard requests.'); return false; }
+      if (year && (!/^\d{4}$/.test(year) || Number(year)<1950 || Number(year)>2100)) { setError(index, 'Enter a valid vehicle year.'); return false; }
     }
-    if (index === 3 && !form.querySelector('input[name="service"]:checked')) {
-      showError(index, 'Please choose at least one file service to continue.'); return false;
-    }
+    if (index === 2 && values.category === 'ECU') { /* optional ECU details */ }
+    if (index === 3 && !values.selectedServices.length) { setError(index, 'Select at least one file service.'); return false; }
     if (index === 4) {
-      if (!fileInput.files[0]) {
-        showError(index, 'Please attach your original file before continuing to verification.'); return false;
-      }
-      if (!form.elements.name.value.trim() || !form.elements.phone.value.trim()) {
-        showError(index, 'Please enter your name and a WhatsApp or phone number.'); return false;
-      }
-      if (fileInput.files[0] && fileInput.files[0].size > maxFileSize) {
-        showError(index, 'That file is over 50 MB. Please compress it or contact us on WhatsApp.'); return false;
-      }
-      if (form.elements.email.value && !form.elements.email.validity.valid) {
-        showError(index, 'Please enter a valid email address or leave it blank.'); return false;
-      }
+      if (!fileInput.files[0] && !fileStagedInStorage) { setError(index, 'Select your original file before continuing.'); return false; }
+      if (fileInput.files[0] && fileInput.files[0].size > maxFileSize) { setError(index, 'The original file must be 50 MB or smaller.'); return false; }
+      if (!values.contactName || !values.contactPhone) { setError(index, 'Your name and phone are required.'); return false; }
+      const consent = form.querySelector('input[name="consent"]'); if (consent && !consent.checked) { setError(index, 'Please confirm you are authorised to request this service.'); return false; }
     }
-    if (index === 5 && !form.elements.consent.checked) {
-      showError(index, 'Please confirm you’re authorised to submit this request.'); return false;
+    if (index === 5) {
+      if (!values.vehicleBrand || !values.vehicleType || !values.vehicleModel || !values.selectedServices.length) { setError(index, 'Complete the required request details before payment.'); return false; }
+      if (!values.contactName || !values.contactPhone) { setError(index, 'Your name and phone are required before payment.'); return false; }
+      if (values.category !== 'ECU' && !values.vehicleYear) { setError(index, 'Year is required for this category.'); return false; }
     }
     return true;
   }
 
-  document.querySelectorAll('.next-button').forEach(button => button.addEventListener('click', () => {
-    if (validatePage(currentPage)) setPage(currentPage + 1);
-  }));
-  document.querySelectorAll('.button-back').forEach(button => button.addEventListener('click', () => setPage(Math.max(0, currentPage - 1))));
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    if (!validatePage(5)) return;
-    if (checkoutStarting || reconciliationStarting) return;
-    if (capturedPayment) {
-      await finishVerifiedPayment(capturedPayment);
-      return;
-    }
-    const submitButton = document.querySelector('.verification-submit');
-    const status = document.querySelector('.verification-status');
-    const backend = window.EfsiSupabase;
-    const session = backend?.getSession();
-    if (!session?.user?.id) {
-      showError(5, 'Sign in to your customer account before paying and submitting your file.');
-      return;
-    }
-    submitButton.disabled = true;
-    status.textContent = 'Checking your customer session…';
-    let token;
-    try { token = await withTimeout(backend?.getAccessToken(), 12000, 'Your sign-in session check timed out. Retry or sign in again.'); }
-    catch (error) {
-      submitButton.disabled = false;
-      status.textContent = 'Checkout could not be started. Your file was not submitted.';
-      showError(5, error.message);
-      return;
-    }
-    if (!session?.user?.id || !token) {
-      submitButton.disabled = false;
-      status.textContent = 'Checkout could not be started. Your file was not submitted.';
-      showError(5, 'Sign in to your customer account before paying and submitting your file.');
-      return;
-    }
-    if (!Number.isSafeInteger(fileVerificationPricePaise) || fileVerificationPricePaise < 1 || !paymentReady) {
-      submitButton.disabled = false;
-      status.textContent = 'Checkout could not be started. Your file was not submitted.';
-      showError(5, 'The secure payment service or verification fee is not ready. Reload the current fee and retry. Your file was not submitted.');
-      return;
-    }
-    checkoutStarting = true;
-    clearError(5);
-    status.textContent = 'Loading secure Razorpay Checkout…';
-    let checkoutStage = 'checkout-sdk';
-    try {
-      const RazorpayCheckout = await loadRazorpayCheckout();
-      const file = fileInput.files[0];
-      if (!file) throw new Error('Select your original file before starting checkout.');
-      const requestData = getPaymentRequestData(file);
-      checkoutStage = 'file-hash';
-      status.textContent = 'Preparing your secure file request…';
-      requestData.originalSha256 = await withTimeout(hashFile(file), 20000, 'Preparing the original file took too long. Try a smaller file or retry.');
-      checkoutStage = 'create-order';
-      console.info('[payment] create-order request started');
-      status.textContent = 'Requesting the ₹99 Test Mode order…';
-      const { response, result } = await fetchJsonWithTimeout('/api/payment/create-order', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ request: requestData })
-      }, 40000, 'The payment server did not respond within 40 seconds. No file was submitted; please retry.');
-      console.info('[payment] create-order response', { httpStatus: response.status, orderIdReceived: Boolean(result?.razorpayOrderId), amount: result?.amount, currency: result?.currency });
-      if (!response.ok) throw new Error(result.error || `Secure checkout request failed (HTTP ${response.status}).`);
-      if (!/^order_[A-Za-z0-9]+$/.test(String(result.razorpayOrderId || ''))) throw new Error('The payment server did not return a valid Razorpay order reference. Your file was not submitted.');
-      if (!/^rzp_test_[A-Za-z0-9]+$/.test(String(result.keyId || ''))) throw new Error('The server did not return a Razorpay Test Mode key. Checkout was stopped safely.');
-      if (result.amount !== fileVerificationPricePaise || result.currency !== 'INR') {
-        fileVerificationPricePaise = result.amount;
-        const latestFee = formatINR(result.amount);
-        verificationPriceLabel.textContent = latestFee;
-        document.querySelectorAll('[data-fee-inline]').forEach(label => { label.textContent = latestFee; });
-        updateSummary();
-        throw new Error('The verification fee changed. Please review the updated amount and submit again.');
-      }
-      checkoutStage = 'checkout-constructor';
-      const checkout = new RazorpayCheckout({
-        key: result.keyId, amount: result.amount, currency: result.currency, order_id: result.razorpayOrderId,
-        name: result.businessName, description: 'File Verification & Support Fee',
-        prefill: { name: requestData.contactName, email: requestData.contactEmail || undefined, contact: requestData.contactPhone },
-        theme: { color: '#829738' },
-        modal: { ondismiss: () => { checkoutStarting = false; submitButton.disabled = false; status.textContent = 'Checkout was closed. No file was submitted.'; } },
-        handler: async paymentResult => {
-          checkoutStarting = false;
-          capturedPayment = { ...paymentResult, requestData };
-          await finishVerifiedPayment(capturedPayment);
-        }
-      });
-      checkout.on('payment.failed', failure => {
-        checkoutStarting = false;
-        submitButton.disabled = false;
-        status.textContent = 'Payment was not completed. Your file was not submitted.';
-        showError(5, failure?.error?.description || 'Payment was not completed. Your file was not submitted.');
-      });
-      if (typeof checkout.open !== 'function') throw new Error('Razorpay Checkout was created but could not open. Reload the page and retry.');
-      console.info('[payment] checkout instance created');
-      checkoutStage = 'checkout-open';
-      status.textContent = 'Opening secure Razorpay Checkout…';
-      checkout.open();
-      console.info('[payment] checkout.open() invoked');
-      const opened = await waitForRazorpayFrame(8000);
-      if (!opened) {
-        try { checkout.close(); } catch {}
-        throw new Error('Razorpay Checkout did not finish loading. A browser content blocker or network filter may be blocking checkout. Your file was not submitted; close any blank checkout panel and retry in a browser that allows checkout.');
-      }
-      checkoutStarting = false;
-      status.textContent = 'Secure Razorpay Checkout is open. Complete payment or close the checkout to cancel.';
-    } catch (error) {
-      checkoutStarting = false;
-      submitButton.disabled = false;
-      status.textContent = 'Checkout could not be started. Your file was not submitted.';
-      showError(5, error.message || 'Checkout failed unexpectedly. Your file was not submitted; please retry.');
-      console.error('[payment] checkout initialization failed', { stage: checkoutStage, errorType: error.name || 'Error' });
-    }
-  });
-
-  paymentRecovery.querySelector('.recovery-submit').addEventListener('click', reconcileCapturedPayment);
-
-  async function reconcileCapturedPayment() {
-    if (reconciliationStarting || checkoutStarting) return;
-    if (!validatePage(5)) return;
-    const orderId = paymentRecovery.querySelector('#recovery-order-id').value.trim();
-    const paymentId = paymentRecovery.querySelector('#recovery-payment-id').value.trim();
-    const button = paymentRecovery.querySelector('.recovery-submit');
-    const submitButton = document.querySelector('.verification-submit');
-    const submitWasDisabled = submitButton.disabled;
-    const status = document.querySelector('.verification-status');
-    const backend = window.EfsiSupabase;
-    const session = backend?.getSession();
-    if (!session?.user?.id) { showError(5, 'Sign in to the customer account that made this payment before recovering the request.'); return; }
-    if (!/^order_[A-Za-z0-9]+$/.test(orderId) || !/^pay_[A-Za-z0-9]+$/.test(paymentId)) {
-      showError(5, 'Enter the Razorpay order ID and payment ID from your existing payment.'); return;
-    }
-    button.disabled = true;
-    submitButton.disabled = true;
-    reconciliationStarting = true;
-    status.textContent = 'Checking the existing Razorpay payment securely…';
-    try {
-      const token = await withTimeout(backend.getAccessToken(), 12000, 'Your sign-in session check timed out. Retry or sign in again.');
-      if (!token) throw new Error('Sign in to the customer account that made this payment before recovering the request.');
-      const file = fileInput.files[0];
-      if (!file) throw new Error('Re-select the exact original file submitted before checkout.');
-      const requestData = getPaymentRequestData(file);
-      requestData.originalSha256 = await withTimeout(hashFile(file), 20000, 'Preparing the original file took too long. Try again.');
-      const { response, result } = await fetchJsonWithTimeout('/api/payment/reconcile', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          razorpay_order_id: orderId, razorpay_payment_id: paymentId,
-          request: requestData, fileBase64: await fileToBase64(file)
-        })
-      }, 90000, 'Payment reconciliation is taking longer than expected. Keep this page open and retry; do not pay again.');
-      if (!response.ok || result.status !== 'PAID' || !result.orderId) throw new Error(result.error || 'The existing payment could not be reconciled. No order was submitted.');
-      savedOrderId = result.orderId;
-      status.textContent = 'Payment verified. Your original file is securely stored and your order is available to our service team.';
-      document.querySelector('.success-state > p').textContent = `Payment verified successfully. Your File Verification & Support Fee is ${formatINR(fileVerificationPricePaise)}. Order ${savedOrderId} and your original file are now securely available to our service team.`;
-      document.querySelector('.paid-order-reference').textContent = `Order reference: ${savedOrderId}`;
-      setPage(6);
-    } catch (error) {
-      status.textContent = 'Your request is not submitted yet. Use Verify existing payment to retry securely; do not pay again.';
-      showError(5, error.message);
-    } finally {
-      button.disabled = false;
-      submitButton.disabled = submitWasDisabled;
-      reconciliationStarting = false;
-    }
+  function applyCategoryFields() {
+    const category = String(new FormData(form).get('category') || 'ECU');
+    const ecu = category === 'ECU';
+    document.querySelectorAll('.ecu-only').forEach(el => { el.hidden = !ecu; el.querySelectorAll('input,select,textarea').forEach(control => { control.disabled = !ecu; if (!ecu) control.value = ''; }); });
+    const tool = document.querySelector('.tool-field');
+    if (tool) { tool.hidden = !ecu; const select = tool.querySelector('select'); if (select) { select.disabled = !ecu; if (!ecu) select.value = ''; } }
+    const thirdStep = document.querySelector('[data-page="2"]');
+    if (thirdStep) { const kicker = thirdStep.querySelector('.form-kicker'); const title = thirdStep.querySelector('h3'); const intro = thirdStep.querySelector('.form-title p'); if (kicker && title && intro) { if (ecu) { kicker.textContent='STEP 03 OF 06'; title.textContent='Select ECU / module'; intro.textContent='Add the controller details and the tool used to read the file.'; } else { kicker.textContent='STEP 03 OF 06'; title.textContent='Confirm module'; intro.textContent='For this service category, only the selected vehicle/module details are collected.'; } } }
+    document.querySelector('.sum-module').textContent = ecu ? ([new FormData(form).get('ecuManufacturer'),new FormData(form).get('ecuModel')].filter(Boolean).join(' · ') || 'Not specified') : 'Not applicable';
   }
-
-  function waitForRazorpayFrame(timeoutMs) {
-    return new Promise(resolve => {
-      const started = Date.now();
-      const poll = () => {
-        const frame = [...document.querySelectorAll('iframe')].some(item => {
-          if (!/razorpay/i.test(`${item.id} ${item.name} ${item.src}`)) return false;
-          let frameUrl;
-          try { frameUrl = new URL(item.src, window.location.href); } catch { return false; }
-          // Checkout inserts a visible about:blank frame before its hosted UI
-          // is ready. Do not report success until the iframe has navigated to
-          // Razorpay's HTTPS checkout origin.
-          if (frameUrl.protocol !== 'https:' || !['api.razorpay.com', 'checkout.razorpay.com'].includes(frameUrl.hostname)) return false;
-          const rect = item.getBoundingClientRect();
-          const style = getComputedStyle(item);
-          return rect.width > 100 && rect.height > 100 && style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity || 1) > 0;
-        });
-        if (frame) return resolve(true);
-        if (Date.now() - started >= timeoutMs) return resolve(false);
-        setTimeout(poll, 100);
-      };
-      poll();
-    });
-  }
-
-  document.querySelectorAll('input[name="category"]').forEach(radio => radio.addEventListener('change', () => {
-    document.querySelectorAll('.choice-card').forEach(card => card.classList.toggle('selected', card.contains(radio) && radio.checked));
-    updateSummary();
-  }));
-  form.addEventListener('input', updateSummary);
-  form.addEventListener('change', updateSummary);
-
-  fileInput.addEventListener('change', () => {
-    const file = fileInput.files[0];
-    document.querySelector('.file-selected').textContent = file ? `Selected: ${file.name} (${formatSize(file.size)})` : '';
-    updateSummary(); clearError(4);
-  });
-  const uploadArea = document.querySelector('.upload-area');
-  uploadArea.addEventListener('dragover', event => { event.preventDefault(); uploadArea.classList.add('dragging'); });
-  ['dragleave', 'drop'].forEach(name => uploadArea.addEventListener(name, () => uploadArea.classList.remove('dragging')));
-  uploadArea.addEventListener('drop', event => {
-    event.preventDefault();
-    if (event.dataTransfer.files.length) { fileInput.files = event.dataTransfer.files; fileInput.dispatchEvent(new Event('change', { bubbles: true })); }
-  });
-
-  document.querySelectorAll('[data-category-link]').forEach(link => link.addEventListener('click', () => {
-    const radio = form.querySelector(`input[name="category"][value="${link.dataset.categoryLink}"]`);
-    if (radio) { radio.checked = true; radio.dispatchEvent(new Event('change', { bubbles: true })); }
-  }));
-
-  function allBrands() { return brandGroups.flatMap(([group, brands]) => brands.map(name => ({ group, name }))); }
-  const brands = allBrands();
-  function closeBrandResults() { brandResults.classList.remove('open'); brandInput.setAttribute('aria-expanded', 'false'); activeBrandOption = -1; }
-  function renderBrands(query = '') {
-    const normalized = query.trim().toLocaleLowerCase();
-    const other = brands.find(item => item.name === 'Other / Not Listed');
-    const matches = brands.filter(item => item.name !== 'Other / Not Listed' && (!normalized || item.name.toLocaleLowerCase().includes(normalized) || item.group.toLocaleLowerCase().includes(normalized)));
-    if (!normalized || 'other / not listed'.includes(normalized)) matches.push(other);
-    const byGroup = new Map();
-    matches.forEach(item => { if (!byGroup.has(item.group)) byGroup.set(item.group, []); byGroup.get(item.group).push(item); });
-    brandResults.innerHTML = [...byGroup.entries()].map(([group, items]) => `<div class="brand-group-label">${escapeHtml(group)}</div>${items.map(item => `<button class="brand-option" type="button" role="option" data-brand="${escapeHtml(item.name)}">${escapeHtml(item.name)}</button>`).join('')}`).join('') || '<div class="brand-no-results">No matching brand. You can enter it as text.</div>';
-    brandResults.querySelectorAll('.brand-option').forEach(option => option.addEventListener('click', () => {
-      brandInput.value = option.dataset.brand; closeBrandResults(); updateSummary(); clearError(1); brandInput.focus();
-    }));
-    brandResults.classList.add('open'); brandInput.setAttribute('aria-expanded', 'true'); activeBrandOption = -1;
-  }
-  brandInput.addEventListener('focus', () => renderBrands(brandInput.value));
-  brandInput.addEventListener('input', () => { renderBrands(brandInput.value); updateSummary(); });
-  brandInput.addEventListener('keydown', event => {
-    const options = [...brandResults.querySelectorAll('.brand-option')];
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault(); activeBrandOption = (activeBrandOption + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length;
-      options.forEach((option, i) => option.classList.toggle('keyboard-active', i === activeBrandOption)); options[activeBrandOption]?.scrollIntoView({ block: 'nearest' });
-    } else if (event.key === 'Enter' && activeBrandOption >= 0) { event.preventDefault(); options[activeBrandOption]?.click(); }
-    else if (event.key === 'Escape') closeBrandResults();
-  });
-  document.addEventListener('click', event => { if (!event.target.closest('.brand-search-wrap')) closeBrandResults(); });
 
   function updateSummary() {
-    const data = new FormData(form);
-    const category = data.get('category') || 'ECU';
-    document.querySelector('.sum-category').textContent = category;
-    document.querySelector('.review-category').textContent = category;
-    document.querySelector('.summary-symbol').textContent = category === 'AIRBAG' ? '◈' : category === 'DASHBOARD' ? '▤' : '▦';
-    const vehicle = [data.get('year'), data.get('brand'), data.get('vehicleType'), data.get('vehicleModel')].filter(Boolean).join(' · ');
-    const module = [data.get('ecuManufacturer'), data.get('ecuModel')].filter(Boolean).join(' · ') || 'Not specified';
-    const serviceList = data.getAll('service').join(', ') || 'Not selected';
-    const file = fileInput.files[0]?.name || 'No file attached';
-    const contact = [data.get('name'), data.get('phone'), data.get('email')].filter(Boolean).join(' · ') || 'Add contact details';
-    const verificationText = fileVerificationPricePaise !== null ? formatINR(fileVerificationPricePaise) : 'Price unavailable';
+    applyCategoryFields();
+    const data = normalizeFormData({ includeFile:false });
+    const vehicle = [data.vehicleYear,data.vehicleBrand,data.vehicleType,data.vehicleModel].filter(Boolean).join(' · ');
+    const module = data.category === 'ECU' ? ([data.ecuManufacturer,data.ecuModel].filter(Boolean).join(' · ') || 'Not specified') : 'Not applicable';
+    document.querySelector('.sum-category').textContent = data.category;
+    document.querySelector('.review-category').textContent = data.category;
+    document.querySelector('.summary-symbol').textContent = data.category === 'AIRBAG' ? '◈' : data.category === 'DASHBOARD' ? '▤' : '▦';
     document.querySelector('.sum-vehicle').textContent = vehicle || 'Add vehicle details';
     document.querySelector('.sum-module').textContent = module;
-    document.querySelector('.sum-services').innerHTML = data.getAll('service').length ? data.getAll('service').map(service => `<span>${escapeHtml(service)}</span>`).join('') : '<span class="sum-empty">Choose services to see them here</span>';
-    document.querySelector('.sum-file').textContent = file;
-    document.querySelector('.sum-verification').textContent = verificationText;
+    document.querySelector('.sum-services').innerHTML = data.selectedServices.length ? data.selectedServices.map(s=>`<span>${escapeHtml(s)}</span>`).join('') : '<span class="sum-empty">Choose services to see them here</span>';
+    document.querySelector('.sum-file').textContent = fileInput.files[0]?.name || (fileStagedInStorage ? 'Private file already staged' : 'No file attached');
+    const fee = fileVerificationPricePaise === null ? 'Price unavailable' : formatINR(fileVerificationPricePaise);
+    document.querySelector('.sum-verification').textContent = fee;
     document.querySelector('.review-vehicle').textContent = vehicle || 'Add vehicle details';
     document.querySelector('.review-module').textContent = module;
-    document.querySelector('.review-tool').textContent = data.get('readingTool') || 'Not specified';
-    document.querySelector('.review-services').textContent = serviceList;
-    document.querySelector('.review-verification').textContent = verificationText;
-    document.querySelector('.review-file').textContent = file;
-    document.querySelector('.review-contact').textContent = contact;
+    document.querySelector('.review-tool').textContent = data.category === 'ECU' ? (data.readingTool || 'Not specified') : 'N/A';
+    document.querySelector('.review-services').textContent = data.selectedServices.join(', ') || 'Not selected';
+    document.querySelector('.review-verification').textContent = fee;
+    document.querySelector('.review-file').textContent = fileInput.files[0]?.name || (fileStagedInStorage ? 'Private file already staged' : 'No file attached');
+    document.querySelector('.review-contact').textContent = [data.contactName,data.contactPhone,data.contactEmail].filter(Boolean).join(' · ') || 'Add contact details';
+    const stagedNote = document.querySelector('.staged-file-note'); if (stagedNote) stagedNote.hidden = !fileStagedInStorage;
+    updatePaymentButtons();
   }
 
-  function updateWhatsAppLink() {
-    const data = new FormData(form);
-    const lines = ['*ECU FILE SERVICE INDIA — File Service Request*', '',
-      `*System:* ${data.get('category') || '—'}`,
-      `*Vehicle:* ${[data.get('year'), data.get('brand'), data.get('vehicleType'), data.get('vehicleModel')].filter(Boolean).join(' · ') || '—'}`,
-      `*ECU / module:* ${[data.get('ecuManufacturer'), data.get('ecuModel')].filter(Boolean).join(' · ') || 'Not specified'}`,
-      `*Reading tool:* ${data.get('readingTool') || 'Not specified'}`,
-      `*Services:* ${data.getAll('service').join(', ') || '—'}`,
-      `*File Verification & Support Fee:* ${fileVerificationPricePaise !== null ? `${formatINR(fileVerificationPricePaise)} required` : 'Price unavailable'}`,
-      `*Notes:* ${data.get('notes') || '—'}`,
-      `*Name:* ${data.get('name') || '—'}`,
-      `*Phone:* ${data.get('phone') || '—'}`,
-      `*Email:* ${data.get('email') || '—'}`,
-      `*Original file:* ${fileInput.files[0]?.name || 'I will attach it in this chat'}`,
-      ...(savedOrderId ? [`*Order reference:* ${savedOrderId}`] : []),
-      '', `Payment for the verification fee has been confirmed. Please use order reference ${savedOrderId || '—'} and advise the expected turnaround.`];
-    document.querySelector('.whatsapp-submit').href = `https://wa.me/918300409707?text=${encodeURIComponent(lines.join('\n'))}`;
+  function renderBrands(query='') {
+    const needle = query.trim().toLowerCase();
+    const matches = brands.filter(brand => !needle || brand.toLowerCase().includes(needle)).slice(0,20);
+    brandResults.innerHTML = matches.map((brand,index)=>`<button type="button" class="brand-option" role="option" data-brand="${escapeHtml(brand)}" aria-selected="false">${escapeHtml(brand)}</button>`).join('');
+    brandResults.classList.toggle('open', matches.length>0 && document.activeElement===brandInput);
+    activeBrandOption = -1;
   }
+  function closeBrandResults(){ brandResults.classList.remove('open'); brandInput.setAttribute('aria-expanded','false'); }
+  brandInput.addEventListener('input',()=>{renderBrands(brandInput.value);brandInput.setAttribute('aria-expanded','true');});
+  brandInput.addEventListener('focus',()=>{renderBrands(brandInput.value);brandInput.setAttribute('aria-expanded','true');});
+  brandInput.addEventListener('keydown',event=>{const options=[...brandResults.querySelectorAll('.brand-option')]; if (!options.length) return; if (event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();activeBrandOption=(activeBrandOption+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;options.forEach((o,i)=>o.classList.toggle('keyboard-active',i===activeBrandOption));options[activeBrandOption]?.scrollIntoView({block:'nearest'});} else if(event.key==='Enter'&&activeBrandOption>=0){event.preventDefault();options[activeBrandOption].click();} else if(event.key==='Escape') closeBrandResults();});
+  brandResults.addEventListener('click',event=>{const button=event.target.closest('.brand-option');if(!button)return;brandInput.value=button.dataset.brand;closeBrandResults();updateSummary();});
+  document.addEventListener('click',event=>{if(!event.target.closest('.brand-search-wrap'))closeBrandResults();});
+  document.querySelectorAll('input[name="category"]').forEach(radio=>radio.addEventListener('change',()=>{document.querySelectorAll('.choice-card').forEach(card=>card.classList.toggle('selected',card.querySelector('input')?.checked));fileStagedInStorage=false;activeIntent=null;updateSummary();}));
+  document.querySelectorAll('input[name="service"],#vehicle-type,#vehicle-model,#vehicle-year,#ecu-maker,#ecu-model,#reading-tool,#customer-name,#customer-phone,#customer-email,#request-notes').forEach(el=>el.addEventListener('input',updateSummary));
+  document.querySelector('#original-file').addEventListener('change',()=>{fileStagedInStorage=false;activeIntent=null;originalFileSha256=''; const label=document.querySelector('.file-selected'); if(label) label.textContent=fileInput.files[0] ? `${fileInput.files[0].name} · ${formatSize(fileInput.files[0].size)}` : ''; updateSummary();});
+  function formatSize(bytes){return bytes<1024*1024?`${Math.max(1,Math.round(bytes/1024))} KB`:`${(bytes/(1024*1024)).toFixed(1)} MB`;}
 
-  function getPaymentRequestData(file) {
-    const data = new FormData(form);
-    return {
-      category: data.get('category'), vehicleBrand: String(data.get('brand') || '').trim(),
-      vehicleType: data.get('vehicleType'), vehicleModel: String(data.get('vehicleModel') || '').trim(),
-      vehicleYear: data.get('year') || '', ecuManufacturer: data.get('ecuManufacturer') || '',
-      ecuModel: data.get('ecuModel') || '', readingTool: data.get('readingTool') || '',
-      selectedServices: data.getAll('service'), notes: data.get('notes') || '',
-      contactName: String(data.get('name') || '').trim(), contactPhone: String(data.get('phone') || '').trim(),
-      contactEmail: data.get('email') || '', originalName: file.name,
-      originalMime: file.type || 'application/octet-stream', originalSize: file.size, originalSha256: ''
-    };
+  function loadRazorpayCheckout(timeoutMs=12000){
+    if (typeof window.Razorpay === 'function') return Promise.resolve(window.Razorpay);
+    if (razorpayScriptPromise) return razorpayScriptPromise;
+    razorpayScriptPromise=new Promise((resolve,reject)=>{const script=document.createElement('script');let done=false;const finish=error=>{if(done)return;done=true;clearTimeout(timer);if(error)reject(error);else if(typeof window.Razorpay==='function')resolve(window.Razorpay);else reject(new Error('Razorpay Checkout did not load.'));};const timer=setTimeout(()=>finish(new Error('Razorpay Checkout did not load in time.')),timeoutMs);script.src='https://checkout.razorpay.com/v1/checkout.js';script.async=true;script.onload=()=>finish();script.onerror=()=>finish(new Error('Razorpay Checkout could not load.'));document.head.appendChild(script);}).catch(error=>{razorpayScriptPromise=null;throw error;});
+    return razorpayScriptPromise;
   }
+  async function hashFile(file){const buffer=await file.arrayBuffer();const digest=await crypto.subtle.digest('SHA-256',buffer);return [...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('');}
+  async function fetchJson(url,options={},timeoutMs=30000){const response=await fetch(url,{...options,signal:AbortSignal.timeout(timeoutMs)});let result=null;try{result=await response.json();}catch{}return {response,result};}
+  function requestDataFromForm(file){const data=normalizeFormData({includeFile:false});return {...data,originalName:file?.name || String(activeIntent?.original_name || ''),originalMime:file?.type || String(activeIntent?.original_mime || 'application/octet-stream'),originalSize:file?.size || Number(activeIntent?.original_size || 0),originalSha256:originalFileSha256 || String(activeIntent?.original_sha256 || '')};}
 
-  async function hashFile(file) {
-    const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
-    return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
-  }
-
-  function fileToBase64(file) {
-    return file.arrayBuffer().then(buffer => {
-      const bytes = new Uint8Array(buffer);
-      let binary = '';
-      for (let start = 0; start < bytes.length; start += 0x8000) {
-        binary += String.fromCharCode(...bytes.subarray(start, Math.min(start + 0x8000, bytes.length)));
-      }
-      return btoa(binary);
-    });
-  }
-
-  async function finishVerifiedPayment(payment) {
-    const button = document.querySelector('.verification-submit');
-    const status = document.querySelector('.verification-status');
-    button.disabled = true;
-    status.textContent = 'Confirming payment securely and submitting your file…';
-    try {
-      const backend = window.EfsiSupabase;
-      const token = await withTimeout(backend?.getAccessToken(), 12000, 'Your customer session check timed out. Sign in again and retry securely.');
-      if (!token) throw new Error('Your customer session expired. Sign in again to finish submitting the paid request.');
-      const file = fileInput.files[0];
-      if (!file) throw new Error('The selected original file is missing. Re-select it before retrying.');
-      const { response, result } = await fetchJsonWithTimeout('/api/payment/verify', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          razorpay_payment_id: payment.razorpay_payment_id,
-          razorpay_order_id: payment.razorpay_order_id,
-          razorpay_signature: payment.razorpay_signature,
-          request: payment.requestData,
-          fileBase64: await fileToBase64(file)
-        })
-      }, 90000, 'Payment verification is taking longer than expected. Your file is not marked submitted; keep this page open and retry securely.');
-      if (!response.ok || result.status !== 'PAID' || !result.orderId) throw new Error(result.error || 'Payment could not be verified. Your file was not submitted.');
-      savedOrderId = result.orderId;
-      capturedPayment = null;
-      status.textContent = 'Payment verified. Your original file is securely stored and your order is available to our service team.';
-      document.querySelector('.success-state > p').textContent = `Payment verified successfully. Your File Verification & Support Fee is ${formatINR(fileVerificationPricePaise)}. Order ${savedOrderId} and your original file are now securely available to our service team.`;
-      document.querySelector('.paid-order-reference').textContent = `Order reference: ${savedOrderId}`;
-      setPage(6);
-    } catch (error) {
-      button.disabled = false;
-      status.textContent = 'Your request is not submitted yet. Keep this page open and use Confirm My Request again to retry securely.';
-      showError(5, error.message);
+  async function ensureCheckoutIntent() {
+    if (activeIntent?.id && fileStagedInStorage && (activeIntent.status==='FILE_STAGED'||activeIntent.status==='PAYMENT_PENDING')) {
+      const current = requestDataFromForm(null);
+      const saved = activeIntent.request_json || {};
+      const same = JSON.stringify(current) === JSON.stringify(saved);
+      if (same) return activeIntent;
+      activeIntent = null; fileStagedInStorage = false; originalFileSha256 = ''; updateSummary();
     }
+    const file=fileInput.files[0];
+    if (!file) throw new Error('Select your original file before starting checkout.');
+    if (file.size>maxFileSize) throw new Error('The original file must be 50 MB or smaller.');
+    const backend=window.EfsiSupabase; if(!backend?.getSession()?.user?.id) throw new Error('Sign in to your customer account before payment.');
+    const request=requestDataFromForm(file);
+    if(!originalFileSha256) originalFileSha256=await hashFile(file);
+    request.originalSha256=originalFileSha256;
+    const token=await backend.getAccessToken(); if(!token) throw new Error('Your customer session expired. Sign in again.');
+    const created=await fetchJson('/api/checkout/intents',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({request})},30000);
+    if(!created.response.ok) throw new Error(created.result?.error||'Secure checkout could not be saved.');
+    activeIntent={id:created.result.intentId,status:created.result.status,amount_paise:created.result.amount,currency:created.result.currency,storage_path:created.result.storagePath,expires_at:created.result.expiresAt,request_sha256:created.result.requestSha256,original_sha256:originalFileSha256,original_name:file.name,original_size:file.size,request_json:request};
+    const encoded=activeIntent.storage_path.split('/').map(encodeURIComponent).join('/');
+    await backend.upload(`private-ecu-files/${encoded}`,file);
+    const staged=await fetchJson(`/api/checkout/intents/${encodeURIComponent(activeIntent.id)}/stage`,{method:'POST',headers:{Authorization:`Bearer ${token}`}},30000);
+    if(!staged.response.ok) throw new Error(staged.result?.error||'Private file staging could not be confirmed.');
+    activeIntent={...activeIntent,status:'FILE_STAGED'};fileStagedInStorage=true;updateSummary();return activeIntent;
   }
-  function formatSize(bytes) { return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }
-  function escapeHtml(value) { return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
 
-  const menuToggle = document.querySelector('.menu-toggle');
-  const nav = document.querySelector('.desktop-nav');
-  menuToggle.addEventListener('click', () => { const isOpen = nav.classList.toggle('open'); menuToggle.setAttribute('aria-expanded', String(isOpen)); });
-  nav.querySelectorAll('a').forEach(link => link.addEventListener('click', () => { nav.classList.remove('open'); menuToggle.setAttribute('aria-expanded', 'false'); }));
-  document.querySelector('.start-over').addEventListener('click', () => { form.reset(); savedOrderId = null; capturedPayment = null; document.querySelectorAll('input[name="category"]').forEach(radio => { if (radio.value === 'ECU') radio.checked = true; }); document.querySelectorAll('.choice-card').forEach((card, i) => card.classList.toggle('selected', i === 0)); document.querySelector('.file-selected').textContent = ''; document.querySelector('.paid-order-reference').textContent = ''; document.querySelector('.success-state > p').textContent = 'Your verified order and original file are now securely available to our service team.'; setPage(0); updateSummary(); });
-  loadPricing();
+  async function startRazorpay(intent) {
+    const backend=window.EfsiSupabase; const token=await backend.getAccessToken();
+    const {response,result}=await fetchJson('/api/payment/create-order',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({intentId:intent.id})},40000);
+    if(!response.ok) throw new Error(result?.error||'Razorpay checkout could not be created.');
+    const RazorpayCheckout=await loadRazorpayCheckout();
+    const checkout=new RazorpayCheckout({key:result.keyId,amount:result.amount,currency:result.currency,order_id:result.providerOrderId,name:'ECU FILE SERVICE INDIA',description:'File Verification & Support Fee',prefill:{name:intent.request_json.contactName,email:intent.request_json.contactEmail||undefined,contact:intent.request_json.contactPhone},modal:{ondismiss:()=>{checkoutStarting=false;document.querySelector('.verification-status').textContent='Checkout closed. Your saved checkout is still available in My account.';document.querySelector('.verification-submit').disabled=false;}},handler:async payment=>{await verifyRazorpay(intent.id,payment);}});
+    activeProvider='razorpay';checkout.open();
+  }
+  async function verifyRazorpay(intentId,payment){const backend=window.EfsiSupabase;const token=await backend.getAccessToken();const {response,result}=await fetchJson('/api/payment/verify',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({intentId,razorpay_order_id:payment.razorpay_order_id,razorpay_payment_id:payment.razorpay_payment_id,razorpay_signature:payment.razorpay_signature})},90000);if(!response.ok)throw new Error(result?.error||'Payment verification failed.');if(result.status!=='PAID')throw new Error('Payment is not confirmed yet.');completeSuccess(result.orderId);}
+  async function startPayPal(intent) {
+    const backend=window.EfsiSupabase;const token=await backend.getAccessToken();const {response,result}=await fetchJson('/api/payment/paypal/create-order',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({intentId:intent.id})},40000);if(!response.ok)throw new Error(result?.error||'PayPal checkout could not be created.');if(!result.approvalUrl)throw new Error('PayPal did not return an approval link.');activeProvider='paypal';window.location.assign(result.approvalUrl);
+  }
+  async function resumePaypalReturn(){const query=new URLSearchParams(location.search);if(query.get('paypal_return')!=='1')return;const intentId=query.get('intent');const token=query.get('token');history.replaceState(null,document.title,location.pathname);if(!intentId||!token)return;const backend=window.EfsiSupabase;const session=backend?.getSession();if(!session?.user?.id){document.querySelector('.verification-status').textContent='Sign in to the account that started this PayPal checkout, then open My account to resume payment verification.';return;}try{document.querySelector('.verification-status').textContent='Confirming PayPal payment securely…';const access=await backend.getAccessToken();const {response,result}=await fetchJson('/api/payment/paypal/capture',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${access}`},body:JSON.stringify({intentId,paypalOrderId:token})},90000);if(!response.ok)throw new Error(result?.error||'PayPal payment could not be confirmed.');completeSuccess(result.orderId);}catch(error){document.querySelector('.verification-status').textContent=error.message;}}
+  async function resumeFromIntent(intent){activeIntent=intent;const req=intent.request_json||{};for(const [name,id] of [['brand','brand'],['vehicleType','vehicle-type'],['vehicleModel','vehicle-model'],['year','vehicle-year'],['ecuManufacturer','ecu-maker'],['ecuModel','ecu-model'],['readingTool','reading-tool'],['notes','request-notes'],['name','customer-name'],['phone','customer-phone']]){const el=document.getElementById(id);if(el)el.value=req[name]||'';}document.querySelectorAll('input[name="category"]').forEach(r=>r.checked=r.value===req.category);document.querySelectorAll('.choice-card').forEach(card=>card.classList.toggle('selected',card.querySelector('input')?.checked));document.querySelectorAll('input[name="service"]').forEach(cb=>cb.checked=(req.selectedServices||[]).includes(cb.value));fileStagedInStorage=true;originalFileSha256=intent.original_sha256||'';setPage(5);document.querySelector('.verification-status').textContent='This checkout is saved securely. Choose a payment method to continue.';updateSummary();}
+  function completeSuccess(orderId){activeIntent=null;fileStagedInStorage=false;document.querySelector('.verification-submit').disabled=true;document.querySelector('.verification-status').textContent='Payment verified and your order is now available in My account.';document.querySelector('.success-state > p').textContent='Payment verified successfully. Your order and private original file are now available to our service team.';document.querySelector('.paid-order-reference').textContent=`Order reference: ${orderId}`;setPage(6);}
+  function updatePaymentButtons(){const razor=document.querySelector('#pay-razorpay');const paypal=document.querySelector('#pay-paypal');if(razor)razor.disabled=!providerReadiness.razorpay||checkoutStarting;if(paypal)paypal.disabled=!providerReadiness.paypal||checkoutStarting;}
+  async function beginPayment(provider){if(checkoutStarting)return;if(!validatePage(5))return;if(!providerReadiness[provider]){setError(5,`${provider==='paypal'?'PayPal':'Razorpay'} is not configured yet.`);return;}const consent=form.querySelector('input[name=consent]');if(!consent?.checked){setError(5,'Please confirm you are authorised to request this service.');return;}const button=document.querySelector('.verification-submit');const status=document.querySelector('.verification-status');const backend=window.EfsiSupabase;if(!backend?.getSession()?.user?.id){setError(5,'Sign in to your customer account before payment.');return;}checkoutStarting=true;updatePaymentButtons();clearError(5);status.textContent='Saving your checkout and securely staging the original file…';try{const intent=await ensureCheckoutIntent();status.textContent=provider==='paypal'?'Opening secure PayPal approval…':'Opening secure Razorpay Checkout…';if(provider==='paypal')await startPayPal(intent);else await startRazorpay(intent);}catch(error){status.textContent=error.message||'Checkout could not be started.';setError(5,status.textContent);checkoutStarting=false;updatePaymentButtons();}}
+
+  document.querySelectorAll('.next-button').forEach(button=>button.addEventListener('click',()=>{if(validatePage(currentPage))setPage(currentPage+1);}));
+  document.querySelectorAll('.button-back').forEach(button=>button.addEventListener('click',()=>setPage(Math.max(0,currentPage-1))));
+  document.querySelector('#pay-razorpay')?.addEventListener('click',()=>beginPayment('razorpay'));
+  document.querySelector('#pay-paypal')?.addEventListener('click',()=>beginPayment('paypal'));
+  document.querySelector('.start-over')?.addEventListener('click',()=>{form.reset();activeIntent=null;fileStagedInStorage=false;originalFileSha256='';document.querySelectorAll('input[name="category"]').forEach(r=>r.checked=r.value==='ECU');document.querySelectorAll('.choice-card').forEach((card,i)=>card.classList.toggle('selected',i===0));const fs=document.querySelector('.file-selected');if(fs)fs.textContent='';setPage(0);updateSummary();});
+  window.addEventListener('efsi:resume-checkout',event=>resumeFromIntent(event.detail));
+  fetch('/api/health',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(health=>{providerReadiness={razorpay:Boolean(health?.paymentReadiness?.razorpay),paypal:Boolean(health?.paymentReadiness?.paypal)};paymentReady=Boolean(health?.paymentConfigured);const status=document.querySelector('.verification-status');const gateways=document.querySelector('.payment-gateway-note');if(gateways)gateways.textContent=health?.paymentReadiness?.razorpay&&health?.paymentReadiness?.paypal?'Razorpay or PayPal secure checkout is available.':health?.paymentReadiness?.razorpay?'Razorpay secure checkout is available.':health?.paymentReadiness?.paypal?'PayPal secure checkout is available.':'Secure payment is not configured yet.';updatePaymentButtons();}).catch(()=>{paymentReady=false;updatePaymentButtons();});
+  fetch('/api/pricing',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(pricing=>{if(!pricing)throw new Error('pricing');fileVerificationPricePaise=pricing.fileVerificationPricePaise;const fee=formatINR(fileVerificationPricePaise);verificationPriceLabel.textContent=fee;document.querySelectorAll('[data-fee-inline]').forEach(el=>el.textContent=fee);updateSummary();}).catch(()=>{verificationPriceLabel.textContent='Price unavailable';document.querySelector('.verification-status').dataset.error='true';document.querySelector('.verification-status').textContent='The verification fee could not be loaded. Reload and retry.';});
   updateSummary();
+  resumePaypalReturn();
 })();

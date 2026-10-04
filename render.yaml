@@ -8,6 +8,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PUBLIC_APP_URL
+        value: https://ecufileservice.in
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
@@ -18,3 +20,19 @@ services:
         sync: false
       - key: RAZORPAY_KEY_SECRET
         sync: false
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_BASE_URL
+        value: https://api-m.paypal.com
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: ADMIN_NOTIFICATION_EMAIL
+        sync: false
+      - key: PAYMENT_GATE_PROOF_SECRET
+        sync: false
+      - key: PAYMENT_GATE_SCHEMA_READY
+        value: "false"
