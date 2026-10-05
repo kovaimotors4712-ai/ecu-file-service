@@ -88,10 +88,26 @@
     try{
       orders=await backend.rest('orders?select=id,customer_id,status,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,selected_services,notes,contact_name,contact_phone,contact_email,payment_status,payment_provider,provider_order_id,provider_payment_id,verification_amount_paise,created_at,updated_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,size_bytes,created_at)&order=created_at.desc&limit=500');
       if(!Array.isArray(orders))throw new Error('The orders response was not a list.');
-      document.querySelector('#stat-all').textContent=orders.length;
-      document.querySelector('#stat-new').textContent=orders.filter(function(o){return o.status==='New';}).length;
-      document.querySelector('#stat-active').textContent=orders.filter(function(o){return ['File Review','Processing'].includes(o.status);}).length;
-      document.querySelector('#stat-completed').textContent=orders.filter(function(o){return o.status==='Completed';}).length;
+      document.querySelector('#stat-total').textContent = orders.length;
+      document.querySelector('#stat-payment-pending').textContent = orders.filter(function(o){return o.status==='Payment Pending'||o.payment_status==='PENDING';}).length;
+      document.querySelector('#stat-paid-new').textContent = orders.filter(function(o){return o.status==='New';}).length;
+      document.querySelector('#stat-processing').textContent = orders.filter(function(o){return ['File Review','Processing'].includes(o.status);}).length;
+      document.querySelector('#stat-completed').textContent = orders.filter(function(o){return o.status==='Completed';}).length;
+      document.querySelector('#stat-cancelled').textContent = orders.filter(function(o){return o.status==='Cancelled';}).length;
+
+      document.querySelector('#stat-date-today').textContent = orders.filter(function(o){return new Date(o.created_at).toDateString()===new Date().toDateString();}).length;
+      document.querySelector('#stat-date-7days').textContent = orders.filter(function(o){return (Date.now()-new Date(o.created_at).getTime())<=7*24*60*60*1000;}).length;
+      document.querySelector('#stat-date-30days').textContent = orders.filter(function(o){return (Date.now()-new Date(o.created_at).getTime())<=30*24*60*60*1000;}).length;
+
+      document.querySelector('#stat-result-ready').textContent = orders.filter(function(o){return (o.order_files||[]).some(function(f){return f.kind==='processed';});}).length;
+      document.querySelector('#stat-result-pending').textContent = orders.filter(function(o){return !(o.order_files||[]).some(function(f){return f.kind==='processed';});}).length;
+
+      const statAll = document.querySelector('#stat-all');
+      if (statAll) statAll.textContent = orders.length;
+      const statNew = document.querySelector('#stat-new');
+      if (statNew) statNew.textContent = orders.filter(function(o){return o.status==='New';}).length;
+      const statActive = document.querySelector('#stat-active');
+      if (statActive) statActive.textContent = orders.filter(function(o){return ['File Review','Processing'].includes(o.status);}).length;
       renderOrders();
       statusMessage.textContent='';
     }catch(error){

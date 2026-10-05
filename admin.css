@@ -16,7 +16,10 @@
 .admin-dashboard-controls { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(140px, 1fr)) minmax(140px, 1fr); gap: 12px; margin-bottom: 18px; }
 .admin-dashboard-controls input, .admin-dashboard-controls select { height: 42px; border: 1px solid #e2e7dd; padding: 0 12px; background: #fff; font: 11px var(--sans); color: var(--ink); outline: none; }
 .admin-dashboard-controls input:focus, .admin-dashboard-controls select:focus { border-color: #829a32; }
-.admin-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+.admin-analytics-section { margin-bottom: 24px; }
+.admin-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 12px; }
+.admin-stats-3 { grid-template-columns: repeat(3, 1fr); }
+.admin-stats-2 { grid-template-columns: repeat(2, 1fr); }
 .admin-stats div { background: #fff; border: 1px solid #e3e8df; padding: 16px 18px; }
 .admin-stats small { display: block; font: 800 9px var(--mono); color: #7f8a84; letter-spacing: 0.1em; margin-bottom: 6px; }
 .admin-stats b { font: 700 24px var(--display); color: var(--ink); }
@@ -49,12 +52,13 @@
 
 @media(max-width: 1024px) {
   .admin-dashboard-controls { grid-template-columns: 1fr 1fr; }
-  .admin-stats { grid-template-columns: repeat(2, 1fr); }
+  .admin-stats { grid-template-columns: repeat(3, 1fr); }
+  .admin-stats-3, .admin-stats-2 { grid-template-columns: repeat(2, 1fr); }
 }
 @media(max-width: 640px) {
   .admin-main { padding: 20px 4% 60px; }
   .admin-dashboard-controls { grid-template-columns: 1fr; }
-  .admin-stats { grid-template-columns: 1fr; }
+  .admin-stats, .admin-stats-3, .admin-stats-2 { grid-template-columns: 1fr; }
   .admin-order { padding: 15px; }
   .admin-order-footer { flex-direction: column; align-items: stretch; }
   .admin-status-row { width: 100%; justify-content: space-between; }

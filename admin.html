@@ -75,11 +75,31 @@
           <option value="oldest">Oldest first</option>
         </select>
       </div>
-      <div class="admin-stats">
-        <div><small>ALL REQUESTS</small><b id="stat-all">0</b></div>
-        <div><small>NEW</small><b id="stat-new">0</b></div>
-        <div><small>IN REVIEW / PROCESSING</small><b id="stat-active">0</b></div>
-        <div><small>COMPLETED</small><b id="stat-completed">0</b></div>
+      <div class="admin-analytics-section">
+        <span class="form-kicker">SUMMARY CARDS</span>
+        <div class="admin-stats">
+          <div><small>TOTAL ORDERS</small><b id="stat-total">0</b></div>
+          <div><small>PAYMENT PENDING</small><b id="stat-payment-pending">0</b></div>
+          <div><small>PAID / NEW</small><b id="stat-paid-new">0</b></div>
+          <div><small>PROCESSING</small><b id="stat-processing">0</b></div>
+          <div><small>COMPLETED</small><b id="stat-completed">0</b></div>
+          <div><small>CANCELLED</small><b id="stat-cancelled">0</b></div>
+        </div>
+      </div>
+      <div class="admin-analytics-section">
+        <span class="form-kicker">DATE SUMMARY</span>
+        <div class="admin-stats admin-stats-3">
+          <div><small>TODAY</small><b id="stat-date-today">0</b></div>
+          <div><small>LAST 7 DAYS</small><b id="stat-date-7days">0</b></div>
+          <div><small>LAST 30 DAYS</small><b id="stat-date-30days">0</b></div>
+        </div>
+      </div>
+      <div class="admin-analytics-section">
+        <span class="form-kicker">RESULT SUMMARY</span>
+        <div class="admin-stats admin-stats-2">
+          <div><small>RESULTS READY</small><b id="stat-result-ready">0</b></div>
+          <div><small>RESULTS PENDING</small><b id="stat-result-pending">0</b></div>
+        </div>
       </div>
       <p id="orders-message" class="admin-message" role="status"></p>
       <div id="order-list" class="admin-order-list"></div>

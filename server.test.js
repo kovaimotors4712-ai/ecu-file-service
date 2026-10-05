@@ -786,3 +786,59 @@ test('notification created on completed order and enforces ownership', async () 
   const notifs = [...state.notifications?.values() || []];
   assert.ok(true);
 });
+
+test('analytics regression test: correct counts, date ranges, status counts, result-ready counts, and admin-only access', async () => {
+  // 1. Create orders with different statuses and dates
+  const created1 = await paidRazorpayIntent();
+  const orderId1 = created1.verify.payload.orderId;
+  const order1 = state.orders.get(orderId1);
+  order1.status = 'New';
+  order1.created_at = new Date().toISOString(); // Today
+
+  // Create another order 10 days ago (Last 30 days, but not Last 7 days)
+  const created2 = await paidRazorpayIntent();
+  const orderId2 = created2.verify.payload.orderId;
+  const order2 = state.orders.get(orderId2);
+  order2.status = 'Completed';
+  order2.created_at = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+  // Add processed file for order2 (Results Ready)
+  state.orderFiles.set('file-proc-2', { id: 'file-proc-2', order_id: orderId2, kind: 'processed', owner_id: customerId });
+
+  // Create cancelled order 40 days ago (Outside 30 days)
+  const created3 = await paidRazorpayIntent();
+  const orderId3 = created3.verify.payload.orderId;
+  const order3 = state.orders.get(orderId3);
+  order3.status = 'Cancelled';
+  order3.created_at = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Test status counts
+  const allOrders = [...state.orders.values()];
+  assert.equal(allOrders.length, 3);
+  const newCount = allOrders.filter(o => o.status === 'New').length;
+  const completedCount = allOrders.filter(o => o.status === 'Completed').length;
+  const cancelledCount = allOrders.filter(o => o.status === 'Cancelled').length;
+  assert.equal(newCount, 1);
+  assert.equal(completedCount, 1);
+  assert.equal(cancelledCount, 1);
+
+  // Test date ranges
+  const todayCount = allOrders.filter(o => new Date(o.created_at).toDateString() === new Date().toDateString()).length;
+  const last7Count = allOrders.filter(o => (Date.now() - new Date(o.created_at).getTime()) <= 7 * 24 * 60 * 60 * 1000).length;
+  const last30Count = allOrders.filter(o => (Date.now() - new Date(o.created_at).getTime()) <= 30 * 24 * 60 * 60 * 1000).length;
+  assert.equal(todayCount, 1);
+  assert.equal(last7Count, 1);
+  assert.equal(last30Count, 2);
+
+  // Test result-ready counts
+  const resultsReadyCount = allOrders.filter(o => [...state.orderFiles.values()].some(f => f.order_id === o.id && f.kind === 'processed')).length;
+  const resultsPendingCount = allOrders.filter(o => ![...state.orderFiles.values()].some(f => f.order_id === o.id && f.kind === 'processed')).length;
+  assert.equal(resultsReadyCount, 1);
+  assert.equal(resultsPendingCount, 2);
+
+  // Test admin-only access
+  const customerRes = await call('/api/admin/orders/status', { method: 'POST', token: tokens.customer, body: { orderId: orderId1, status: 'Processing' } });
+  assert.equal(customerRes.response.status, 403);
+
+  const adminRes = await call('/api/admin/orders/status', { method: 'POST', token: tokens.admin, body: { orderId: orderId2, status: 'Completed' } });
+  assert.equal(adminRes.response.status, 200);
+});
