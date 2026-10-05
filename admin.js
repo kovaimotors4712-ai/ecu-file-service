@@ -215,6 +215,7 @@
             '<select id="status-select-'+escape(order.id)+'" class="order-status-select" onchange="window.handleAdminStatusUpdate(\''+escape(order.id)+'\', this.value)">'+
               statuses.map(function(st){return '<option value="'+st+'" '+(order.status===st?'selected':'')+'>'+st+'</option>';}).join('')+
             '</select>'+
+            '<button class="button button-ghost" type="button" onclick="window.openAdminMessages(\''+escape(order.id)+'\')">Customer Support Messages</button>'+
           '</div>'+
           '<p class="admin-message" role="status"></p>'+
         '</div>'+
@@ -340,6 +341,66 @@
       message.classList.add('admin-error');
     }
   });
+
+  window.openAdminMessages = async function(orderId) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'admin-dialog';
+    dialog.innerHTML = `<div style="padding:20px;max-width:500px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+        <h3 style="margin:0;font-size:16px">Admin Reply: ${escape(orderId.slice(0, 8))}</h3>
+        <button type="button" class="dialog-close-btn">Close</button>
+      </div>
+      <div class="messages-list" style="max-height:300px;overflow-y:auto;border:1px solid #ddd;padding:10px;margin-bottom:15px;background:#f9f9f9;display:grid;gap:8px">Loading...</div>
+      <form class="message-reply-form" style="display:flex;gap:8px">
+        <textarea name="message" required placeholder="Reply to customer..." maxlength="2000" style="flex:1;height:60px;padding:8px"></textarea>
+        <button type="submit" class="button button-dark">Send Reply</button>
+      </form>
+    </div>`;
+    document.body.appendChild(dialog);
+    dialog.showModal();
+
+    dialog.querySelector('.dialog-close-btn').addEventListener('click', () => dialog.close());
+    const list = dialog.querySelector('.messages-list');
+    const form = dialog.querySelector('.message-reply-form');
+
+    async function loadMessages() {
+      try {
+        const token = await backend.getAccessToken();
+        const res = await fetch(`/api/admin/orders/messages?orderId=${encodeURIComponent(orderId)}`, { headers: { Authorization: `Bearer ${token}` } });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result?.error || 'Failed to load messages.');
+        list.innerHTML = result.messages.length ? result.messages.map(m => `
+          <div style="padding:8px 12px;border-radius:6px;background:${m.sender_type==='admin'?'#eef3ec':'#f1f5f9'};font-size:12px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;font:750 10px var(--mono);color:#55605b">
+              <span>${m.sender_type==='admin'?'YOU (ADMIN)':'CUSTOMER'}</span>
+              <span>${new Date(m.created_at).toLocaleString()}</span>
+            </div>
+            <div style="white-space:pre-wrap;word-break:break-word">${escape(m.message)}</div>
+          </div>
+        `).join('') : '<p>No messages yet.</p>';
+        list.scrollTop = list.scrollHeight;
+      } catch (e) { list.innerHTML = `<p style="color:red">${escape(e.message)}</p>`; }
+    }
+
+    loadMessages();
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const textarea = form.querySelector('textarea');
+      const msg = textarea.value.trim();
+      if (!msg) return;
+      try {
+        const token = await backend.getAccessToken();
+        const res = await fetch('/api/admin/orders/messages/reply', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ orderId, message: msg }) });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result?.error || 'Failed to send reply.');
+        textarea.value = '';
+        loadMessages();
+      } catch (e) { alert(e.message); }
+    });
+
+    dialog.addEventListener('close', () => dialog.remove());
+  };
 
   document.querySelector('#admin-signout').addEventListener('click', async function() { await backend.signOut(); setSignedOut(); });
   document.querySelector('#admin-denied-signout').addEventListener('click', async function() { await backend.signOut(); setSignedOut(); });

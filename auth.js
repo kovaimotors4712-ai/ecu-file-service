@@ -156,6 +156,7 @@
           </div>
           <div class="customer-order-actions">
             ${processed.length > 0 ? `<button type="button" class="customer-file-download" data-order-id="${escapeHtml(order.id)}" data-object-path="${escapeHtml(processed[0].object_path)}" data-file-name="${escapeHtml(processed[0].original_name)}">Result Ready · Download</button>` : '<small>Processing...</small>'}
+            <button type="button" class="customer-messages-open" data-order-id="${escapeHtml(order.id)}">Messages</button>
           </div>
         </article>`;
       }).join('');
@@ -283,6 +284,70 @@
     button.disabled = true;
     try { const blob = await download(`private-ecu-files/${objectPath}`); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = button.dataset.fileName || 'processed-file.bin'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); message.textContent = 'Your private file download has started.'; } catch (error) { message.textContent = error.message || 'The file could not be downloaded.'; } finally { button.disabled = false; }
   });
+
+  document.querySelector('.customer-order-list')?.addEventListener('click', async event => {
+    const button = event.target.closest('.customer-messages-open'); if (!button) return;
+    const orderId = button.dataset.orderId;
+    openMessagesDialog(orderId);
+  });
+
+  async function openMessagesDialog(orderId) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'account-dialog';
+    dialog.innerHTML = `<div class="messages-dialog" style="padding:20px;max-width:500px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+        <h3 style="margin:0;font-size:16px">Order Messages</h3>
+        <button type="button" class="dialog-close-btn" style="padding:4px 8px">Close</button>
+      </div>
+      <div class="messages-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--line);padding:10px;margin-bottom:15px;background:#fcfdfb;display:grid;gap:8px">Loading...</div>
+      <form class="message-send-form" style="display:flex;gap:8px">
+        <textarea name="message" required placeholder="Type a message related to this order..." maxlength="2000" style="flex:1;height:60px;padding:8px;resize:vertical"></textarea>
+        <button type="submit" class="button" style="align-self:flex-end">Send</button>
+      </form>
+    </div>`;
+    document.body.appendChild(dialog);
+    dialog.showModal();
+
+    dialog.querySelector('.dialog-close-btn').addEventListener('click', () => dialog.close());
+    const list = dialog.querySelector('.messages-list');
+    const form = dialog.querySelector('.message-send-form');
+
+    async function loadMessages() {
+      try {
+        const res = await fetch(`/api/orders/messages?orderId=${encodeURIComponent(orderId)}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result?.error || 'Failed to load messages.');
+        list.innerHTML = result.messages.length ? result.messages.map(m => `
+          <div style="padding:8px 12px;border-radius:6px;background:${m.sender_type==='admin'?'#eef3ec':'#f1f5f9'};font-size:12px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;font:750 10px var(--mono);color:#55605b">
+              <span>${m.sender_type==='admin'?'ADMIN SUPPORT':'YOU'}</span>
+              <span>${new Date(m.created_at).toLocaleString()}</span>
+            </div>
+            <div style="white-space:pre-wrap;word-break:break-word">${escapeHtml(m.message)}</div>
+          </div>
+        `).join('') : '<p style="color:#78847f;font-size:12px;margin:0">No messages yet. Send a message to our support team regarding this order.</p>';
+        list.scrollTop = list.scrollHeight;
+      } catch (e) { list.innerHTML = `<p style="color:#b91c1c;font-size:12px">${escapeHtml(e.message)}</p>`; }
+    }
+
+    loadMessages();
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const textarea = form.querySelector('textarea');
+      const msg = textarea.value.trim();
+      if (!msg) return;
+      try {
+        const res = await fetch('/api/orders/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ orderId, message: msg }) });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result?.error || 'Failed to send message.');
+        textarea.value = '';
+        loadMessages();
+      } catch (e) { alert(e.message); }
+    });
+
+    dialog.addEventListener('close', () => dialog.remove());
+  }
   document.querySelector('.dialog-close').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => unsubscribeRealtime());
   dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });

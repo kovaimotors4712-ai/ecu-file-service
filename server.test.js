@@ -43,6 +43,7 @@ const state = {
   intents: new Map(),
   orders: new Map(),
   orderFiles: new Map(),
+  orderMessages: new Map(),
   objects: new Map(),
   outbox: new Map(),
   razorOrderCalls: 0,
@@ -64,7 +65,7 @@ const state = {
 };
 
 function resetState() {
-  for (const map of [state.intents, state.orders, state.orderFiles, state.objects, state.outbox]) map.clear();
+  for (const map of [state.intents, state.orders, state.orderFiles, state.orderMessages, state.objects, state.outbox]) map.clear();
   state.razorOrderCalls = 0;
   state.paypalOrderCalls = 0;
   state.paypalCaptureCalls = 0;
@@ -262,6 +263,41 @@ const upstream = async (urlValue, options = {}) => {
       const id = `FILE-${state.orderFiles.size + 1}`;
       state.orderFiles.set(id, { ...body, id, created_at: new Date().toISOString() });
       return response(201, [{ ...state.orderFiles.get(id) }]);
+    }
+  }
+
+  if (url.pathname === '/rest/v1/order_messages') {
+    const user = identity(options);
+    if (!user) return response(401, { message: 'Authentication required.' });
+    if (method === 'GET') {
+      let rows = [...state.orderMessages.values()];
+      const orderId = url.searchParams.get('order_id');
+      if (orderId?.startsWith('eq.')) {
+        const idVal = orderId.slice(3);
+        rows = rows.filter(row => row.order_id === idVal);
+        if (user.role === 'customer') {
+          const order = state.orders.get(idVal);
+          if (!order || order.customer_id !== user.id) return response(404, { message: 'Order not found.' });
+          rows = rows.filter(row => row.customer_id === user.id);
+        }
+      }
+      return response(200, rows);
+    }
+    if (method === 'POST') {
+      const body = JSON.parse(options.body);
+      const id = `MSG-${state.orderMessages.size + 1}`;
+      const msg = { ...body, id, created_at: new Date().toISOString() };
+      state.orderMessages.set(id, msg);
+      return response(201, [{ ...msg }]);
+    }
+    if (method === 'PATCH') {
+      const idFilter = url.searchParams.get('id');
+      const body = JSON.parse(options.body);
+      const ids = idFilter?.startsWith('in.(') ? idFilter.slice(4, -1).split(',') : [];
+      for (const [id, msg] of state.orderMessages.entries()) {
+        if (ids.includes(id)) Object.assign(msg, body);
+      }
+      return response(200, []);
     }
   }
 
@@ -841,4 +877,50 @@ test('analytics regression test: correct counts, date ranges, status counts, res
 
   const adminRes = await call('/api/admin/orders/status', { method: 'POST', token: tokens.admin, body: { orderId: orderId2, status: 'Completed' } });
   assert.equal(adminRes.response.status, 200);
+});
+
+test('order messaging regression tests: full flow, RLS, length validation, and read status', async () => {
+  const { verify } = await paidRazorpayIntent();
+  const orderId = verify.payload.orderId;
+  const token = tokens.customer;
+
+  // 1. Customer sends message
+  const send = await call('/api/orders/messages', { method: 'POST', token, body: { orderId, message: 'Hello admin!' } });
+  assert.equal(send.response.status, 201);
+  assert.equal(state.orderMessages.size, 1);
+
+  // 2. Customer sees messages
+  const get = await call(`/api/orders/messages?orderId=${orderId}`, { token });
+  assert.equal(get.response.status, 200);
+  assert.equal(get.payload.messages.length, 1);
+  assert.equal(get.payload.messages[0].message, 'Hello admin!');
+
+  // 3. Customer cannot see another customer's messages
+  const other = await call(`/api/orders/messages?orderId=${orderId}`, { token: tokens.other });
+  assert.equal(other.response.status, 404);
+
+  // 4. Admin reads/replies
+  const adminGet = await call(`/api/admin/orders/messages?orderId=${orderId}`, { token: tokens.admin });
+  assert.equal(adminGet.response.status, 200);
+  // Re-fetch to verify update
+  const adminGet2 = await call(`/api/admin/orders/messages?orderId=${orderId}`, { token: tokens.admin });
+  assert.equal(adminGet2.payload.messages[0].is_read, true); // Admin marks customer message as read
+
+  const reply = await call('/api/admin/orders/messages/reply', { method: 'POST', token: tokens.admin, body: { orderId, message: 'Hello customer!' } });
+  assert.equal(reply.response.status, 201);
+  assert.equal(state.orderMessages.size, 2);
+
+  // 5. Unauthenticated denied
+  const unauth = await call(`/api/orders/messages?orderId=${orderId}`, { token: null });
+  assert.equal(unauth.response.status, 401);
+
+  // 6. Message length validation
+  const long = await call('/api/orders/messages', { method: 'POST', token, body: { orderId, message: 'A'.repeat(2001) } });
+  assert.equal(long.response.status, 400);
+
+  // 7. HTML/script injection (Sanitization: check storage)
+  const script = await call('/api/orders/messages', { method: 'POST', token, body: { orderId, message: '<script>alert(1)</script>' } });
+  assert.equal(script.response.status, 201);
+  const msgs = [...state.orderMessages.values()];
+  assert.ok(msgs.find(m => m.message.includes('&lt;script&gt;')));
 });

@@ -710,6 +710,163 @@ async function handleAdminPaymentStatus(request, response) {
   return true;
 }
 
+function sanitizeMessageText(text) {
+  return String(text || '').trim().replace(/[&<>'"]/g, tag => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;'
+  }[tag] || tag));
+}
+
+async function handleGetMessages(request, response, url) {
+  try {
+    const customer = await requireCustomer(request);
+    if (!customer) { jsonResponse(response, 401, { error: 'Sign in to view messages.' }); return true; }
+    const orderId = String(url.searchParams.get('orderId') || '');
+    if (!/^[0-9a-f-]{36}$/i.test(orderId)) { jsonResponse(response, 400, { error: 'Invalid order reference.' }); return true; }
+
+    // Verify order belongs to customer
+    const orderRes = await supabaseRequest(customer.token, `rest/v1/orders?select=id,customer_id&id=eq.${encodeURIComponent(orderId)}&customer_id=eq.${encodeURIComponent(customer.id)}&limit=1`, { timeoutMs: 15000 });
+    if (!orderRes.ok || (await orderRes.json()).length === 0) { jsonResponse(response, 404, { error: 'Order not found.' }); return true; }
+
+    // Fetch messages
+    const messagesRes = await supabaseRequest(customer.token, `rest/v1/order_messages?select=id,order_id,customer_id,sender_type,message,is_read,created_at&order_id=eq.${encodeURIComponent(orderId)}&customer_id=eq.${encodeURIComponent(customer.id)}&order=created_at.asc`, { timeoutMs: 15000 });
+    if (!messagesRes.ok) { jsonResponse(response, 502, { error: 'Messages could not be loaded.' }); return true; }
+    const messages = await messagesRes.json();
+
+    // Mark unread admin messages as read
+    const unreadAdminIds = messages.filter(m => m.sender_type === 'admin' && !m.is_read).map(m => m.id);
+    if (unreadAdminIds.length > 0) {
+      await supabaseRequest(customer.token, `rest/v1/order_messages?id=in.(${unreadAdminIds.join(',')})`, {
+        method: 'PATCH',
+        prefer: 'return=minimal',
+        body: { is_read: true },
+        timeoutMs: 15000
+      }).catch(() => {});
+    }
+
+    jsonResponse(response, 200, { messages });
+  } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Failed to load messages.' }); }
+  return true;
+}
+
+async function handleSendMessage(request, response) {
+  try {
+    const customer = await requireCustomer(request);
+    if (!customer) { jsonResponse(response, 401, { error: 'Sign in to send messages.' }); return true; }
+    const body = await readJson(request, 8192);
+    const orderId = String(body?.orderId || '');
+    if (!/^[0-9a-f-]{36}$/i.test(orderId)) { jsonResponse(response, 400, { error: 'Invalid order reference.' }); return true; }
+
+    const rawMessage = String(body?.message || '');
+    const cleanMessage = sanitizeMessageText(rawMessage);
+    if (cleanMessage.length < 1 || cleanMessage.length > 2000) {
+      jsonResponse(response, 400, { error: 'Message must be between 1 and 2000 characters.' });
+      return true;
+    }
+
+    // Verify order belongs to customer
+    const orderRes = await supabaseRequest(customer.token, `rest/v1/orders?select=id,customer_id&id=eq.${encodeURIComponent(orderId)}&customer_id=eq.${encodeURIComponent(customer.id)}&limit=1`, { timeoutMs: 15000 });
+    if (!orderRes.ok || (await orderRes.json()).length === 0) { jsonResponse(response, 404, { error: 'Order not found.' }); return true; }
+
+    const insertRes = await supabaseRequest(customer.token, 'rest/v1/order_messages', {
+      method: 'POST',
+      prefer: 'return=representation',
+      body: {
+        order_id: orderId,
+        customer_id: customer.id,
+        sender_type: 'customer',
+        message: cleanMessage,
+        is_read: false
+      },
+      timeoutMs: 15000
+    });
+    if (!insertRes.ok) {
+      const err = await insertRes.json().catch(() => null);
+      jsonResponse(response, insertRes.status >= 500 ? 502 : 409, { error: err?.message || 'Message could not be sent.' });
+      return true;
+    }
+    const inserted = await insertRes.json();
+    jsonResponse(response, 201, { message: inserted?.[0] || null });
+  } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Failed to send message.' }); }
+  return true;
+}
+
+async function handleAdminGetMessages(request, response, url) {
+  try {
+    const admin = await requireAdmin(request);
+    if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
+    const orderId = String(url.searchParams.get('orderId') || '');
+    if (!/^[0-9a-f-]{36}$/i.test(orderId)) { jsonResponse(response, 400, { error: 'Invalid order reference.' }); return true; }
+
+    const orderRes = await supabaseRequest(admin.token, `rest/v1/orders?select=id,customer_id&id=eq.${encodeURIComponent(orderId)}&limit=1`, { timeoutMs: 15000 });
+    if (!orderRes.ok || (await orderRes.json()).length === 0) { jsonResponse(response, 404, { error: 'Order not found.' }); return true; }
+    const orderData = (await orderRes.json())[0];
+
+    const messagesRes = await supabaseRequest(admin.token, `rest/v1/order_messages?select=id,order_id,customer_id,sender_type,message,is_read,created_at&order_id=eq.${encodeURIComponent(orderId)}&order=created_at.asc`, { timeoutMs: 15000 });
+    if (!messagesRes.ok) { jsonResponse(response, 502, { error: 'Messages could not be loaded.' }); return true; }
+    const messages = await messagesRes.json();
+
+    // Mark unread customer messages as read
+    const unreadCustomerIds = messages.filter(m => m.sender_type === 'customer' && !m.is_read).map(m => m.id);
+    if (unreadCustomerIds.length > 0) {
+      await supabaseRequest(admin.token, `rest/v1/order_messages?id=in.(${unreadCustomerIds.join(',')})`, {
+        method: 'PATCH',
+        prefer: 'return=minimal',
+        body: { is_read: true },
+        timeoutMs: 15000
+      }).catch(() => {});
+    }
+
+    jsonResponse(response, 200, { messages });
+  } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Failed to load messages.' }); }
+  return true;
+}
+
+async function handleAdminReply(request, response) {
+  try {
+    const admin = await requireAdmin(request);
+    if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
+    const body = await readJson(request, 8192);
+    const orderId = String(body?.orderId || '');
+    if (!/^[0-9a-f-]{36}$/i.test(orderId)) { jsonResponse(response, 400, { error: 'Invalid order reference.' }); return true; }
+
+    const rawMessage = String(body?.message || '');
+    const cleanMessage = sanitizeMessageText(rawMessage);
+    if (cleanMessage.length < 1 || cleanMessage.length > 2000) {
+      jsonResponse(response, 400, { error: 'Message must be between 1 and 2000 characters.' });
+      return true;
+    }
+
+    const orderRes = await supabaseRequest(admin.token, `rest/v1/orders?select=id,customer_id&id=eq.${encodeURIComponent(orderId)}&limit=1`, { timeoutMs: 15000 });
+    if (!orderRes.ok || (await orderRes.json()).length === 0) { jsonResponse(response, 404, { error: 'Order not found.' }); return true; }
+    const orderData = (await orderRes.json())[0];
+
+    const insertRes = await supabaseRequest(admin.token, 'rest/v1/order_messages', {
+      method: 'POST',
+      prefer: 'return=representation',
+      body: {
+        order_id: orderId,
+        customer_id: orderData.customer_id,
+        sender_type: 'admin',
+        message: cleanMessage,
+        is_read: false
+      },
+      timeoutMs: 15000
+    });
+    if (!insertRes.ok) {
+      const err = await insertRes.json().catch(() => null);
+      jsonResponse(response, insertRes.status >= 500 ? 502 : 409, { error: err?.message || 'Reply could not be saved.' });
+      return true;
+    }
+    const inserted = await insertRes.json();
+    jsonResponse(response, 201, { message: inserted?.[0] || null });
+  } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Failed to send reply.' }); }
+  return true;
+}
+
 async function handlePricing(request, response) {
   if (request.method === 'GET') {
     try { jsonResponse(response, 200, readPricing()); } catch { jsonResponse(response, 500, { error: 'Pricing configuration could not be loaded.' }); }
@@ -824,6 +981,10 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/payment/paypal/capture') return handleCapturePayPal(request, response);
   if (url.pathname === '/api/admin/orders/status') return handleAdminStatus(request, response);
   if (url.pathname === '/api/admin/payment-status') return handleAdminPaymentStatus(request, response);
+  if (url.pathname === '/api/orders/messages' && request.method === 'GET') return handleGetMessages(request, response, url);
+  if (url.pathname === '/api/orders/messages' && request.method === 'POST') return handleSendMessage(request, response);
+  if (url.pathname === '/api/admin/orders/messages' && request.method === 'GET') return handleAdminGetMessages(request, response, url);
+  if (url.pathname === '/api/admin/orders/messages/reply' && request.method === 'POST') return handleAdminReply(request, response);
 
   const proxyRoute = url.pathname.match(/^\/api\/supabase\/(auth\/v1|rest\/v1|storage\/v1)(\/.*)?$/);
   if (!proxyRoute) return false;
