@@ -666,6 +666,13 @@ async function handleAdminStatus(request, response) {
     if (body.status === 'Completed') {
       const files = await supabaseRequest(admin.token, `rest/v1/order_files?select=id&order_id=eq.${encodeURIComponent(orderId)}&kind=eq.processed&limit=1`, { timeoutMs: 15000 });
       if (!files.ok || (await files.json()).length === 0) { jsonResponse(response, 409, { error: 'Upload a processed file before marking the order Completed.' }); return true; }
+      const customer = await supabaseRequest(admin.token, `rest/v1/orders?select=customer_id&id=eq.${encodeURIComponent(orderId)}&limit=1`, { timeoutMs: 15000 });
+      if (customer.ok) {
+        const orderData = await customer.json();
+        if (orderData?.[0]?.customer_id) {
+          await supabaseRequest(admin.token, 'rest/v1/notifications', { method: 'POST', body: { customer_id: orderData[0].customer_id, order_id: orderId, message: 'Your ECU file is ready for download.' }, timeoutMs: 15000 });
+        }
+      }
     }
     const updated = await supabaseRequest(admin.token, `rest/v1/orders?id=eq.${encodeURIComponent(orderId)}`, { method: 'PATCH', prefer: 'return=representation', body: { status: body.status }, timeoutMs: 15000 });
     if (!updated.ok) {

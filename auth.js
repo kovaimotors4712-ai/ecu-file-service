@@ -118,9 +118,11 @@
     if (signout) signout.hidden = !email;
     const ordersPanel = document.querySelector('#customer-orders');
     const pendingPanel = document.querySelector('#pending-checkouts');
+    const notificationPanel = document.querySelector('#customer-notifications');
     if (ordersPanel) ordersPanel.hidden = !email;
     if (pendingPanel) pendingPanel.hidden = !email;
-    if (email && dialog?.open) { loadCustomerOrders(); loadPendingCheckouts(); subscribeToOrders(); }
+    if (notificationPanel) notificationPanel.hidden = !email;
+    if (email && dialog?.open) { loadCustomerOrders(); loadPendingCheckouts(); loadCustomerNotifications(); subscribeToOrders(); }
   }
 
   async function loadCustomerOrders() {
@@ -144,8 +146,24 @@
     } catch (error) { if (requestId === ordersRequest) list.textContent = `Your order history could not be loaded. ${error.message || 'Retry.'}`; }
   }
 
+  async function loadCustomerNotifications() {
+    const list = document.querySelector('#customer-notification-list');
+    const customerId = session?.user?.id;
+    if (!list || !customerId) return;
+    try {
+      const rows = await rest(`notifications?select=id,order_id,message,is_read,created_at&customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.desc&limit=20`);
+      if (!Array.isArray(rows) || !rows.length) { list.innerHTML = '<small>No notifications yet.</small>'; return; }
+      list.innerHTML = rows.map(item => `<article class="notification-item ${item.is_read ? '' : 'unread'}" data-notification-id="${escapeHtml(item.id)}" data-order-id="${escapeHtml(item.order_id)}"><div><p>${escapeHtml(item.message)}</p><small>${new Date(item.created_at).toLocaleString()}</small></div>${item.is_read ? '' : '<span class="unread-dot"></span>'}</article>`).join('');
+    } catch (error) { list.textContent = `Notifications could not be loaded. ${error.message || ''}`; }
+  }
+
+  async function markNotificationRead(notificationId) {
+    try {
+      await rest(`notifications?id=eq.${encodeURIComponent(notificationId)}`, { method: 'PATCH', body: { is_read: true } });
+      await loadCustomerNotifications();
+    } catch {}
+  }
   async function loadPendingCheckouts() {
-    const list = document.querySelector('#pending-checkout-list');
     const customerId = session?.user?.id;
     if (!list || !customerId) return;
     try {
@@ -200,7 +218,17 @@
   function showPasswordReset(text = '') { authTabs.hidden = true; form.hidden = true; resetForm.hidden = false; document.querySelector('.auth-reset').hidden = true; accountTitle.textContent = 'Set a new password'; accountIntro.textContent = 'Choose a new password for your customer account.'; message.textContent = text; if (!dialog.open) dialog.showModal(); document.querySelector('#auth-new-password').focus(); }
 
   document.querySelector('#account-trigger').addEventListener('click', () => { dialog.showModal(); if (session?.user?.id) { loadCustomerOrders(); loadPendingCheckouts(); subscribeToOrders(); } });
-  document.querySelector('#refresh-customer-orders')?.addEventListener('click', loadCustomerOrders);
+  document.querySelector('#customer-notification-list')?.addEventListener('click', async event => {
+    const item = event.target.closest('.notification-item');
+    if (!item) return;
+    const notificationId = item.dataset.notificationId;
+    const orderId = item.dataset.orderId;
+    if (notificationId) markNotificationRead(notificationId);
+    if (orderId) {
+      dialog.close();
+      // Scroll to order if available in UI, or switch to orders panel
+    }
+  });
   document.querySelector('#pending-checkout-list')?.addEventListener('click', async event => {
     const button = event.target.closest('.resume-checkout');
     if (!button) return;
