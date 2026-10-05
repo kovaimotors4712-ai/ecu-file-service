@@ -53,6 +53,28 @@
           <p id="pricing-message" class="admin-message" role="status">Loading current price…</p>
         </form>
       </section>
+      <div class="admin-dashboard-controls">
+        <input id="order-search" type="text" placeholder="Search orders (ID, customer, vehicle...)">
+        <select id="order-status-filter">
+          <option value="all">All Statuses</option>
+          <option value="New">New / Paid</option>
+          <option value="File Review">File Review</option>
+          <option value="Processing">Processing</option>
+          <option value="Completed">Completed</option>
+          <option value="Cancelled">Cancelled</option>
+          <option value="Not Possible">Not Possible</option>
+          <option value="Payment Pending">Payment Pending</option>
+        </select>
+        <select id="order-result-filter">
+          <option value="all">Any Result Status</option>
+          <option value="ready">Result Ready</option>
+          <option value="pending">Result Pending</option>
+        </select>
+        <select id="order-sort-order">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
+      </div>
       <div class="admin-stats">
         <div><small>ALL REQUESTS</small><b id="stat-all">0</b></div>
         <div><small>NEW</small><b id="stat-new">0</b></div>
