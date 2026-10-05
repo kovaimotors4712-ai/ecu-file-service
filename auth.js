@@ -79,7 +79,7 @@
     if (!response.ok) { let body = null; try { body = await response.json(); } catch {} throw new Error(body?.message || body?.error || `File download failed (${response.status})`); }
     return response.blob();
   }
-  function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
+  function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": "'" })[char]); }
 
   function saveSession(next) {
     const previousUserId = session?.user?.id;
@@ -140,8 +140,24 @@
         const files = Array.isArray(order.order_files) ? order.order_files : [];
         const processed = files.filter(file => file.kind === 'processed' && String(file.object_path || '').startsWith(`${customerId}/${order.id}/processed/`));
         const vehicle = [order.vehicle_year, order.vehicle_brand, order.vehicle_model].filter(Boolean).join(' ');
-        const module = order.category === 'ECU' ? [order.ecu_manufacturer, order.ecu_model].filter(Boolean).join(' · ') : '';
-        return `<article class="customer-order-card"><div class="customer-order-top"><b>${escapeHtml(vehicle || order.category)}</b><span>${escapeHtml(order.status)}</span></div><p>${escapeHtml(order.category)} · ${escapeHtml(order.vehicle_type)}${module ? ` · ${escapeHtml(module)}` : ''}</p><p>${escapeHtml((order.selected_services || []).join(', '))}</p><div class="customer-order-meta"><span>Payment: ${escapeHtml(order.payment_status || 'PENDING')}</span><span>Gateway: ${escapeHtml(order.payment_provider || '—')}</span><span>Original file: ${files.some(file => file.kind === 'original') ? 'received' : 'not linked'}</span></div>${processed.map(file => `<button type="button" class="customer-file-download" data-order-id="${escapeHtml(order.id)}" data-object-path="${escapeHtml(file.object_path)}" data-file-name="${escapeHtml(file.original_name)}">Download processed file · ${escapeHtml(file.original_name)}</button>`).join('') || '<small>Your service team will add the processed file here when ready.</small>'}</article>`;
+        const statusSteps = ['Payment', 'File Received', 'File Review', 'Processing', 'Completed'];
+        const currentStepIndex = statusSteps.indexOf(order.status) >= 0 ? statusSteps.indexOf(order.status) : 0;
+        const timeline = `<div class="order-timeline">${statusSteps.map((step, index) => `<span class="${index <= currentStepIndex ? 'active' : ''}">${step}</span>`).join(' → ')}</div>`;
+        return `<article class="customer-order-card" data-order-id="${escapeHtml(order.id)}">
+          <div class="customer-order-top">
+            <b>Order: ${escapeHtml(order.id.slice(0, 8))}</b>
+            <span>${escapeHtml(order.status)}</span>
+          </div>
+          <div class="customer-order-body">
+            <p><strong>Vehicle:</strong> ${escapeHtml(vehicle || order.category)}</p>
+            <p><strong>Services:</strong> ${escapeHtml((order.selected_services || []).join(', '))}</p>
+            <p><strong>Created:</strong> ${new Date(order.created_at).toLocaleDateString()}</p>
+            ${timeline}
+          </div>
+          <div class="customer-order-actions">
+            ${processed.length > 0 ? `<button type="button" class="customer-file-download" data-order-id="${escapeHtml(order.id)}" data-object-path="${escapeHtml(processed[0].object_path)}" data-file-name="${escapeHtml(processed[0].original_name)}">Result Ready · Download</button>` : '<small>Processing...</small>'}
+          </div>
+        </article>`;
       }).join('');
     } catch (error) { if (requestId === ordersRequest) list.textContent = `Your order history could not be loaded. ${error.message || 'Retry.'}`; }
   }
@@ -152,6 +168,9 @@
     if (!list || !customerId) return;
     try {
       const rows = await rest(`notifications?select=id,order_id,message,is_read,created_at&customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.desc&limit=20`);
+      const unreadCount = rows.filter(n => !n.is_read).length;
+      const countEl = document.querySelector('.notification-count');
+      if (countEl) countEl.textContent = unreadCount > 0 ? unreadCount : '';
       if (!Array.isArray(rows) || !rows.length) { list.innerHTML = '<small>No notifications yet.</small>'; return; }
       list.innerHTML = rows.map(item => `<article class="notification-item ${item.is_read ? '' : 'unread'}" data-notification-id="${escapeHtml(item.id)}" data-order-id="${escapeHtml(item.order_id)}"><div><p>${escapeHtml(item.message)}</p><small>${new Date(item.created_at).toLocaleString()}</small></div>${item.is_read ? '' : '<span class="unread-dot"></span>'}</article>`).join('');
     } catch (error) { list.textContent = `Notifications could not be loaded. ${error.message || ''}`; }
@@ -165,6 +184,7 @@
   }
   async function loadPendingCheckouts() {
     const customerId = session?.user?.id;
+    const list = document.querySelector('#pending-checkout-list');
     if (!list || !customerId) return;
     try {
       const rows = await rest(`checkout_intents?select=id,status,request_json,original_name,original_size,amount_paise,currency,payment_provider,provider_order_id,expires_at,updated_at&customer_id=eq.${encodeURIComponent(customerId)}&status=in.(DRAFT,FILE_STAGED,PAYMENT_PENDING)&order=updated_at.desc&limit=10`);
@@ -224,10 +244,7 @@
     const notificationId = item.dataset.notificationId;
     const orderId = item.dataset.orderId;
     if (notificationId) markNotificationRead(notificationId);
-    if (orderId) {
-      dialog.close();
-      // Scroll to order if available in UI, or switch to orders panel
-    }
+    if (orderId) { dialog.close(); }
   });
   document.querySelector('#pending-checkout-list')?.addEventListener('click', async event => {
     const button = event.target.closest('.resume-checkout');
