@@ -901,7 +901,7 @@ async function flushNotificationOutbox() {
       if (!claim.ok) continue;
       const claimedRows = await claim.json().catch(() => []);
       if (!Array.isArray(claimedRows) || !claimedRows.length) continue;
-      const orderResponse = await supabaseRequest(token, `rest/v1/orders?select=id,category,vehicle_brand,vehicle_model,vehicle_year,contact_name,contact_phone,contact_email,payment_status,status,payment_provider,provider_order_id,provider_payment_id,created_at&id=eq.${encodeURIComponent(row.order_id)}&limit=1`, { timeoutMs: 15000 });
+      const orderResponse = await supabaseRequest(token, `rest/v1/orders?select=id,category,vehicle_brand,vehicle_model,vehicle_year,contact_name,contact_phone,contact_email,payment_status,status,payment_provider,provider_order_id,provider_payment_id,created_at,ecu_manufacturer,ecu_model,reading_tool,selected_services,notes,verification_amount_paise&id=eq.${encodeURIComponent(row.order_id)}&limit=1`, { timeoutMs: 15000 });
       if (!orderResponse.ok) {
         await supabaseRequest(token, `rest/v1/notification_outbox?id=eq.${encodeURIComponent(row.id)}&status=eq.SENDING`, { method:'PATCH', prefer:'return=minimal', body:{ status:'RETRY', next_attempt_at:new Date(Date.now()+15*60*1000).toISOString(), last_error:'Order lookup failed before email delivery.', updated_at:new Date().toISOString() }, timeoutMs:15000 }).catch(()=>{});
         continue;
@@ -911,8 +911,41 @@ async function flushNotificationOutbox() {
         await supabaseRequest(token, `rest/v1/notification_outbox?id=eq.${encodeURIComponent(row.id)}&status=eq.SENDING`, { method:'PATCH', prefer:'return=minimal', body:{ status:'RETRY', next_attempt_at:new Date(Date.now()+15*60*1000).toISOString(), last_error:'Referenced order was not found.', updated_at:new Date().toISOString() }, timeoutMs:15000 }).catch(()=>{});
         continue;
       }
-      const subject = row.event_type === 'paid_order' ? `Paid order ${order.id}` : `New order ${order.id}`;
-      const html = `<h2>ECU FILE SERVICE INDIA</h2><p><strong>${subject}</strong></p><p>Customer: ${String(order.contact_name || '').replace(/[&<>]/g, '')}</p><p>Vehicle: ${[order.vehicle_year, order.vehicle_brand, order.vehicle_model].filter(Boolean).map(v => String(v).replace(/[&<>]/g, '')).join(' ')}</p><p>Category: ${String(order.category || '').replace(/[&<>]/g, '')}</p><p>Status: ${String(order.status || '').replace(/[&<>]/g, '')}</p><p>Payment: ${String(order.payment_status || '').replace(/[&<>]/g, '')} (${String(order.payment_provider || '').replace(/[&<>]/g, '')})</p><p>Order ID: ${order.id}</p>`;
+      const fileResponse = await supabaseRequest(token, `rest/v1/order_files?select=original_name&order_id=eq.${encodeURIComponent(order.id)}&kind=eq.original&limit=1`, { timeoutMs: 15000 });
+      const fileInfo = fileResponse.ok ? (await fileResponse.json())?.[0] : null;
+      const originalFileName = fileInfo?.original_name || 'N/A';
+
+      const esc = (val) => String(val || '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      const formatAmount = (paise) => paise ? `₹${(Number(paise)/100).toFixed(2)}` : 'N/A';
+      const services = Array.isArray(order.selected_services) ? order.selected_services.join(', ') : 'None';
+      const vehicle = [order.vehicle_year, order.vehicle_brand, order.vehicle_model].filter(Boolean).join(' ');
+      const ecuDetails = order.category === 'ECU' ? `
+        <p><strong>ECU:</strong> ${esc(order.ecu_manufacturer || 'N/A')} ${esc(order.ecu_model || 'N/A')}</p>
+        <p><strong>Reading Tool:</strong> ${esc(order.reading_tool || 'N/A')}</p>
+      ` : '';
+
+      const html = `
+        <div style="font-family: sans-serif; line-height: 1.5;">
+          <h2 style="color: #333;">New Order Received – ECU File Service India</h2>
+          <p><strong>Order ID:</strong> ${esc(order.id)}</p>
+          <p><strong>Status:</strong> ${esc(order.status)}</p>
+          <p><strong>Payment Status:</strong> ${esc(order.payment_status)} (${esc(order.payment_provider || 'N/A')})</p>
+          <p><strong>Amount Paid:</strong> ${formatAmount(order.verification_amount_paise)}</p>
+          <hr/>
+          <p><strong>Customer:</strong> ${esc(order.contact_name)}</p>
+          <p><strong>Email:</strong> ${esc(order.contact_email || 'N/A')}</p>
+          <p><strong>Phone:</strong> ${esc(order.contact_phone)}</p>
+          <hr/>
+          <p><strong>Vehicle:</strong> ${esc(vehicle)}</p>
+          <p><strong>Category:</strong> ${esc(order.category)}</p>
+          ${ecuDetails}
+          <p><strong>Services:</strong> ${esc(services)}</p>
+          <p><strong>Original File:</strong> ${esc(originalFileName)}</p>
+          <p><strong>Created:</strong> ${esc(new Date(order.created_at).toLocaleString())}</p>
+          <p><strong>Notes:</strong> ${esc(order.notes || 'None')}</p>
+        </div>
+      `.trim();
+      const subject = `New Order Received – ECU File Service India`;
       try {
         const emailResponse = await requestHttps('https://api.resend.com/emails', {
           method: 'POST',

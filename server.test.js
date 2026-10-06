@@ -668,9 +668,47 @@ test('Resend outbox sends idempotently without blocking order creation', async (
   const paid = await paidRazorpayIntent();
   await new Promise(resolve => setTimeout(resolve, 10));
   await flushNotificationOutbox();
-  assert.equal(state.resendCalls,2);
-  assert.match(state.lastResendRequest.headers['Idempotency-Key'],/^efsi\/(?:new_order|paid_order)\//);
-  assert.equal([...state.outbox.values()].every(row => row.status==='SENT'),true);
+  assert.equal(state.resendCalls, 2);
+  assert.match(state.lastResendRequest.headers['Idempotency-Key'], /^efsi\/(?:new_order|paid_order)\//);
+  assert.equal([...state.outbox.values()].every(row => row.status === 'SENT'), true);
+
+  const { body } = state.lastResendRequest;
+  assert.equal(body.subject, 'New Order Received – ECU File Service India');
+  assert.match(body.html, /New Order Received – ECU File Service India/);
+  assert.match(body.html, new RegExp(paid.verify.payload.orderId));
+  assert.match(body.html, /PAID/);
+  assert.match(body.html, /₹99\.00/);
+  assert.match(body.html, /Test Customer/);
+  assert.match(body.html, /customer@example\.invalid/);
+  assert.match(body.html, /\+919876543210/);
+  assert.match(body.html, /2022 Tata Nexon/);
+  assert.match(body.html, /Bosch MD1/);
+  assert.match(body.html, /KESS/);
+  assert.match(body.html, /DTC OFF/);
+  assert.match(body.html, /test-ecu\.bin/);
+});
+
+test('Resend outbox safely handles missing optional fields in order email', async () => {
+  const { request, fileText } = customerRequest();
+  request.category = 'AIRBAG';
+  request.contactEmail = '';
+  delete request.ecuManufacturer;
+  delete request.ecuModel;
+  delete request.readingTool;
+  delete request.notes;
+  const created = await call('/api/checkout/intents', { method: 'POST', token: tokens.customer, body: { request } });
+  state.objects.set(created.payload.storagePath, fileText);
+  await call(`/api/checkout/intents/${encodeURIComponent(created.payload.intentId)}/stage`, { method: 'POST', token: tokens.customer });
+  await call('/api/payment/create-order', { method: 'POST', token: tokens.customer, body: { intentId: created.payload.intentId } });
+  await call('/api/payment/verify', { method: 'POST', token: tokens.customer, body: { intentId: created.payload.intentId, razorpay_order_id: 'order_TestLocal01', razorpay_payment_id: 'pay_TestLocal01', razorpay_signature: crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update('order_TestLocal01|pay_TestLocal01').digest('hex') } });
+
+  await flushNotificationOutbox();
+  const { body } = state.lastResendRequest;
+  assert.equal(body.subject, 'New Order Received – ECU File Service India');
+  assert.doesNotMatch(body.html, /undefined/);
+  assert.doesNotMatch(body.html, /null/);
+  assert.match(body.html, /AIRBAG/);
+  assert.match(body.html, /N\/A/);
 });
 
 test('Resend failure moves an email event to RETRY instead of breaking the order', async () => {
