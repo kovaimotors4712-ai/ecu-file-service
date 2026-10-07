@@ -962,3 +962,39 @@ test('order messaging regression tests: full flow, RLS, length validation, and r
   const msgs = [...state.orderMessages.values()];
   assert.ok(msgs.find(m => m.message.includes('&lt;script&gt;')));
 });
+
+test('supabaseRequest sends service role key for service token and anon key for customer requests', async () => {
+  let capturedKeys = [];
+  setTestUpstreamRequest(async (urlValue, options) => {
+    capturedKeys.push({ url: urlValue, apikey: options.headers?.apikey });
+    return response(200, []);
+  });
+  await cleanupExpiredCheckoutIntents();
+  await call('/api/supabase/rest/v1/orders?select=id', { token: tokens.customer });
+  setTestUpstreamRequest(upstream);
+
+  assert.ok(capturedKeys.some(r => r.apikey === 'service_test_key'));
+  assert.ok(capturedKeys.some(r => r.apikey === 'sb_publishable_local_test'));
+});
+
+test('notification worker prevents concurrent/overlapping runs', async () => {
+  let activeRuns = 0;
+  let maxConcurrent = 0;
+  setTestUpstreamRequest(async (urlValue, options) => {
+    if (urlValue.includes('notification_outbox')) {
+      activeRuns++;
+      maxConcurrent = Math.max(maxConcurrent, activeRuns);
+      await new Promise(r => setTimeout(r, 50));
+      activeRuns--;
+      return response(200, []);
+    }
+    return upstream(urlValue, options);
+  });
+
+  await Promise.all([
+    flushNotificationOutbox(),
+    flushNotificationOutbox()
+  ]);
+  setTestUpstreamRequest(upstream);
+  assert.equal(maxConcurrent, 1);
+});

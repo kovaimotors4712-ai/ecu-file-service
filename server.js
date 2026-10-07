@@ -211,10 +211,11 @@ async function requireAdmin(request) {
 }
 
 async function supabaseRequest(token, route, { method = 'GET', body, prefer, headers = {}, timeoutMs = 30000 } = {}) {
+  const apikey = (token && supabaseServiceRoleKey && token === supabaseServiceRoleKey) ? supabaseServiceRoleKey : supabaseAnonKey;
   return requestHttps(`${supabaseUrl}/${route}`, {
     method,
     headers: {
-      apikey: supabaseAnonKey,
+      apikey,
       Authorization: `Bearer ${token}`,
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       ...(prefer ? { Prefer: prefer } : {}),
@@ -968,16 +969,20 @@ function triggerCleanupWorker(delay = 2000) {
     await cleanupExpiredCheckoutIntents().catch(() => {});
     triggerCleanupWorker(60 * 60 * 1000);
   }, delay);
+  cleanupWorkerTimer.unref();
 }
 
 function triggerNotificationWorker(delay = 500) {
   if (!supabaseServiceRoleKey || notificationWorkerTimer) return;
-  notificationWorkerTimer = setTimeout(async () => {
-    notificationWorkerTimer = null;
+  const run = async () => {
     await flushNotificationOutbox().catch(() => {});
-    const next = setTimeout(() => { notificationWorkerTimer = null; flushNotificationOutbox().catch(() => {}); }, 30000);
-    notificationWorkerTimer = next;
+    notificationWorkerTimer = setTimeout(run, 30000);
+    notificationWorkerTimer.unref();
+  };
+  notificationWorkerTimer = setTimeout(async () => {
+    await run();
   }, delay);
+  notificationWorkerTimer.unref();
 }
 
 async function cleanupExpiredCheckoutIntents() {
