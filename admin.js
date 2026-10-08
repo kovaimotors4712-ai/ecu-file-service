@@ -1,6 +1,9 @@
-(() => {
+(function init() {
   const backend = window.EfsiSupabase;
-  if (!backend) return;
+  if (!backend) {
+    setTimeout(init, 100);
+    return;
+  }
   const loginPanel = document.querySelector('#admin-login');
   const deniedPanel = document.querySelector('#admin-denied');
   const dashboard = document.querySelector('#admin-dashboard');
@@ -219,7 +222,7 @@
           '</div>'+
           '<p class="admin-message" role="status"></p>'+
         '</div>'+
-      '</article>';
+        '</article>';
     }).join('');
   }
 
@@ -330,11 +333,18 @@
   document.querySelector('#admin-auth').addEventListener('submit', async function(event) {
     event.preventDefault();
     message.classList.remove('admin-error');
-    message.textContent = 'Signing in…';
+    message.textContent = 'Authenticating...';
     try {
-      if (!await configured()) throw new Error('Supabase is not configured on this server.');
+      const isConfigured = await configured();
+      if (!isConfigured) throw new Error('Supabase is not configured on this server.');
       await backend.signIn(document.querySelector('#admin-email').value.trim(), document.querySelector('#admin-password').value);
       document.querySelector('#admin-password').value = '';
+      const session = backend.getSession();
+      if (!session?.user) throw new Error('Sign-in failed.');
+      if (session.user.app_metadata?.role !== 'admin') {
+         showDenied('This account is signed in but has no trusted administrator role.');
+         return;
+      }
       await enterAdmin();
     } catch (error) {
       message.textContent = error.message;
@@ -411,6 +421,5 @@
   if (resultFilter) resultFilter.addEventListener('change', renderOrders);
   if (sortSelect) sortSelect.addEventListener('change', renderOrders);
 
-  configured().then(function(ready) { if (!ready) message.textContent = 'Supabase is not configured yet. Check the server environment.'; });
   enterAdmin();
 })();

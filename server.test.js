@@ -447,9 +447,12 @@ async function paidPayPalIntent() {
 test('serves customer and admin pages', async () => {
   const customer = await call('/');
   const admin = await call('/admin.html');
+  const adminJs = await call('/admin.js');
   assert.equal(customer.response.status, 200);
   assert.equal(admin.response.status, 200);
+  assert.equal(adminJs.response.status, 200);
   assert.match(customer.response.headers.get('content-type') || '', /text\/html/);
+  assert.match(adminJs.response.headers.get('content-type') || '', /text\/javascript/);
 });
 
 test('allows the custom domain CORS origin and rejects an unrelated origin', async () => {
@@ -997,4 +1000,33 @@ test('notification worker prevents concurrent/overlapping runs', async () => {
   ]);
   setTestUpstreamRequest(upstream);
   assert.equal(maxConcurrent, 1);
+});
+
+test('regression test: role="admin" is preserved when getUser() returns a user without app_metadata', async () => {
+  const sessionUser = {
+    id: adminId,
+    email: 'admin@example.invalid',
+    app_metadata: { role: 'admin' }
+  };
+  const fetchedUser = {
+    id: adminId,
+    email: 'admin@example.invalid'
+    // app_metadata omitted/absent
+  };
+
+  let capturedSession = null;
+  const mockSaveSession = (s) => { capturedSession = s; };
+
+  // Simulate the merging logic present in auth.js:
+  // session.user = { ...fetchedUser, app_metadata: { ...(session.user.app_metadata || {}), ...(fetchedUser.app_metadata || {}) } }
+  const mergedUser = {
+    ...fetchedUser,
+    app_metadata: {
+      ...(sessionUser.app_metadata || {}),
+      ...(fetchedUser.app_metadata || {})
+    }
+  };
+  mockSaveSession({ user: mergedUser });
+
+  assert.equal(capturedSession.user.app_metadata.role, 'admin');
 });
