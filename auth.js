@@ -122,7 +122,10 @@
     if (ordersPanel) ordersPanel.hidden = !email;
     if (pendingPanel) pendingPanel.hidden = !email;
     if (notificationPanel) notificationPanel.hidden = !email;
-    if (email && dialog?.open) { loadCustomerOrders(); loadPendingCheckouts(); loadCustomerNotifications(); subscribeToOrders(); }
+    if (email && dialog?.open) {
+      loadCustomerOrders(); loadPendingCheckouts(); loadCustomerNotifications(); subscribeToOrders();
+      api.auth.getUser().then(user => { if (user?.id === session.user.id) saveSession({ ...session, user }); }).catch(console.error);
+    }
   }
 
   async function loadCustomerOrders() {
