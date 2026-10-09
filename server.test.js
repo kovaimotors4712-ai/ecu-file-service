@@ -1030,3 +1030,10 @@ test('regression test: role="admin" is preserved when getUser() returns a user w
 
   assert.equal(capturedSession.user.app_metadata.role, 'admin');
 });
+
+test('regression test: index.html references auth.js with version parameter and server serves static assets correctly', async () => {
+  const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  assert.ok(indexHtml.includes('auth.js?v=ba583d0'));
+  assert.ok(indexHtml.includes('app.js?v=ba583d0'));
+  assert.ok(indexHtml.includes('supabase.js?v=ba583d0'));
+});
