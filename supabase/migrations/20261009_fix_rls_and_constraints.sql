@@ -1,4 +1,4 @@
-﻿-- Migration: [`supabase/migrations/20261009_fix_rls_and_constraints.sql`](supabase/migrations/20261009_fix_rls_and_constraints.sql)
+﻿-- Migration: [`supabase/migrations/20261009_fix_rls_and_constraints.sql`](supabase/migrations/20261009_fix_rls_and_constraints.sql:1)
 -- Description: Idempotent fix for RLS, column privileges, and constraints for notifications and order messages.
 -- NOTE: Production SQL was NOT executed. This script is wrapped in a transaction block (BEGIN; ... COMMIT;)
 -- and executes with RLS continuously enabled (without any DISABLE ROW LEVEL SECURITY period).
@@ -18,6 +18,42 @@ create table if not exists public.notifications (
   created_at timestamptz default now()
 );
 
+-- Safely handle existing table: migrate legacy checkout_intents order_id reference to orders(id), check for orphans, and ensure foreign key
+do $$
+declare
+  v_orphan_count integer;
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'notifications') then
+    if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'checkout_intents') then
+      update public.notifications n
+      set order_id = c.order_id
+      from public.checkout_intents c
+      where n.order_id = c.id
+        and c.order_id is not null;
+    end if;
+
+    select count(*) into v_orphan_count
+    from public.notifications n
+    where not exists (
+      select 1 from public.orders o where o.id = n.order_id
+    );
+
+    if v_orphan_count > 0 then
+      raise exception 'Migration aborted: found % orphan notification(s) with order_id not present in public.orders.', v_orphan_count;
+    end if;
+
+    alter table public.notifications drop constraint if exists notifications_order_id_fkey;
+    if not exists (
+      select 1 from information_schema.table_constraints tc
+      join information_schema.key_column_usage kcu on tc.constraint_name = kcu.constraint_name
+      where tc.table_schema = 'public' and tc.table_name = 'notifications' and tc.constraint_type = 'FOREIGN KEY' and kcu.column_name = 'order_id'
+    ) then
+      alter table public.notifications
+        add constraint notifications_order_id_fkey foreign key (order_id) references public.orders(id) on delete cascade;
+    end if;
+  end if;
+end $$;
+
 create index if not exists notifications_customer_id_idx on public.notifications(customer_id, created_at desc);
 
 -- 3. Complete CREATE TABLE IF NOT EXISTS for public.order_messages matching columns in server.js and auth.js
@@ -32,6 +68,22 @@ create table if not exists public.order_messages (
   constraint order_messages_order_owner_fk foreign key (order_id, customer_id)
     references public.orders(id, customer_id) on delete cascade
 );
+
+-- Safely handle existing order_messages table constraints
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'order_messages') then
+    alter table public.order_messages drop constraint if exists order_messages_order_owner_fk;
+    if not exists (
+      select 1 from information_schema.table_constraints
+      where table_schema = 'public' and table_name = 'order_messages' and constraint_name = 'order_messages_order_owner_fk'
+    ) then
+      alter table public.order_messages
+        add constraint order_messages_order_owner_fk foreign key (order_id, customer_id)
+        references public.orders(id, customer_id) on delete cascade;
+    end if;
+  end if;
+end $$;
 
 create index if not exists order_messages_order_created_idx on public.order_messages(order_id, created_at asc);
 create index if not exists order_messages_customer_unread_idx on public.order_messages(customer_id, is_read)
