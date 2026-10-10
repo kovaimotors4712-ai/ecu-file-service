@@ -79,6 +79,7 @@
     if (!response.ok) { let body = null; try { body = await response.json(); } catch {} throw new Error(body?.message || body?.error || `File download failed (${response.status})`); }
     return response.blob();
   }
+  function formatINR(paise) { return new Intl.NumberFormat('en-IN', { style:'currency', currency:'INR', minimumFractionDigits:0, maximumFractionDigits:2 }).format(Number(paise || 0) / 100); }
   function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": "'" })[char]); }
 
   function saveSession(next) {
@@ -149,7 +150,7 @@
     const requestId = ++ordersRequest;
     list.textContent = 'Loading your orders…';
     try {
-      const rows = await rest(`orders?select=id,status,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,selected_services,payment_status,payment_provider,provider_order_id,provider_payment_id,created_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,created_at)&customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.desc&limit=50`);
+      const rows = await rest(`orders?select=id,status,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,selected_services,payment_status,payment_provider,provider_order_id,provider_payment_id,second_stage_amount,second_stage_status,second_stage_payment_link,created_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,created_at)&customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.desc&limit=50`);
       if (requestId !== ordersRequest || session?.user?.id !== customerId) return;
       if (!Array.isArray(rows) || !rows.length) { list.textContent = 'No orders yet. Your active and completed requests will appear here.'; return; }
       list.innerHTML = rows.map(order => {
@@ -159,6 +160,11 @@
         const statusSteps = ['Payment', 'File Received', 'File Review', 'Processing', 'Completed'];
         const currentStepIndex = statusSteps.indexOf(order.status) >= 0 ? statusSteps.indexOf(order.status) : 0;
         const timeline = `<div class="order-timeline">${statusSteps.map((step, index) => `<span class="${index <= currentStepIndex ? 'active' : ''}">${step}</span>`).join(' → ')}</div>`;
+        const secondStage = order.second_stage_amount > 0 ? `
+          <div style="margin-top:10px;padding:10px;background:#fff8ed;border:1px solid #fce3b8;border-radius:4px">
+            <p style="margin:0 0 5px;font-size:12px"><strong>Second-Stage Payment:</strong> ${formatINR(order.second_stage_amount)} (${order.second_stage_status === 'paid' ? '<span style="color:#586b24">Paid</span>' : '<span style="color:#a87a2a">Pending</span>'})</p>
+            ${(order.second_stage_status !== 'paid' && order.second_stage_payment_link) ? `<a href="${escapeHtml(order.second_stage_payment_link)}" target="_blank" rel="noopener noreferrer" class="button button-dark" style="font-size:10px;padding:5px 10px;text-decoration:none;display:inline-block">Pay Now</a>` : ''}
+          </div>` : '';
         return `<article class="customer-order-card" data-order-id="${escapeHtml(order.id)}">
           <div class="customer-order-top">
             <b>Order: ${escapeHtml(order.id.slice(0, 8))}</b>
@@ -169,6 +175,7 @@
             <p><strong>Services:</strong> ${escapeHtml((order.selected_services || []).join(', '))}</p>
             <p><strong>Created:</strong> ${new Date(order.created_at).toLocaleDateString()}</p>
             ${timeline}
+            ${secondStage}
           </div>
           <div class="customer-order-actions">
             ${processed.length > 0 ? `<button type="button" class="customer-file-download" data-order-id="${escapeHtml(order.id)}" data-object-path="${escapeHtml(processed[0].object_path)}" data-file-name="${escapeHtml(processed[0].original_name)}">Result Ready · Download</button>` : '<small>Processing...</small>'}
@@ -183,6 +190,7 @@
     const list = document.querySelector('#customer-notification-list');
     const customerId = session?.user?.id;
     if (!list || !customerId) return;
+    list.textContent = 'Loading notifications…';
     try {
       const rows = await rest(`notifications?select=id,order_id,message,is_read,created_at&customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.desc&limit=20`);
       const unreadCount = rows.filter(n => !n.is_read).length;
@@ -190,7 +198,7 @@
       if (countEl) countEl.textContent = unreadCount > 0 ? unreadCount : '';
       if (!Array.isArray(rows) || !rows.length) { list.innerHTML = '<small>No notifications yet.</small>'; return; }
       list.innerHTML = rows.map(item => `<article class="notification-item ${item.is_read ? '' : 'unread'}" data-notification-id="${escapeHtml(item.id)}" data-order-id="${escapeHtml(item.order_id)}"><div><p>${escapeHtml(item.message)}</p><small>${new Date(item.created_at).toLocaleString()}</small></div>${item.is_read ? '' : '<span class="unread-dot"></span>'}</article>`).join('');
-    } catch (error) { list.textContent = `Notifications could not be loaded. ${error.message || ''}`; }
+    } catch (error) { list.innerHTML = `<small>Notifications could not be loaded: ${escapeHtml(error.message || 'Please retry.')}</small>`; }
   }
 
   async function markNotificationRead(notificationId) {
@@ -293,6 +301,77 @@
       button.disabled = false;
     }
   });
+  document.querySelector('.customer-order-list')?.addEventListener('click', async event => {
+    const button = event.target.closest('.customer-pay-now'); if (!button || button.disabled) return;
+    const orderId = button.dataset.orderId;
+    if (!orderId) return;
+    button.disabled = true;
+    const prevText = button.textContent;
+    button.textContent = 'Processing…';
+    try {
+      if (typeof window.Razorpay !== 'function') {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('Razorpay Checkout SDK failed to load.'));
+          document.head.appendChild(script);
+        });
+      }
+      const token = await accessToken();
+      const res = await fetch('/api/payment/second-stage/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ orderId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to initialize payment.');
+
+      const rzp = new window.Razorpay({
+        key: data.keyId,
+        amount: data.amount,
+        currency: data.currency,
+        order_id: data.providerOrderId,
+        name: data.businessName || 'ECU FILE SERVICE INDIA',
+        description: 'Second-Stage Service Fee',
+        handler: async function (response) {
+          button.textContent = 'Verifying…';
+          try {
+            const verifyToken = await accessToken();
+            const verifyRes = await fetch('/api/payment/second-stage/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${verifyToken}` },
+              body: JSON.stringify({
+                orderId,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature
+              })
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) throw new Error(verifyData.error || 'Payment verification failed.');
+            await loadCustomerOrders();
+          } catch (err) {
+            alert(err.message || 'Verification error.');
+            button.disabled = false;
+            button.textContent = prevText;
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            button.disabled = false;
+            button.textContent = prevText;
+          }
+        }
+      });
+      rzp.open();
+    } catch (err) {
+      alert(err.message || 'Payment failed to start.');
+      button.disabled = false;
+      button.textContent = prevText;
+    }
+  });
+
   document.querySelector('.customer-order-list')?.addEventListener('click', async event => {
     const button = event.target.closest('.customer-file-download'); if (!button || button.disabled) return;
     const orderId = button.dataset.orderId; const objectPath = button.dataset.objectPath || '';

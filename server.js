@@ -711,6 +711,132 @@ async function handleAdminPaymentStatus(request, response) {
   return true;
 }
 
+async function handleAdminCreateSecondStagePaymentLink(request, response) {
+  if (request.method !== 'POST') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
+  try {
+    const admin = await requireAdmin(request);
+    if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
+    const body = await readJson(request);
+    const orderId = String(body?.orderId || '');
+    if (!/^[0-9a-f-]{36}$/i.test(orderId)) { jsonResponse(response, 400, { error: 'Invalid order reference.' }); return true; }
+    const amountPaise = Number(body?.amountPaise ?? body?.amount);
+    if (!Number.isSafeInteger(amountPaise) || amountPaise <= 0) {
+      jsonResponse(response, 400, { error: 'Enter a valid positive integer amount in paise.' });
+      return true;
+    }
+
+    const orderRes = await supabaseRequest(admin.token, `rest/v1/orders?id=eq.${encodeURIComponent(orderId)}&select=id,status,payment_status,contact_name,contact_email,contact_phone,second_stage_status,second_stage_amount,second_stage_payment_link`, { timeoutMs: 15000 });
+    if (!orderRes.ok) { jsonResponse(response, 404, { error: 'Order could not be loaded.' }); return true; }
+    const rows = await orderRes.json();
+    const order = rows?.[0];
+    if (!order) { jsonResponse(response, 404, { error: 'Order not found.' }); return true; }
+    if (order.status !== 'Possible') {
+      jsonResponse(response, 409, { error: 'Second-stage payment can only be created when the order is in Possible status.' });
+      return true;
+    }
+    if (order.second_stage_status === 'paid') {
+      jsonResponse(response, 409, { error: 'Second-stage payment is already completed; payment link cannot be created.' });
+      return true;
+    }
+    if (String(order.payment_status || '').toUpperCase() !== 'PAID') {
+      jsonResponse(response, 400, { error: 'Original payment must be completed before creating second-stage payment.' });
+      return true;
+    }
+
+    const plPayload = {
+      amount: amountPaise,
+      currency: 'INR',
+      accept_partial: false,
+      description: `Second-stage payment for order ${orderId}`,
+      customer: {
+        name: order.contact_name || 'Customer',
+        email: order.contact_email || undefined,
+        contact: order.contact_phone || undefined
+      },
+      notify: { sms: false, email: false },
+      reminder_enable: true,
+      notes: { order_id: orderId, type: 'second_stage' }
+    };
+
+    const plResponse = await razorpayApi('payment_links', { method: 'POST', body: plPayload });
+    const paymentLinkUrl = String(plResponse?.short_url || plResponse?.payment_link_url || plResponse?.url || '');
+    try {
+      const parsedUrl = new URL(paymentLinkUrl);
+      if (parsedUrl.protocol !== 'https:' || !/(?:^|\.)(rzp\.io|razorpay\.com)$/i.test(parsedUrl.hostname)) {
+        throw new Error('Invalid payment link URL domain');
+      }
+    } catch {
+      throw Object.assign(new Error('Razorpay returned an invalid payment link URL.'), { statusCode: 502 });
+    }
+
+    const patchBody = {
+      second_stage_amount: amountPaise,
+      second_stage_payment_link: paymentLinkUrl,
+      second_stage_status: 'pending'
+    };
+
+    const updated = await supabaseRequest(admin.token, `rest/v1/orders?id=eq.${encodeURIComponent(orderId)}&select=*`, {
+      method: 'PATCH',
+      prefer: 'return=representation',
+      body: patchBody,
+      timeoutMs: 15000
+    });
+    if (!updated.ok) {
+      const err = await updated.json().catch(() => null);
+      jsonResponse(response, updated.status >= 500 ? 502 : 409, { error: err?.message || 'Second-stage payment link could not be saved.' });
+      return true;
+    }
+    const updatedRows = await updated.json();
+    jsonResponse(response, 200, { order: updatedRows?.[0] || null });
+  } catch (error) {
+    jsonResponse(response, error.statusCode || (error.code === 'RAZORPAY_UPSTREAM' ? 502 : 400), { error: error.message || 'Failed to create second-stage Razorpay payment link.' });
+  }
+  return true;
+}
+
+async function handleAdminMarkSecondStagePaid(request, response) {
+  if (request.method !== 'POST') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
+  try {
+    const admin = await requireAdmin(request);
+    if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
+    const body = await readJson(request);
+    const orderId = String(body?.orderId || '');
+    if (!/^[0-9a-f-]{36}$/i.test(orderId)) { jsonResponse(response, 400, { error: 'Invalid order reference.' }); return true; }
+
+    const orderRes = await supabaseRequest(admin.token, `rest/v1/orders?id=eq.${encodeURIComponent(orderId)}&select=id,status,payment_status,second_stage_status,second_stage_payment_link,second_stage_amount`, { timeoutMs: 15000 });
+    if (!orderRes.ok) { jsonResponse(response, 404, { error: 'Order could not be loaded.' }); return true; }
+    const rows = await orderRes.json();
+    const order = rows?.[0];
+    if (!order) { jsonResponse(response, 404, { error: 'Order not found.' }); return true; }
+    if (!order.second_stage_payment_link) {
+      jsonResponse(response, 400, { error: 'Cannot mark second-stage paid without a payment link.' });
+      return true;
+    }
+
+    const patchBody = {
+      second_stage_status: 'paid',
+      second_stage_paid_at: new Date().toISOString()
+    };
+
+    const updated = await supabaseRequest(admin.token, `rest/v1/orders?id=eq.${encodeURIComponent(orderId)}`, {
+      method: 'PATCH',
+      prefer: 'return=representation',
+      body: patchBody,
+      timeoutMs: 15000
+    });
+    if (!updated.ok) {
+      const err = await updated.json().catch(() => null);
+      jsonResponse(response, updated.status >= 500 ? 502 : 409, { error: err?.message || 'Second-stage payment could not be marked paid.' });
+      return true;
+    }
+    const updatedRows = await updated.json();
+    jsonResponse(response, 200, { order: updatedRows?.[0] || null });
+  } catch (error) {
+    jsonResponse(response, error.statusCode || 400, { error: error.message || 'Failed to mark second-stage payment paid.' });
+  }
+  return true;
+}
+
 function sanitizeMessageText(text) {
   return String(text || '').trim().replace(/[&<>'"]/g, tag => ({
     '&': '&amp;',
@@ -1019,6 +1145,8 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/payment/paypal/capture') return handleCapturePayPal(request, response);
   if (url.pathname === '/api/admin/orders/status') return handleAdminStatus(request, response);
   if (url.pathname === '/api/admin/payment-status') return handleAdminPaymentStatus(request, response);
+  if (url.pathname === '/api/admin/orders/second-stage-amount' || url.pathname === '/api/admin/orders/set-second-stage' || url.pathname === '/api/admin/orders/second-stage/create-payment-link') return handleAdminCreateSecondStagePaymentLink(request, response);
+  if (url.pathname === '/api/admin/orders/second-stage/mark-paid') return handleAdminMarkSecondStagePaid(request, response);
   if (url.pathname === '/api/orders/messages' && request.method === 'GET') return handleGetMessages(request, response, url);
   if (url.pathname === '/api/orders/messages' && request.method === 'POST') return handleSendMessage(request, response);
   if (url.pathname === '/api/admin/orders/messages' && request.method === 'GET') return handleAdminGetMessages(request, response, url);

@@ -89,7 +89,7 @@
     statusMessage.textContent='Loading orders…';
     statusMessage.classList.remove('admin-error');
     try{
-      orders=await backend.rest('orders?select=id,customer_id,status,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,selected_services,notes,contact_name,contact_phone,contact_email,payment_status,payment_provider,provider_order_id,provider_payment_id,verification_amount_paise,created_at,updated_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,size_bytes,created_at)&order=created_at.desc&limit=500');
+      orders=await backend.rest('orders?select=id,customer_id,status,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,selected_services,notes,contact_name,contact_phone,contact_email,payment_status,payment_provider,provider_order_id,provider_payment_id,verification_amount_paise,second_stage_amount,second_stage_status,second_stage_paid_at,created_at,updated_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,size_bytes,created_at)&order=created_at.desc&limit=500');
       if(!Array.isArray(orders))throw new Error('The orders response was not a list.');
       document.querySelector('#stat-total').textContent = orders.length;
       document.querySelector('#stat-payment-pending').textContent = orders.filter(function(o){return o.status==='Payment Pending'||o.payment_status==='PENDING';}).length;
@@ -202,6 +202,7 @@
           '<div><small>FILE VERIFICATION FEE</small><b>'+(order.verification_amount_paise!=null?escape(formatINR(order.verification_amount_paise)):'—')+'</b></div>'+
           '<div><small>PAYMENT STATUS</small><b>'+escape(payment)+'<br><span style="font-family:var(--mono);font-size:9px;color:#7f8a84">Ref: '+escape(paymentRef)+'</span></b></div>'+
           '<div><small>RESULT AVAILABILITY</small><b>'+(processedFile?'<span style="color:#586b24">Processed Result Ready</span>':'<span style="color:#a87a2a">Result Pending</span>')+'</b></div>'+
+          (order.status==='Possible' ? ('<div class="admin-second-stage-wrap" style="grid-column:1/-1;border-top:1px solid #e3e8df;margin-top:8px;padding-top:8px"><small style="display:block;font:800 8px var(--mono);color:#7d8983;letter-spacing:0.1em;margin-bottom:3px">SECOND-STAGE PAYMENT</small><div style="display:flex;gap:8px;align-items:center"><input type="number" id="stage-amount-'+escape(order.id)+'" value="'+(order.second_stage_amount||'')+'" placeholder="Amount (paise)" style="padding:4px;width:100px;font-size:11px"><input type="text" id="stage-link-'+escape(order.id)+'" value="'+escape(order.second_stage_payment_link||'')+'" placeholder="Payment Link URL" style="padding:4px;width:150px;font-size:11px"><button class="button button-dark" type="button" onclick="window.handleAdminSetSecondStage(\''+escape(order.id)+'\')">Save</button>'+(order.second_stage_status==='paid'?'<span style="color:#586b24;font-size:11px;margin-left:8px">✓ Paid</span>':'<button class="button button-ghost" type="button" onclick="window.handleAdminMarkSecondStagePaid(\''+escape(order.id)+'\')">Mark Paid</button>')+'</div></div>') : '')+
         '</div>'+
         (order.notes?('<div style="margin-bottom:14px;padding:10px 14px;background:#f9fbf7;border:1px solid #e8ede3;font-size:11px"><small style="display:block;font:800 8px var(--mono);color:#7d8983;letter-spacing:0.1em;margin-bottom:3px">CUSTOMER NOTES</small>'+escape(order.notes)+'</div>'):'')+
         '<div class="admin-files-box">'+
@@ -283,6 +284,59 @@
       });
       if (!inserted) throw new Error('The processed file could not be registered.');
       if (local) local.textContent = 'Processed file uploaded and linked successfully.';
+      await loadOrders();
+    } catch (error) {
+      if (local) {
+        local.textContent = error.message;
+        local.classList.add('admin-error');
+      }
+    }
+  };
+
+  window.handleAdminSetSecondStage = async function(id) {
+    const card = document.querySelector('[data-order-id="'+CSS.escape(id)+'"]');
+    const inputAmount = document.querySelector('#stage-amount-'+CSS.escape(id));
+    const inputLink = document.querySelector('#stage-link-'+CSS.escape(id));
+    const local = card?.querySelector('.admin-message');
+    const amountVal = Number(inputAmount?.value);
+    const linkVal = inputLink?.value.trim();
+    if (!Number.isFinite(amountVal) || amountVal <= 0 || !linkVal) {
+      if (local) { local.textContent = 'Enter a valid positive amount and payment link.'; local.classList.add('admin-error'); }
+      return;
+    }
+    if (local) { local.textContent = 'Saving second-stage payment details…'; local.classList.remove('admin-error'); }
+    try {
+      const token = await backend.getAccessToken();
+      const response = await fetch('/api/admin/orders/second-stage/create-payment-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer '+token },
+        body: JSON.stringify({ orderId: id, amountPaise: Math.round(amountVal), paymentLink: linkVal })
+      });
+      const result = await parseJson(response);
+      if (!response.ok) throw new Error(result.error || 'Second-stage payment details could not be saved.');
+      if (local) local.textContent = 'Second-stage payment saved successfully.';
+      await loadOrders();
+    } catch (error) {
+      if (local) {
+        local.textContent = error.message;
+        local.classList.add('admin-error');
+      }
+    }
+  };
+
+  window.handleAdminMarkSecondStagePaid = async function(id) {
+    const card = document.querySelector('[data-order-id="'+CSS.escape(id)+'"]');
+    const local = card?.querySelector('.admin-message');
+    if (local) { local.textContent = 'Marking paid…'; local.classList.remove('admin-error'); }
+    try {
+      const token = await backend.getAccessToken();
+      const response = await fetch('/api/admin/orders/second-stage/mark-paid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer '+token },
+        body: JSON.stringify({ orderId: id })
+      });
+      const result = await parseJson(response);
+      if (!response.ok) throw new Error(result.error || 'Second-stage payment could not be marked paid.');
       await loadOrders();
     } catch (error) {
       if (local) {
