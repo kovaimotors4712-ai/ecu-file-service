@@ -1144,9 +1144,46 @@ test('comprehensive second-stage security, validation, error, idempotency, and r
   // 3. Order ownership verification for second-stage payment creation & verification
   // Set order to Possible and set amount first
   await call('/api/admin/orders/status', { method: 'POST', token: tokens.admin, body: { orderId, status: 'Possible' } });
-  await call('/api/admin/orders/second-stage-amount', { method: 'POST', token: tokens.admin, body: { orderId, amountPaise: 12000 } });
+  await call('/api/admin/orders/second-stage/create-payment-link', { method: 'POST', token: tokens.admin, body: { orderId, amountPaise: 12000, paymentLink: 'https://rzp.io/i/test123' } });
 
   const otherCreate = await call('/api/payment/second-stage/create-order', { method: 'POST', token: tokens.other, body: { orderId } });
   assert.equal(otherCreate.response.status, 404);
+
+  // 4. Test unauthorized modification attempt
+  const customerHack = await call('/api/supabase/rest/v1/orders?id=eq.' + orderId, {
+    method: 'PATCH',
+    token: tokens.customer,
+    body: { second_stage_amount: 99999 }
+  });
+  // RLS or trigger must explicitly reject with 403 or 409 and NOT 500
+  assert.ok(customerHack.response.status === 403 || customerHack.response.status === 409);
+
+  // Verify second-stage fields remain unchanged
+  const checkOrder = state.orders.get(orderId);
+  assert.equal(checkOrder.second_stage_amount, 12000);
+
+  // 5. Test zero and negative amount validation checks in create-payment-link
+  const zeroAmountRes = await call('/api/admin/orders/second-stage/create-payment-link', {
+    method: 'POST',
+    token: tokens.admin,
+    body: { orderId, amountPaise: 0, paymentLink: 'https://rzp.io/i/test0' }
+  });
+  assert.equal(zeroAmountRes.response.status, 400);
+
+  const negativeAmountRes = await call('/api/admin/orders/second-stage/create-payment-link', {
+    method: 'POST',
+    token: tokens.admin,
+    body: { orderId, amountPaise: -100, paymentLink: 'https://rzp.io/i/testneg' }
+  });
+  assert.equal(negativeAmountRes.response.status, 400);
+
+  // 6. Test creating/changing payment link when order is NOT in Possible status
+  await call('/api/admin/orders/status', { method: 'POST', token: tokens.admin, body: { orderId, status: 'Processing' } });
+  const notPossibleRes = await call('/api/admin/orders/second-stage/create-payment-link', {
+    method: 'POST',
+    token: tokens.admin,
+    body: { orderId, amountPaise: 5000, paymentLink: 'https://rzp.io/i/testnotpossible' }
+  });
+  assert.equal(notPossibleRes.response.status, 409);
 
 });
