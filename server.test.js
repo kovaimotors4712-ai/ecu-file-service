@@ -535,6 +535,19 @@ test('does not expose project secrets, fixtures, or migration files', async () =
   }
 });
 
+test('serves exact Google verification file googlea2bbe9d2fd8bede2.html and blocks arbitrary html files', async () => {
+  const good = await fetch(`${baseUrl}/googlea2bbe9d2fd8bede2.html`);
+  assert.equal(good.status, 200);
+  const text = await good.text();
+  assert.match(text, /google-site-verification/);
+
+  const bad = await fetch(`${baseUrl}/google1234567890abcdef.html`);
+  assert.equal(bad.status, 404);
+
+  const arbitrary = await fetch(`${baseUrl}/arbitrary.html`);
+  assert.equal(arbitrary.status, 404);
+});
+
 test('unknown API routes return JSON 404', async () => {
   const result = await call('/api/not-real');
   assert.equal(result.response.status, 404);
