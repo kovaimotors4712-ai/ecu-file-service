@@ -499,6 +499,20 @@ test('serves customer and admin pages', async () => {
   assert.match(adminJs.response.headers.get('content-type') || '', /text\/javascript/);
 });
 
+test('serves robots.txt and sitemap.xml with correct headers and content', async () => {
+  const robots = await call('/robots.txt');
+  const sitemap = await call('/sitemap.xml');
+  assert.equal(robots.response.status, 200);
+  assert.equal(sitemap.response.status, 200);
+  assert.match(robots.response.headers.get('content-type') || '', /text\/plain/);
+  assert.match(sitemap.response.headers.get('content-type') || '', /(?:application|text)\/xml/);
+  assert.match(robots.payload, /User-agent: \*/);
+  assert.match(robots.payload, /Disallow: \/admin/);
+  assert.match(robots.payload, /Disallow: \/api\//);
+  assert.match(robots.payload, /Sitemap: https:\/\/ecufileservice\.in\/sitemap\.xml/);
+  assert.match(sitemap.payload, /<loc>https:\/\/ecufileservice\.in\/<\/loc>/);
+});
+
 test('allows the custom domain CORS origin and rejects an unrelated origin', async () => {
   const good = await fetch(`${baseUrl}/api/health`, { headers:{ Origin:'https://ecufileservice.in' } });
   const bad = await fetch(`${baseUrl}/api/health`, { headers:{ Origin:'https://evil.example' } });

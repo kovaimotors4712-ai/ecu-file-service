@@ -230,7 +230,8 @@
     auth: {
       async updateUser(attributes) { return request('auth/v1/user', { method: 'PUT', body: attributes }); },
       async getUser() { return request('auth/v1/user'); },
-      async verifyRecoveryToken(tokenHash) { return request('auth/v1/verify', { method: 'POST', body: { type: 'recovery', token_hash: tokenHash } }); },
+      async verifyToken(tokenHash, type) { return request('auth/v1/verify', { method: 'POST', body: { type, token_hash: tokenHash } }); },
+      async verifyRecoveryToken(tokenHash) { return api.auth.verifyToken(tokenHash, 'recovery'); },
       async resetPasswordForEmail(email, { redirectTo = window.location.origin } = {}) { const redirect = new URL(redirectTo, window.location.origin); if (redirect.origin !== window.location.origin) throw new Error('Password reset must return to this website.'); return request(`auth/v1/recover?redirect_to=${encodeURIComponent(redirect.toString())}`, { method: 'POST', body: { email } }); }
     }
   };
@@ -476,18 +477,20 @@
 
   async function handleAuthCallback() {
     const query = new URLSearchParams(location.search); const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
-    const getParam = name => fragment.get(name) || query.get(name); const type = String(getParam('type') || '').toLowerCase(); const recovery = type === 'recovery' || type === 'password_recovery';
+    const getParam = name => fragment.get(name) || query.get(name); const type = String(getParam('type') || '').toLowerCase(); const recovery = type === 'recovery' || type === 'password_recovery' || type === 'signup';
     const authError = getParam('error_description') || getParam('error'); if (!recovery && !authError) return;
     history.replaceState(null, document.title, location.pathname);
-    if (authError) { showSignIn(`This password reset link could not be used: ${authError}.`); if (!dialog.open) dialog.showModal(); return; }
+    if (authError) { showSignIn(`This ${type === 'signup' ? 'signup confirmation' : 'password reset'} link could not be used: ${authError}.`); if (!dialog.open) dialog.showModal(); return; }
     try {
       const access = getParam('access_token'); const hash = getParam('token_hash');
       if (access) saveSession(withExpiry({ access_token: access, refresh_token: getParam('refresh_token'), token_type: getParam('token_type') || 'bearer', expires_in: Number(getParam('expires_in')) || 3600, expires_at: Number(getParam('expires_at')) || undefined }));
-      else if (hash) { saveSession(null); saveSession(withExpiry(await api.auth.verifyRecoveryToken(hash))); }
-      else throw new Error('The reset link did not include a recovery session.');
-      const user = await api.auth.getUser(); if (!user?.id) throw new Error('The recovery session is invalid or expired.');
-      saveSession({ ...session, user }); authEvent = 'PASSWORD_RECOVERY'; showPasswordReset('Enter and confirm your new password below.');
-    } catch (error) { authEvent = null; saveSession(null); showSignIn(error.message || 'This recovery link is invalid or expired.'); if (!dialog.open) dialog.showModal(); }
+      else if (hash) { saveSession(null); saveSession(withExpiry(await api.auth.verifyToken(hash, type))); }
+      else throw new Error('The link did not include a valid session.');
+      const user = await api.auth.getUser(); if (!user?.id) throw new Error('The session is invalid or expired.');
+      saveSession({ ...session, user });
+      if (type === 'signup') { showSignIn('Account confirmed! You are now signed in.'); }
+      else { authEvent = 'PASSWORD_RECOVERY'; showPasswordReset('Enter and confirm your new password below.'); }
+    } catch (error) { authEvent = null; saveSession(null); showSignIn(error.message || 'This link is invalid or expired.'); if (!dialog.open) dialog.showModal(); }
   }
 
   document.querySelector('.account-signout').addEventListener('click', async () => { try { await api.signOut(); message.textContent = 'You are signed out.'; } catch (error) { message.textContent = error.message; } });
