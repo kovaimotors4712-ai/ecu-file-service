@@ -507,7 +507,10 @@ test('serves robots.txt and sitemap.xml with correct headers and content', async
   assert.match(robots.response.headers.get('content-type') || '', /text\/plain/);
   assert.match(sitemap.response.headers.get('content-type') || '', /(?:application|text)\/xml/);
   assert.match(robots.payload, /User-agent: \*/);
+  assert.match(robots.payload, /Allow: \//);
+  assert.doesNotMatch(robots.payload, /^Disallow: \/\s*$/m);
   assert.match(robots.payload, /Disallow: \/admin/);
+  assert.match(robots.payload, /Disallow: \/admin\.html/);
   assert.match(robots.payload, /Disallow: \/api\//);
   assert.match(robots.payload, /Sitemap: https:\/\/ecufileservice\.in\/sitemap\.xml/);
   assert.match(sitemap.payload, /<loc>https:\/\/ecufileservice\.in\/<\/loc>/);
