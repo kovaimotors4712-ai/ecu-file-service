@@ -930,8 +930,9 @@ async function handleAdminGetMessages(request, response, url) {
     if (!/^[0-9a-f-]{36}$/i.test(orderId)) { jsonResponse(response, 400, { error: 'Invalid order reference.' }); return true; }
 
     const orderRes = await supabaseRequest(admin.token, `rest/v1/orders?select=id,customer_id&id=eq.${encodeURIComponent(orderId)}&limit=1`, { timeoutMs: 15000 });
-    if (!orderRes.ok || (await orderRes.json()).length === 0) { jsonResponse(response, 404, { error: 'Order not found.' }); return true; }
-    const orderData = (await orderRes.json())[0];
+    const orderRows = orderRes.ok ? await orderRes.json().catch(() => []) : [];
+    if (!Array.isArray(orderRows) || orderRows.length === 0) { jsonResponse(response, 404, { error: 'Order not found.' }); return true; }
+    const orderData = orderRows[0];
 
     const messagesRes = await supabaseRequest(admin.token, `rest/v1/order_messages?select=id,order_id,customer_id,sender_type,message,is_read,created_at&order_id=eq.${encodeURIComponent(orderId)}&order=created_at.asc`, { timeoutMs: 15000 });
     if (!messagesRes.ok) { jsonResponse(response, 502, { error: 'Messages could not be loaded.' }); return true; }
@@ -969,8 +970,9 @@ async function handleAdminReply(request, response) {
     }
 
     const orderRes = await supabaseRequest(admin.token, `rest/v1/orders?select=id,customer_id&id=eq.${encodeURIComponent(orderId)}&limit=1`, { timeoutMs: 15000 });
-    if (!orderRes.ok || (await orderRes.json()).length === 0) { jsonResponse(response, 404, { error: 'Order not found.' }); return true; }
-    const orderData = (await orderRes.json())[0];
+    const orderRows = orderRes.ok ? await orderRes.json().catch(() => []) : [];
+    if (!Array.isArray(orderRows) || orderRows.length === 0) { jsonResponse(response, 404, { error: 'Order not found.' }); return true; }
+    const orderData = orderRows[0];
 
     const insertRes = await supabaseRequest(admin.token, 'rest/v1/order_messages', {
       method: 'POST',

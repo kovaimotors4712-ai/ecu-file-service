@@ -302,7 +302,7 @@
       button.disabled = false;
     }
   });
-  document.querySelector('.customer-order-list')?.addEventListener('click', async event => {
+  document.querySelector('#customer-orders .customer-order-list')?.addEventListener('click', async event => {
     const button = event.target.closest('.customer-pay-now'); if (!button || button.disabled) return;
     const orderId = button.dataset.orderId;
     if (!orderId) return;
@@ -373,7 +373,7 @@
     }
   });
 
-  document.querySelector('.customer-order-list')?.addEventListener('click', async event => {
+  document.querySelector('#customer-orders .customer-order-list')?.addEventListener('click', async event => {
     const button = event.target.closest('.customer-file-download'); if (!button || button.disabled) return;
     const orderId = button.dataset.orderId; const objectPath = button.dataset.objectPath || '';
     if (!/^[0-9a-f-]{36}$/i.test(orderId || '') || !objectPath.startsWith(`${session?.user?.id}/${orderId}/processed/`)) { message.textContent = 'This file link is not valid for your account.'; return; }
@@ -381,7 +381,7 @@
     try { const blob = await download(`private-ecu-files/${objectPath}`); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = button.dataset.fileName || 'processed-file.bin'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); message.textContent = 'Your private file download has started.'; } catch (error) { message.textContent = error.message || 'The file could not be downloaded.'; } finally { button.disabled = false; }
   });
 
-  document.querySelector('.customer-order-list')?.addEventListener('click', async event => {
+  document.querySelector('#customer-orders .customer-order-list')?.addEventListener('click', async event => {
     const button = event.target.closest('.customer-messages-open'); if (!button) return;
     const orderId = button.dataset.orderId;
     openMessagesDialog(orderId);
