@@ -735,10 +735,7 @@ async function handleAdminCreateSecondStagePaymentLink(request, response) {
       jsonResponse(response, 409, { error: 'Second-stage payment can only be created when the order is in Possible status.' });
       return true;
     }
-    if (order.second_stage_status === 'paid') {
-      jsonResponse(response, 409, { error: 'Second-stage payment is already completed; payment link cannot be created.' });
-      return true;
-    }
+    // Allow creating/updating payment link even if previous one was paid (for modifications)
     if (String(order.payment_status || '').toUpperCase() !== 'PAID') {
       jsonResponse(response, 400, { error: 'Original payment must be completed before creating second-stage payment.' });
       return true;
@@ -773,7 +770,10 @@ async function handleAdminCreateSecondStagePaymentLink(request, response) {
     const patchBody = {
       second_stage_amount: amountPaise,
       second_stage_payment_link: paymentLinkUrl,
-      second_stage_status: 'pending'
+      second_stage_status: 'pending',
+      second_stage_paid_at: null,
+      second_stage_razorpay_order_id: null,
+      second_stage_razorpay_payment_id: null
     };
 
     const updated = await supabaseRequest(admin.token, `rest/v1/orders?id=eq.${encodeURIComponent(orderId)}&select=*`, {
@@ -791,6 +791,45 @@ async function handleAdminCreateSecondStagePaymentLink(request, response) {
     jsonResponse(response, 200, { order: updatedRows?.[0] || null });
   } catch (error) {
     jsonResponse(response, error.statusCode || (error.code === 'RAZORPAY_UPSTREAM' ? 502 : 400), { error: error.message || 'Failed to create second-stage Razorpay payment link.' });
+  }
+  return true;
+}
+
+async function handleAdminMarkSecondStageUnpaid(request, response) {
+  if (request.method !== 'POST') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
+  try {
+    const admin = await requireAdmin(request);
+    if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
+    const body = await readJson(request);
+    const orderId = String(body?.orderId || '');
+    if (!/^[0-9a-f-]{36}$/i.test(orderId)) { jsonResponse(response, 400, { error: 'Invalid order reference.' }); return true; }
+
+    const orderRes = await supabaseRequest(admin.token, `rest/v1/orders?id=eq.${encodeURIComponent(orderId)}&select=id,second_stage_status`, { timeoutMs: 15000 });
+    if (!orderRes.ok) { jsonResponse(response, 404, { error: 'Order could not be loaded.' }); return true; }
+    const rows = await orderRes.json();
+    const order = rows?.[0];
+    if (!order) { jsonResponse(response, 404, { error: 'Order not found.' }); return true; }
+
+    const patchBody = {
+      second_stage_status: 'pending',
+      second_stage_paid_at: null
+    };
+
+    const updated = await supabaseRequest(admin.token, `rest/v1/orders?id=eq.${encodeURIComponent(orderId)}`, {
+      method: 'PATCH',
+      prefer: 'return=representation',
+      body: patchBody,
+      timeoutMs: 15000
+    });
+    if (!updated.ok) {
+      const err = await updated.json().catch(() => null);
+      jsonResponse(response, updated.status >= 500 ? 502 : 409, { error: err?.message || 'Second-stage payment could not be marked unpaid.' });
+      return true;
+    }
+    const updatedRows = await updated.json();
+    jsonResponse(response, 200, { order: updatedRows?.[0] || null });
+  } catch (error) {
+    jsonResponse(response, error.statusCode || 400, { error: error.message || 'Failed to mark second-stage payment unpaid.' });
   }
   return true;
 }
@@ -1150,6 +1189,8 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/admin/payment-status') return handleAdminPaymentStatus(request, response);
   if (url.pathname === '/api/admin/orders/second-stage-amount' || url.pathname === '/api/admin/orders/set-second-stage' || url.pathname === '/api/admin/orders/second-stage/create-payment-link') return handleAdminCreateSecondStagePaymentLink(request, response);
   if (url.pathname === '/api/admin/orders/second-stage/mark-paid') return handleAdminMarkSecondStagePaid(request, response);
+  if (url.pathname === '/api/admin/orders/second-stage/mark-unpaid') return handleAdminMarkSecondStageUnpaid(request, response);
+  if (url.pathname === '/api/admin/orders/second-stage/mark-unpaid') return handleAdminMarkSecondStageUnpaid(request, response);
   if (url.pathname === '/api/orders/messages' && request.method === 'GET') return handleGetMessages(request, response, url);
   if (url.pathname === '/api/orders/messages' && request.method === 'POST') return handleSendMessage(request, response);
   if (url.pathname === '/api/admin/orders/messages' && request.method === 'GET') return handleAdminGetMessages(request, response, url);
