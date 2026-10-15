@@ -17,16 +17,14 @@
   const sortSelect = document.querySelector('#order-sort-order');
 
   let orders = [];
+  let attachmentPreviewUrls = [];
+  let photoPreviewObserver = null;
   let realtimeClient = null;
   let ordersChannel = null;
 
   function escape(value) {
     return String(value ?? '').replace(/[&<>"']/g, function(c) {
-      if (c === '&') return '&';
-      if (c === '<') return '<';
-      if (c === '>') return '>';
-      if (c === '"') return '"';
-      return String.fromCharCode(39, 51, 57, 59).replace('', ''); // '
+      return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c];
     });
   }
   function formatINR(paise) { return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',minimumFractionDigits:0,maximumFractionDigits:2}).format(Number(paise||0)/100); }
@@ -44,6 +42,7 @@
     ordersChannel=realtimeClient.channel('admin-orders')
       .on('postgres_changes',{event:'*',schema:'public',table:'orders'},function(){loadOrders();})
       .on('postgres_changes',{event:'*',schema:'public',table:'order_files'},function(){loadOrders();})
+      .on('postgres_changes',{event:'*',schema:'public',table:'order_attachments'},function(){loadOrders();})
       .subscribe();
   }
   function unsubscribeRealtime(){try{ordersChannel&&realtimeClient?.removeChannel(ordersChannel);}catch{}ordersChannel=null;}
@@ -89,7 +88,7 @@
     statusMessage.textContent='Loading orders…';
     statusMessage.classList.remove('admin-error');
     try{
-      orders=await backend.rest('orders?select=id,customer_id,status,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,selected_services,notes,contact_name,contact_phone,contact_email,payment_status,payment_provider,provider_order_id,provider_payment_id,verification_amount_paise,second_stage_amount,second_stage_status,second_stage_paid_at,second_stage_payment_link,created_at,updated_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,size_bytes,created_at)&order=created_at.desc&limit=500');
+      orders=await backend.rest('orders?select=id,customer_id,status,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,module_details,selected_services,notes,contact_name,contact_phone,contact_email,payment_status,payment_provider,provider_order_id,provider_payment_id,verification_amount_paise,second_stage_amount,second_stage_status,second_stage_paid_at,second_stage_payment_link,created_at,updated_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,size_bytes,created_at),order_attachments!order_attachments_order_id_fkey(id,kind,original_name,object_path,mime_type,size_bytes,created_at)&order=created_at.desc&limit=500');
       if(!Array.isArray(orders))throw new Error('The orders response was not a list.');
       document.querySelector('#stat-total').textContent = orders.length;
       document.querySelector('#stat-payment-pending').textContent = orders.filter(function(o){return o.status==='Payment Pending'||o.payment_status==='PENDING';}).length;
@@ -180,7 +179,9 @@
       const files=order.order_files||[];
       const originalFile=files.find(function(f){return f.kind==='original';});
       const processedFile=files.find(function(f){return f.kind==='processed';});
-      const module=order.category==='ECU'?[order.ecu_manufacturer,order.ecu_model].filter(Boolean).join(' · ')||'Not specified':'Not applicable';
+      const module=order.category==='ECU'?[order.ecu_manufacturer,order.ecu_model].filter(Boolean).join(' · ')||'Not specified':order.category==='AIRBAG'?(order.module_details||'Not specified'):'Historical dashboard order';
+      const attachments=Array.isArray(order.order_attachments)?order.order_attachments:[];
+      const photoRows=attachments.map(function(att){const label=att.kind==='module_photo'?'AIRBAG MODULE PHOTO':'PART-NUMBER PHOTO';return '<div class="admin-airbag-attachment"><div class="admin-file-info"><span>'+label+'</span><b>'+escape(att.original_name)+' ('+Math.max(1,Math.round((att.size_bytes||0)/1024))+' KB)</b></div><img class="admin-airbag-photo" data-photo-path="'+escape(att.object_path)+'" alt="'+escape(label)+'" loading="lazy"><div class="admin-file-actions"><button class="button button-ghost" type="button" data-admin-download="true" data-object-path="'+escape(att.object_path)+'" data-file-name="'+escape(att.original_name)+'">Download Photo</button></div></div>';}).join('');
       const payment=[order.payment_status||'PENDING',order.payment_provider||'—'].join(' · ');
       const paymentRef=order.provider_payment_id||order.razorpay_payment_id||'—';
 
@@ -196,7 +197,8 @@
         '<div class="admin-order-grid">'+
           '<div><small>CUSTOMER</small><b>'+escape(order.contact_name)+' · '+escape(order.contact_phone)+'<br>'+escape(order.contact_email||'')+'</b></div>'+
           '<div><small>SYSTEM / VEHICLE TYPE</small><b>'+escape(order.category)+' · '+escape(order.vehicle_type)+'</b></div>'+
-          '<div><small>ECU / MODULE</small><b>'+escape(module)+'</b></div>'+
+          '<div><small>ECU / MODULE</small><b>'+escape(order.category==='AIRBAG'?'Airbag SRS module':module)+'</b></div>'+
+          (order.category==='AIRBAG'&&order.module_details?'<div style="grid-column:1/-1"><small>AIRBAG MODULE DETAILS</small><b>'+escape(order.module_details)+'</b></div>':'')+
           '<div><small>READING TOOL</small><b>'+escape(order.category==='ECU'?(order.reading_tool||'Not specified'):'Not applicable')+'</b></div>'+
           '<div><small>FILE SERVICES</small><b>'+escape(services)+'</b></div>'+
           '<div><small>FILE VERIFICATION FEE</small><b>'+(order.verification_amount_paise!=null?escape(formatINR(order.verification_amount_paise)):'—')+'</b></div>'+
@@ -206,8 +208,9 @@
         '</div>'+
         (order.notes?('<div style="margin-bottom:14px;padding:10px 14px;background:#f9fbf7;border:1px solid #e8ede3;font-size:11px"><small style="display:block;font:800 8px var(--mono);color:#7d8983;letter-spacing:0.1em;margin-bottom:3px">CUSTOMER NOTES</small>'+escape(order.notes)+'</div>'):'')+
         '<div class="admin-files-box">'+
-          (originalFile?('<div class="admin-file-row"><div class="admin-file-info"><span>ORIGINAL FILE</span><b>'+escape(originalFile.original_name)+' ('+Math.round((originalFile.size_bytes||0)/1024)+' KB)</b></div><div class="admin-file-actions"><button class="button button-ghost" type="button" onclick="window.downloadAdminFile(\''+escape(originalFile.object_path)+'\',\''+escape(originalFile.original_name)+'\')">Download Original</button></div></div>'):'<div style="font-size:11px;color:#7f8a84">Original file record missing.</div>')+
-          (processedFile?('<div class="admin-file-row" style="background:#f4f8ec"><div class="admin-file-info"><span>PROCESSED RESULT</span><b>'+escape(processedFile.original_name)+' ('+Math.round((processedFile.size_bytes||0)/1024)+' KB)</b></div><div class="admin-file-actions"><button class="button button-ghost" type="button" onclick="window.downloadAdminFile(\''+escape(processedFile.object_path)+'\',\''+escape(processedFile.original_name)+'\')">Download Result</button></div></div>'):'<div style="font-size:11px;color:#a87a2a">Processed result not uploaded yet.</div>')+
+          (photoRows?'<div class="admin-airbag-photos"><small style="display:block;font:800 9px var(--mono);letter-spacing:.1em;color:#7f8a84;margin-bottom:10px">CUSTOMER AIRBAG PHOTOS</small>'+photoRows+'</div>':'')+
+          (originalFile?('<div class="admin-file-row"><div class="admin-file-info"><span>ORIGINAL FILE</span><b>'+escape(originalFile.original_name)+' ('+Math.round((originalFile.size_bytes||0)/1024)+' KB)</b></div><div class="admin-file-actions"><button class="button button-ghost" type="button" data-admin-download="true" data-object-path="'+escape(originalFile.object_path)+'" data-file-name="'+escape(originalFile.original_name)+'">Download Original</button></div></div>'):'<div style="font-size:11px;color:#7f8a84">Original file record missing.</div>')+
+          (processedFile?('<div class="admin-file-row" style="background:#f4f8ec"><div class="admin-file-info"><span>PROCESSED RESULT</span><b>'+escape(processedFile.original_name)+' ('+Math.round((processedFile.size_bytes||0)/1024)+' KB)</b></div><div class="admin-file-actions"><button class="button button-ghost" type="button" data-admin-download="true" data-object-path="'+escape(processedFile.object_path)+'" data-file-name="'+escape(processedFile.original_name)+'">Download Result</button></div></div>'):'<div style="font-size:11px;color:#a87a2a">Processed result not uploaded yet.</div>')+
           '<div class="admin-upload-wrap">'+
             '<input type="file" id="upload-input-'+escape(order.id)+'">'+
             '<button class="button button-dark" type="button" onclick="window.handleAdminUpload(\''+escape(order.id)+'\')">Upload Processed Result</button>'+
@@ -225,7 +228,31 @@
         '</div>'+
         '</article>';
     }).join('');
+    loadAdminAirbagPhotoPreviews();
   }
+
+  async function loadAdminAirbagPhotoPreviews(){
+    if (photoPreviewObserver) photoPreviewObserver.disconnect();
+    attachmentPreviewUrls.forEach(function(url){URL.revokeObjectURL(url);});
+    attachmentPreviewUrls=[];
+    const images=[...document.querySelectorAll('.admin-airbag-photo[data-photo-path]')];
+    const loadOne=async function(img){
+      if(img.dataset.previewLoaded)return;
+      img.dataset.previewLoaded='true';
+      try{const blob=await backend.download('private-ecu-files/'+img.dataset.photoPath);const url=URL.createObjectURL(blob);attachmentPreviewUrls.push(url);img.src=url;}
+      catch{img.alt='Private photo preview unavailable; use Download Photo.';img.classList.add('photo-unavailable');}
+    };
+    if(typeof IntersectionObserver==='function'){
+      photoPreviewObserver=new IntersectionObserver(function(entries,observer){entries.forEach(function(entry){if(entry.isIntersecting){observer.unobserve(entry.target);loadOne(entry.target);}});},{rootMargin:'180px'});
+      images.forEach(function(img){photoPreviewObserver.observe(img);});
+    }else{await Promise.all(images.map(loadOne));}
+  }
+
+  document.querySelector('#order-list')?.addEventListener('click',function(event){
+    const button=event.target.closest('button[data-admin-download]');
+    if(!button)return;
+    window.downloadAdminFile(button.dataset.objectPath,button.dataset.fileName);
+  });
 
   window.downloadAdminFile = async function(objectPath, name) {
     try {

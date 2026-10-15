@@ -1,6 +1,6 @@
 # ECU FILE SERVICE INDIA
 
-A responsive customer storefront and admin console for ECU, airbag and dashboard file-service requests.
+A responsive ECU SOLUTION storefront and admin console for ECU file services and Airbag Crash Clear. Historical Dashboard orders remain in the database and admin order history.
 
 ## Current architecture
 
@@ -32,13 +32,16 @@ The original upload never travels through a Base64 JSON field or through a perma
 - Reading Tool
 - File Services
 
-**Airbag** and **Dashboard / Cluster** requests collect only:
-- Brand
-- Vehicle Type
-- Model
-- Year
+**Airbag Crash Clear** requests collect:
+- Brand, vehicle type, model and required year
+- Airbag module details
+- Required module photo and part-number label photo (JPG/PNG/WEBP, up to 10 MB each)
+- The single Airbag service: `Crash Clear`
+- Original file and contact details (valid email required for notifications)
 
-The server normalizes these fields as well, so hidden/disabled ECU-only fields cannot be smuggled into an Airbag or Dashboard order.
+Dashboard is no longer offered for new orders. Historical Dashboard records are retained for admin review.
+
+The server normalizes fields and validates the Airbag photo sizes, MIME types, storage paths, and SHA-256 hashes before payment can begin.
 
 ## Customer account
 
@@ -64,14 +67,16 @@ The server rejects unauthorized status changes and the database requires a proce
 
 ## Supabase migration order
 
-Apply these migrations in order:
+For an existing production deployment, do not rerun the base migrations. After deploying this application code to Render, apply the following new migrations in timestamp order from the Supabase SQL Editor:
 
-1. `supabase/migrations/20260924_ecu_file_service.sql` — base schema.
-2. `supabase/migrations/20261004_updates.sql` — final provider-neutral payment/check-out/storage/realtime/email/RLS design.
+1. `supabase/migrations/20261014_email_notifications.sql` — adds idempotent event keys, payment/status events, and separate Admin/customer Resend notifications.
+2. `supabase/migrations/20261015_airbag_crash_clear.sql` — adds private order attachments, Airbag module details, secure photo-storage policy extensions, and the compatible paid-checkout finalizer.
+
+Deploy code first, then apply both new migrations promptly. Until the second migration is applied, Airbag photo uploads remain blocked by the previous private-storage policy; do not accept live Airbag orders during that short transition. Existing ECU checkout/payment validation stays server-authoritative. Do not apply migrations 20260924 or 20261004 to a database where they have already been applied.
 
 `20260924_razorpay_payment_gate.sql` is intentionally a superseded marker and must **not** be applied as a second payment schema.
 
-The final migration is designed to be non-destructive and safe to re-run. It does not drop the Supabase Realtime publication; it only adds the UI-required tables if they are not already published.
+The new migrations do not drop the Supabase Realtime publication. Review backups and confirm each migration finishes successfully before moving to the next.
 
 ### Vault proof secret
 
@@ -164,3 +169,13 @@ Never deploy the development bypass. It is only for local UI testing.
 - Duplicate payment callbacks are idempotent.
 - Abandoned checkout intents and unreferenced staged objects are cleaned up by the server worker.
 - The server never exposes environment files, migration files, fixtures, or service credentials as public assets.
+
+
+## Deploy and verify
+
+- Keep Render secrets in the Render Environment dashboard; never place production secrets in this repository or the ZIP.
+- Set `RESEND_API_KEY`, `EMAIL_FROM` (a sender/domain verified in Resend), and `ADMIN_NOTIFICATION_EMAIL` in Render.
+- Set `PUBLIC_APP_URL=https://ecufileservice.in`; keep the existing domain and DNS.
+- Run `npm test` before deployment. The tests use local mocked Razorpay/PayPal/Resend providers and do not initiate real payments.
+- After both migrations finish, confirm `/api/health` reports payment readiness and check the notification outbox in Supabase.
+- Submit `https://ecufileservice.in/sitemap.xml` in Google Search Console after deployment. Indexing/rankings are controlled by search engines and are not guaranteed.

@@ -80,7 +80,7 @@
     return response.blob();
   }
   function formatINR(paise) { return new Intl.NumberFormat('en-IN', { style:'currency', currency:'INR', minimumFractionDigits:0, maximumFractionDigits:2 }).format(Number(paise || 0) / 100); }
-  function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": "'" })[char]); }
+  function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
 
   function saveSession(next) {
     const previousUserId = session?.user?.id;

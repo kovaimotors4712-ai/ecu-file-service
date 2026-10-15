@@ -36,6 +36,13 @@ const tokens = {
 
 const clean = value => String(value ?? '').trim();
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
+const testPhoto = (mime, label) => {
+  const suffix = Buffer.from(label, 'utf8');
+  if (mime === 'image/jpeg') return Buffer.concat([Buffer.from([0xff,0xd8,0xff,0xe0,0x00,0x10]), suffix, Buffer.from([0xff,0xd9])]);
+  if (mime === 'image/png') return Buffer.concat([Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]), suffix]);
+  if (mime === 'image/webp') return Buffer.concat([Buffer.from('RIFF'), Buffer.from([0x20,0x00,0x00,0x00]), Buffer.from('WEBP'), suffix]);
+  return suffix;
+};
 const proofFor = ({ id, provider, orderId, paymentId, amount, requestSha }) => crypto.createHmac('sha256', process.env.PAYMENT_GATE_PROOF_SECRET)
   .update(['EFSI_PAYMENT_CONFIRMATION_V2', customerId, id, provider, orderId, paymentId, amount, requestSha].join('|')).digest('hex');
 
@@ -43,6 +50,7 @@ const state = {
   intents: new Map(),
   orders: new Map(),
   orderFiles: new Map(),
+  orderAttachments: new Map(),
   orderMessages: new Map(),
   objects: new Map(),
   outbox: new Map(),
@@ -51,6 +59,7 @@ const state = {
   paypalCaptureCalls: 0,
   resendCalls: 0,
   lastResendRequest: null,
+  resendRequests: [],
   nextOrderSequence: 1,
   nextIntentSequence: 1,
   razorPaymentStatus: 'captured',
@@ -65,12 +74,13 @@ const state = {
 };
 
 function resetState() {
-  for (const map of [state.intents, state.orders, state.orderFiles, state.orderMessages, state.objects, state.outbox]) map.clear();
+  for (const map of [state.intents, state.orders, state.orderFiles, state.orderAttachments, state.orderMessages, state.objects, state.outbox]) map.clear();
   state.razorOrderCalls = 0;
   state.paypalOrderCalls = 0;
   state.paypalCaptureCalls = 0;
   state.resendCalls = 0;
   state.lastResendRequest = null;
+  state.resendRequests = [];
   state.nextOrderSequence = 1;
   state.nextIntentSequence = 1;
   state.razorPaymentStatus = 'captured';
@@ -90,8 +100,9 @@ function uuidFor(prefix, n) {
 }
 
 function response(status, payload, headers = {}) {
-  const text = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  const bytes = Buffer.from(text);
+  const isBinary = Buffer.isBuffer(payload) || payload instanceof Uint8Array;
+  const text = typeof payload === 'string' ? payload : isBinary ? Buffer.from(payload).toString('latin1') : JSON.stringify(payload);
+  const bytes = isBinary ? Buffer.from(payload) : Buffer.from(text);
   return {
     status,
     ok: status >= 200 && status < 300,
@@ -198,6 +209,7 @@ const upstream = async (urlValue, options = {}) => {
   if (url.hostname === 'api.resend.com' && url.pathname === '/emails' && method === 'POST') {
     state.resendCalls += 1;
     state.lastResendRequest = { headers: options.headers, body: JSON.parse(options.body) };
+    state.resendRequests.push(state.lastResendRequest);
     if (state.resendShouldFail) return response(500, { message: 'synthetic Resend outage' });
     return response(200, { id: 'email-local-1' });
   }
@@ -244,7 +256,7 @@ const upstream = async (urlValue, options = {}) => {
     const idFilter = url.searchParams.get('id');
     if (idFilter?.startsWith('in.(')) rows = rows.filter(row => idFilter.slice(4, -1).split(',').includes(row.id));
     if (method === 'GET') {
-      return response(200, rows.map(row => ({ ...row, order_files: [...state.orderFiles.values()].filter(file => file.order_id === row.id) })));
+      return response(200, rows.map(row => ({ ...row, order_files: [...state.orderFiles.values()].filter(file => file.order_id === row.id), order_attachments: [...state.orderAttachments.values()].filter(file => file.order_id === row.id) })));
     }
     if (method === 'PATCH') {
       if (user.role !== 'admin' && user.role !== 'service') return response(403, { message: 'RLS blocked order update.' });
@@ -360,7 +372,7 @@ const upstream = async (urlValue, options = {}) => {
       ecu_manufacturer: request.category === 'ECU' ? request.ecuManufacturer || null : null,
       ecu_model: request.category === 'ECU' ? request.ecuModel || null : null,
       reading_tool: request.category === 'ECU' ? request.readingTool || null : null,
-      selected_services: request.selectedServices, notes: request.notes || null,
+      selected_services: request.selectedServices, notes: request.notes || null, module_details: request.category === 'AIRBAG' ? request.moduleDetails : null,
       contact_name: request.contactName, contact_phone: request.contactPhone, contact_email: request.contactEmail || null,
       payment_status: 'PAID', payment_provider: body.p_payment_provider, provider_order_id: body.p_provider_order_id,
       provider_payment_id: body.p_provider_payment_id, verification_amount_paise: body.p_amount_paise,
@@ -370,10 +382,16 @@ const upstream = async (urlValue, options = {}) => {
     state.orders.set(orderId, order);
     const fileId = `FILE-${state.orderFiles.size + 1}`;
     state.orderFiles.set(fileId, { id: fileId, order_id: orderId, owner_id: customerId, kind: 'original', bucket_id: 'private-ecu-files', object_path: intent.storage_path, original_name: intent.original_name, mime_type: intent.original_mime, size_bytes: intent.original_size, uploaded_by: customerId, created_at: new Date().toISOString() });
+    if (request.category === 'AIRBAG') {
+      for (const [kind, photo] of [['module_photo', request.modulePhoto], ['part_number_photo', request.partNumberPhoto]]) {
+        const attachmentId = `ATT-${state.orderAttachments.size + 1}`;
+        state.orderAttachments.set(attachmentId, { id: attachmentId, order_id: orderId, owner_id: customerId, kind, bucket_id: 'private-ecu-files', object_path: photo.storagePath, original_name: photo.name, mime_type: photo.mime, size_bytes: photo.size, uploaded_by: customerId, created_at: new Date().toISOString() });
+      }
+    }
     Object.assign(intent, { status: 'PAID', payment_status: 'PAID', payment_provider: body.p_payment_provider, provider_order_id: body.p_provider_order_id, provider_payment_id: body.p_provider_payment_id, paid_at: body.p_paid_at || new Date().toISOString() });
     const now = new Date().toISOString();
-    state.outbox.set(`outbox-${orderId}-new`, { id:`outbox-${orderId}-new`, order_id:orderId, event_type:'new_order', status:'PENDING', attempts:0, next_attempt_at:now, created_at:now });
-    state.outbox.set(`outbox-${orderId}-paid`, { id:`outbox-${orderId}-paid`, order_id:orderId, event_type:'paid_order', status:'PENDING', attempts:0, next_attempt_at:now, created_at:now });
+    state.outbox.set(`outbox-${orderId}-new`, { id:`outbox-${orderId}-new`, order_id:orderId, event_type:'new_order', event_key:`${orderId}:new_order`, payload:{}, status:'PENDING', attempts:0, next_attempt_at:now, created_at:now });
+    state.outbox.set(`outbox-${orderId}-paid`, { id:`outbox-${orderId}-paid`, order_id:orderId, event_type:'paid_order', event_key:`${orderId}:paid_order`, payload:{}, status:'PENDING', attempts:0, next_attempt_at:now, created_at:now });
     return response(200, { id: orderId, orderId: orderId });
   }
 
@@ -467,13 +485,14 @@ async function createAndStageIntent(overrides = {}) {
   assert.equal(create.response.status, 200);
   const objectPath = create.payload.storagePath;
   state.objects.set(objectPath, fileText);
+  for (const photo of [request.modulePhoto, request.partNumberPhoto]) { if (photo?.storagePath) state.objects.set(photo.storagePath, photo.testContent || 'TEST AIRBAG PHOTO'); }
   const stage = await call(`/api/checkout/intents/${encodeURIComponent(create.payload.intentId)}/stage`, { method:'POST', token:tokens.customer });
   assert.equal(stage.response.status, 200);
   return { intentId:create.payload.intentId, objectPath, request, fileText };
 }
 
-async function paidRazorpayIntent() {
-  const created = await createAndStageIntent();
+async function paidRazorpayIntent(overrides = {}) {
+  const created = await createAndStageIntent(overrides);
   const paymentOrder = await call('/api/payment/create-order', { method:'POST', token:tokens.customer, body:{ intentId:created.intentId } });
   assert.equal(paymentOrder.response.status, 200);
   const verify = await call('/api/payment/verify', { method:'POST', token:tokens.customer, body:{ intentId:created.intentId, razorpay_order_id:'order_TestLocal01', razorpay_payment_id:'pay_TestLocal01', razorpay_signature:crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update('order_TestLocal01|pay_TestLocal01').digest('hex') } });
@@ -492,9 +511,15 @@ test('serves customer and admin pages', async () => {
   const customer = await call('/');
   const admin = await call('/admin.html');
   const adminJs = await call('/admin.js');
+  const ecuSeo = await call('/ecu-file-services.html');
+  const airbagSeo = await call('/airbag-crash-clear.html');
   assert.equal(customer.response.status, 200);
   assert.equal(admin.response.status, 200);
   assert.equal(adminJs.response.status, 200);
+  assert.equal(ecuSeo.response.status, 200);
+  assert.equal(airbagSeo.response.status, 200);
+  assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
+  assert.match(airbagSeo.payload,/canonical.*airbag-crash-clear\.html/);
   assert.match(customer.response.headers.get('content-type') || '', /text\/html/);
   assert.match(adminJs.response.headers.get('content-type') || '', /text\/javascript/);
 });
@@ -590,15 +615,31 @@ test('rejects an oversized checkout request before payment creation', async () =
   assert.match(result.payload.error,/50 MB/i);
 });
 
-test('enforces Airbag and Dashboard year plus clears ECU-only fields', async () => {
-  const airbag = await createAndStageIntent({ category:'AIRBAG', vehicleYear:'2021', ecuManufacturer:'Bosch', ecuModel:'MD1', readingTool:'KESS' });
+test('enforces Airbag Crash Clear fields, isolates ECU details, and rejects new Dashboard orders', async () => {
+  const moduleText = testPhoto('image/jpeg','TEST AIRBAG MODULE PHOTO');
+  const partText = testPhoto('image/png','TEST AIRBAG PART NUMBER PHOTO');
+  const moduleSha = hash(moduleText);
+  const partSha = hash(partText);
+  const airbag = await createAndStageIntent({
+    category:'AIRBAG', vehicleYear:'2021', ecuManufacturer:'Bosch', ecuModel:'MD1', readingTool:'KESS',
+    selectedServices:['Crash Clear'], moduleDetails:'Continental SRS module, part number 5WK4 1234',
+    modulePhoto:{ name:'module.jpg', mime:'image/jpeg', size:Buffer.byteLength(moduleText), sha256:moduleSha, storagePath:`content/${moduleSha}`, testContent:moduleText },
+    partNumberPhoto:{ name:'part-number.png', mime:'image/png', size:Buffer.byteLength(partText), sha256:partSha, storagePath:`content/${partSha}`, testContent:partText }
+  });
   const saved = state.intents.get(airbag.intentId).request_json;
   assert.equal(saved.category,'AIRBAG');
   assert.equal(saved.ecuManufacturer,null);
   assert.equal(saved.ecuModel,null);
   assert.equal(saved.readingTool,null);
-  const missingYear = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request:{ ...customerRequest().request, category:'DASHBOARD', vehicleYear:'', originalSha256:hash('x'), originalSize:1 } } });
+  assert.equal(saved.selectedServices[0],'Crash Clear');
+  assert.equal(state.objects.has(saved.modulePhoto.storagePath),true);
+  assert.equal(state.objects.has(saved.partNumberPhoto.storagePath),true);
+  const missingYear = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request:{ ...customerRequest().request, category:'AIRBAG', vehicleYear:'', selectedServices:['Crash Clear'], moduleDetails:'SRS module', modulePhoto:saved.modulePhoto, partNumberPhoto:saved.partNumberPhoto } } });
   assert.equal(missingYear.response.status,400);
+  assert.match(missingYear.payload.error,/Year is required for Airbag Crash Clear/);
+  const dashboard = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request:{ ...customerRequest().request, category:'DASHBOARD' } } });
+  assert.equal(dashboard.response.status,400);
+  assert.match(dashboard.payload.error,/Choose ECU or Airbag/);
 });
 
 test('Razorpay create flow binds provider order to the durable intent', async () => {
@@ -741,51 +782,76 @@ test('a different customer cannot read the paid order through the server-side or
   assert.equal(result.payload.length,0);
 });
 
-test('Resend outbox sends idempotently without blocking order creation', async () => {
+test('Resend outbox sends event-specific email to Admin and customer idempotently', async () => {
   const paid = await paidRazorpayIntent();
   await new Promise(resolve => setTimeout(resolve, 10));
   await flushNotificationOutbox();
-  assert.equal(state.resendCalls, 2);
-  assert.match(state.lastResendRequest.headers['Idempotency-Key'], /^efsi\/(?:new_order|paid_order)\//);
+  assert.equal(state.resendCalls, 4);
   assert.equal([...state.outbox.values()].every(row => row.status === 'SENT'), true);
-
-  const { body } = state.lastResendRequest;
-  assert.equal(body.subject, 'New Order Received – ECU File Service India');
-  assert.match(body.html, /New Order Received – ECU File Service India/);
-  assert.match(body.html, new RegExp(paid.verify.payload.orderId));
-  assert.match(body.html, /PAID/);
-  assert.match(body.html, /₹99\.00/);
-  assert.match(body.html, /Test Customer/);
-  assert.match(body.html, /customer@example\.invalid/);
-  assert.match(body.html, /\+919876543210/);
-  assert.match(body.html, /2022 Tata Nexon/);
-  assert.match(body.html, /Bosch MD1/);
-  assert.match(body.html, /KESS/);
-  assert.match(body.html, /DTC OFF/);
-  assert.match(body.html, /test-ecu\.bin/);
+  assert.deepEqual(state.resendRequests.map(item => item.body.to[0]), [
+    'admin@example.invalid','customer@example.invalid','admin@example.invalid','customer@example.invalid'
+  ]);
+  assert.deepEqual(state.resendRequests.map(item => item.body.subject), [
+    'New Order Received – ECU File Service India','We received your order – ECU SOLUTION',
+    'Payment Confirmed – ECU File Service India','Payment received – ECU SOLUTION'
+  ]);
+  assert.ok(state.resendRequests.every(item => /^efsi\/.+\/(?:admin|customer)$/.test(item.headers['Idempotency-Key'])));
+  const bodies = state.resendRequests.map(item => item.body.html).join('\n');
+  assert.match(bodies, new RegExp(paid.verify.payload.orderId));
+  assert.match(bodies, /PAID/);
+  assert.match(bodies, /₹99\.00/);
+  assert.match(bodies, /Test Customer/);
+  assert.match(bodies, /customer@example\.invalid/);
+  assert.match(bodies, /\+919876543210/);
+  assert.match(bodies, /2022 Tata Nexon/);
+  assert.match(bodies, /Bosch MD1/);
+  assert.match(bodies, /KESS/);
+  assert.match(bodies, /DTC OFF/);
+  assert.match(bodies, /test-ecu\.bin/);
 });
 
-test('Resend outbox safely handles missing optional fields in order email', async () => {
-  const { request, fileText } = customerRequest();
-  request.category = 'AIRBAG';
-  request.contactEmail = '';
-  delete request.ecuManufacturer;
-  delete request.ecuModel;
-  delete request.readingTool;
-  delete request.notes;
-  const created = await call('/api/checkout/intents', { method: 'POST', token: tokens.customer, body: { request } });
-  state.objects.set(created.payload.storagePath, fileText);
-  await call(`/api/checkout/intents/${encodeURIComponent(created.payload.intentId)}/stage`, { method: 'POST', token: tokens.customer });
-  await call('/api/payment/create-order', { method: 'POST', token: tokens.customer, body: { intentId: created.payload.intentId } });
-  await call('/api/payment/verify', { method: 'POST', token: tokens.customer, body: { intentId: created.payload.intentId, razorpay_order_id: 'order_TestLocal01', razorpay_payment_id: 'pay_TestLocal01', razorpay_signature: crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update('order_TestLocal01|pay_TestLocal01').digest('hex') } });
-
+test('Airbag Crash Clear order captures module details and sends event emails to both recipients', async () => {
+  const moduleText = testPhoto('image/jpeg','AIRBAG MODULE PHOTO DATA');
+  const partText = testPhoto('image/webp','AIRBAG PART NUMBER PHOTO DATA');
+  const moduleSha = hash(moduleText);
+  const partSha = hash(partText);
+  const paid = await paidRazorpayIntent({
+    category:'AIRBAG', vehicleYear:'2021', selectedServices:['Crash Clear'], moduleDetails:'Autoliv SRS module, P/N 123456789',
+    modulePhoto:{ name:'airbag-module.jpg', mime:'image/jpeg', size:Buffer.byteLength(moduleText), sha256:moduleSha, storagePath:`content/${moduleSha}`, testContent:moduleText },
+    partNumberPhoto:{ name:'part-number.webp', mime:'image/webp', size:Buffer.byteLength(partText), sha256:partSha, storagePath:`content/${partSha}`, testContent:partText }
+  });
+  assert.equal(paid.verify.response.status,200);
+  assert.equal(state.orderAttachments.size,2);
+  const order = [...state.orders.values()][0];
+  assert.equal(order.module_details,'Autoliv SRS module, P/N 123456789');
   await flushNotificationOutbox();
-  const { body } = state.lastResendRequest;
-  assert.equal(body.subject, 'New Order Received – ECU File Service India');
-  assert.doesNotMatch(body.html, /undefined/);
-  assert.doesNotMatch(body.html, /null/);
-  assert.match(body.html, /AIRBAG/);
-  assert.match(body.html, /N\/A/);
+  assert.equal(state.resendCalls,4);
+  const html = state.resendRequests.map(item=>item.body.html).join('\n');
+  assert.match(html,/AIRBAG/);
+  assert.match(html,/Autoliv SRS module, P\/N 123456789/);
+  assert.doesNotMatch(html,/undefined|null/);
+});
+
+test('status-change notification sends separate idempotent updates to Admin and customer', async () => {
+  const paid = await paidRazorpayIntent();
+  const order = [...state.orders.values()][0];
+  order.status = 'Processing';
+  const now = new Date().toISOString();
+  const eventKey = `${order.id}:status_change:test-event-1`;
+  state.outbox.set(`outbox-${order.id}-status`, {
+    id:`outbox-${order.id}-status`, order_id:order.id, event_type:'status_change', event_key:eventKey,
+    payload:{ previous_status:'New', status:'Processing' }, status:'PENDING', attempts:0, next_attempt_at:now, created_at:now
+  });
+  await flushNotificationOutbox();
+  const statusEmails = state.resendRequests.filter(item => item.headers['Idempotency-Key'].includes(`${eventKey}/`));
+  assert.equal(statusEmails.length,2);
+  assert.deepEqual(statusEmails.map(item => item.body.to[0]),['admin@example.invalid','customer@example.invalid']);
+  assert.deepEqual(statusEmails.map(item => item.body.subject),[
+    'Order Status Updated: Processing – ECU File Service India',
+    'Your order status is now Processing – ECU SOLUTION'
+  ]);
+  assert.ok(statusEmails.every(item => item.body.html.includes('New') && item.body.html.includes('Processing')));
+  assert.ok(paid.verify.payload.orderId);
 });
 
 test('Resend failure moves an email event to RETRY instead of breaking the order', async () => {
@@ -833,7 +899,11 @@ test('static source contains category field isolation, provider routes, Resend, 
   const serverSource = fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
   assert.match(app,/category === 'ECU'/);
   assert.match(app,/control\.disabled = !ecu/);
-  assert.match(app,/Year is required for Airbag and Dashboard/);
+  assert.match(app,/Year is required for Airbag Crash Clear/);
+  assert.doesNotMatch(index,/value="DASHBOARD"/);
+  assert.match(index,/value="Crash Clear"/);
+  assert.match(index,/id="airbag-module-photo"/);
+  assert.match(index,/id="airbag-part-photo"/);
   assert.match(index,/id="pay-paypal"/);
   assert.match(index,/class="[^"]*\becu-only\b[^"]*"/);
   assert.match(admin,/class="order-status-select"/);
@@ -883,6 +953,22 @@ test('migration permits shared content-addressed file references across orders',
   assert.match(migration,/drop constraint if exists order_files_object_path_key/i);
   assert.match(migration,/order_files_object_path_idx/i);
   assert.match(migration,/checkout_intents_storage_path_check/i);
+});
+
+test('new migrations preserve payment proof while adding private Airbag photos and customer/status email events', () => {
+  const emailMigration = fs.readFileSync(path.join(__dirname,'supabase/migrations/20261014_email_notifications.sql'),'utf8');
+  const airbagMigration = fs.readFileSync(path.join(__dirname,'supabase/migrations/20261015_airbag_crash_clear.sql'),'utf8');
+  assert.match(emailMigration,/event_key text/i);
+  assert.match(emailMigration,/status_change/i);
+  assert.match(emailMigration,/enforce_order_contact_email/i);
+  assert.match(airbagMigration,/create table if not exists public\.order_attachments/i);
+  assert.match(airbagMigration,/Customers upload own checkout files/i);
+  assert.match(airbagMigration,/Customers read own checkout and order files/i);
+  assert.match(airbagMigration,/module_photo/i);
+  assert.match(airbagMigration,/part_number_photo/i);
+  assert.match(airbagMigration,/EFSI_PAYMENT_CONFIRMATION_V2/);
+  assert.match(airbagMigration,/private-ecu-files/);
+  assert.doesNotMatch(airbagMigration,/public\.storage\.buckets[^;]*public/i);
 });
 
 test('production environment templates contain both payment gateways and email secrets', () => {

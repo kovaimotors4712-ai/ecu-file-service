@@ -18,8 +18,10 @@ const pricingFile = path.join(root, 'pricing.local.json');
 const defaultFileVerificationPricePaise = 9900;
 const maxFileVerificationPricePaise = 100000000;
 const maxOriginalFileBytes = 50 * 1024 * 1024;
+const maxAirbagPhotoBytes = 10 * 1024 * 1024;
+const allowedAirbagPhotoMimes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const allowedCorsOrigins = new Set(['https://ecufileservice.in', 'https://www.ecufileservice.in']);
-const publicFiles = new Set(['index.html', 'admin.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'googlea2bbe9d2fd8bede2.html']);
+const publicFiles = new Set(['index.html', 'admin.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'googlea2bbe9d2fd8bede2.html']);
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
@@ -242,16 +244,22 @@ function safeEqualHex(left, right) {
 }
 
 function normalizePaymentRequest(value) {
-  const allowedCategories = ['ECU', 'AIRBAG', 'DASHBOARD'];
-  const allowedServices = ['DTC OFF', 'DPF OFF', 'AdBlue / SCR OFF', 'EGR OFF', 'O2 Remove', 'EVAP OFF', 'Decat', 'IMMO OFF', 'Speed Limit', 'Custom Request'];
+  const allowedCategories = ['ECU', 'AIRBAG']; // Dashboard remains readable for historical orders, but is not offered for new orders.
+  const allowedEcuServices = ['DTC OFF', 'DPF OFF', 'AdBlue / SCR OFF', 'EGR OFF', 'O2 Remove', 'EVAP OFF', 'Decat', 'IMMO OFF', 'Speed Limit', 'Custom Request'];
   const clean = item => typeof item === 'string' ? item.trim() : '';
   const category = clean(value?.category);
-  const services = Array.isArray(value?.selectedServices) ? [...new Set(value.selectedServices.filter(item => allowedServices.includes(item)))] : [];
+  const services = Array.isArray(value?.selectedServices) ? [...new Set(value.selectedServices.filter(item => typeof item === 'string'))] : [];
   const yearText = clean(value?.vehicleYear);
   const year = yearText ? Number(yearText) : null;
-  if (!allowedCategories.includes(category) || !clean(value?.vehicleBrand) || !clean(value?.vehicleType) || !clean(value?.vehicleModel) || !clean(value?.contactName) || !clean(value?.contactPhone) || services.length === 0) throw new Error('Please complete the required vehicle, service and contact details.');
+  const email = clean(value?.contactEmail).slice(0, 254);
+  if (!allowedCategories.includes(category)) throw new Error('Choose ECU or Airbag for a new order.');
+  if (!clean(value?.vehicleBrand) || !clean(value?.vehicleType) || !clean(value?.vehicleModel) || !clean(value?.contactName) || !clean(value?.contactPhone) || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('Complete the required vehicle, contact and valid email details.');
+  }
   if (year !== null && (!Number.isInteger(year) || year < 1950 || year > 2100)) throw new Error('Enter a valid vehicle year.');
-  if ((category === 'AIRBAG' || category === 'DASHBOARD') && year === null) throw new Error('Year is required for Airbag and Dashboard requests.');
+  if (category === 'AIRBAG' && year === null) throw new Error('Year is required for Airbag Crash Clear requests.');
+  if (category === 'AIRBAG' && (services.length !== 1 || services[0] !== 'Crash Clear')) throw new Error('Airbag requests support Crash Clear only.');
+  if (category === 'ECU' && (services.length === 0 || services.some(service => !allowedEcuServices.includes(service)))) throw new Error('Select a valid ECU file service.');
   const isEcu = category === 'ECU';
   const result = {
     category,
@@ -259,13 +267,32 @@ function normalizePaymentRequest(value) {
     ecuManufacturer: isEcu ? (clean(value.ecuManufacturer).slice(0, 100) || null) : null,
     ecuModel: isEcu ? (clean(value.ecuModel).slice(0, 120) || null) : null,
     readingTool: isEcu ? (clean(value.readingTool).slice(0, 100) || null) : null,
+    moduleDetails: category === 'AIRBAG' ? clean(value.moduleDetails).slice(0, 1200) : null,
+    modulePhoto: null,
+    partNumberPhoto: null,
     selectedServices: services,
     notes: clean(value.notes).replace(/\[EFSI_[A-Z0-9_]+\]/gi, '').slice(0, 3600) || null,
-    contactName: clean(value.contactName).slice(0, 120), contactPhone: clean(value.contactPhone).slice(0, 40), contactEmail: clean(value.contactEmail).slice(0, 254) || null,
+    contactName: clean(value.contactName).slice(0, 120), contactPhone: clean(value.contactPhone).slice(0, 40), contactEmail: email,
     originalName: clean(value.originalName).slice(0, 255), originalMime: /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i.test(clean(value.originalMime)) ? clean(value.originalMime).slice(0, 120) : 'application/octet-stream',
     originalSize: Number(value.originalSize), originalSha256: clean(value.originalSha256).toLowerCase()
   };
   if (!result.originalName || !Number.isSafeInteger(result.originalSize) || result.originalSize < 1 || result.originalSize > maxOriginalFileBytes || !/^[a-f0-9]{64}$/.test(result.originalSha256)) throw new Error('Select a valid original file up to 50 MB and try again.');
+  if (category === 'AIRBAG') {
+    if (!result.moduleDetails) throw new Error('Airbag module details are required.');
+    const normalizePhoto = (photo, label) => {
+      const name = clean(photo?.name).slice(0, 255);
+      const mime = clean(photo?.mime).toLowerCase();
+      const size = Number(photo?.size);
+      const sha256 = clean(photo?.sha256).toLowerCase();
+      const storagePath = clean(photo?.storagePath);
+      if (!name || !allowedAirbagPhotoMimes.has(mime) || !Number.isSafeInteger(size) || size < 1 || size > maxAirbagPhotoBytes || !/^[a-f0-9]{64}$/.test(sha256) || storagePath !== `content/${sha256}`) {
+        throw new Error(`Select a valid airbag ${label} (JPG, PNG or WEBP up to 10 MB).`);
+      }
+      return { name, mime, size, sha256, storagePath };
+    };
+    result.modulePhoto = normalizePhoto(value.modulePhoto, 'module photo');
+    result.partNumberPhoto = normalizePhoto(value.partNumberPhoto, 'part-number photo');
+  }
   return result;
 }
 
@@ -273,7 +300,7 @@ function intentStoragePath(customerId, sha256) { void customerId; return `conten
 
 async function fetchIntent(customer, intentId) {
   if (!/^[0-9a-f-]{36}$/i.test(String(intentId || ''))) return null;
-  const select = 'id,customer_id,status,payment_status,payment_provider,provider_order_id,provider_payment_id,request_sha256,original_name,original_mime,original_size,original_sha256,storage_path,amount_paise,currency,expires_at,file_staged_at,paid_at,order_id,updated_at';
+  const select = 'id,customer_id,status,payment_status,payment_provider,provider_order_id,provider_payment_id,request_sha256,request_json,original_name,original_mime,original_size,original_sha256,storage_path,amount_paise,currency,expires_at,file_staged_at,paid_at,order_id,updated_at';
   const result = await supabaseRequest(customer.token, `rest/v1/checkout_intents?select=${select}&id=eq.${encodeURIComponent(intentId)}&customer_id=eq.${encodeURIComponent(customer.id)}&limit=1`, { timeoutMs: 15000 });
   if (!result.ok) return null;
   const rows = await result.json();
@@ -318,12 +345,12 @@ async function handleCreateCheckoutIntent(request, response) {
     if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error: 'Durable checkout storage is not configured on this server.' }); return true; }
     const body = await readJson(request);
     const order = normalizePaymentRequest(body?.request);
-    console.log('Diagnostic [handleCreateCheckoutIntent] Request:', JSON.stringify(order));
-  const intent = await createCheckoutIntent(customer, order);
-  console.log('Diagnostic [handleCreateCheckoutIntent] Intent Created:', intent.id);
+    console.info('[checkout] Request accepted for validation:', JSON.stringify({ category: order.category, originalSize: order.originalSize, serviceCount: order.selectedServices.length, hasEmail: Boolean(order.contactEmail), hasAirbagPhotos: Boolean(order.modulePhoto && order.partNumberPhoto) }));
+    const intent = await createCheckoutIntent(customer, order);
+    console.info('[checkout] Intent saved:', intent.id);
     jsonResponse(response, 200, { intentId: intent.id, status: intent.status, amount: intent.amount_paise, currency: intent.currency, storagePath: intent.storage_path, expiresAt: intent.expires_at, requestSha256: intent.request_sha256 });
   } catch (error) {
-    console.error('Diagnostic [handleCreateCheckoutIntent]:', error);
+    console.error('[checkout] Intent creation failed:', String(error.message || 'unknown error').slice(0, 240));
     if (error.statusCode) {
       jsonResponse(response, error.statusCode, { error: error.message });
     } else {
@@ -371,6 +398,30 @@ async function verifyStoredObject(customer, intent) {
   });
 }
 
+function matchesAirbagPhotoSignature(bytes, mime) {
+  if (!Buffer.isBuffer(bytes)) bytes = Buffer.from(bytes || []);
+  if (mime === 'image/jpeg') return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (mime === 'image/png') return bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]));
+  if (mime === 'image/webp') return bytes.length >= 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
+  return false;
+}
+
+async function verifyStagedAirbagPhoto(intent, photo, label) {
+  if (!photo || !allowedAirbagPhotoMimes.has(String(photo.mime || '').toLowerCase()) ||
+      !Number.isSafeInteger(Number(photo.size)) || Number(photo.size) < 1 || Number(photo.size) > maxAirbagPhotoBytes ||
+      !/^[a-f0-9]{64}$/.test(String(photo.sha256 || '')) || photo.storagePath !== `content/${photo.sha256}`) {
+    return { ok:false, status:400, error:`The ${label} metadata is invalid. Upload the photo again.` };
+  }
+  const encoded = photo.storagePath.split('/').map(encodeURIComponent).join('/');
+  const stored = await supabaseRequest(serviceToken(), `storage/v1/object/private-ecu-files/${encoded}`, { method:'GET', timeoutMs:30000 });
+  if (!stored.ok) return { ok:false, status:409, error:`The ${label} is not present in private storage. Upload it again.` };
+  const bytes = Buffer.from(await stored.arrayBuffer());
+  if (bytes.length !== Number(photo.size) || bytes.length > maxAirbagPhotoBytes) return { ok:false, status:409, error:`The ${label} size does not match the saved checkout.` };
+  if (!matchesAirbagPhotoSignature(bytes, String(photo.mime || '').toLowerCase())) return { ok:false, status:415, error:`The ${label} content is not a valid ${photo.mime} image. Upload a JPG, PNG or WEBP photo.` };
+  const digest = crypto.createHash('sha256').update(bytes).digest('hex');
+  return safeEqualHex(digest, String(photo.sha256)) ? { ok:true } : { ok:false, status:409, error:`The ${label} hash does not match the saved checkout. Upload it again.` };
+}
+
 async function handleStageCheckoutIntent(request, response, intentId) {
   if (request.method !== 'POST') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
   try {
@@ -382,6 +433,12 @@ async function handleStageCheckoutIntent(request, response, intentId) {
     if (!['DRAFT','FILE_STAGED','PAYMENT_PENDING'].includes(intent.status) || intent.payment_status !== 'PENDING') { jsonResponse(response, 409, { error: 'This checkout is no longer awaiting file staging.' }); return true; }
     const integrity = await verifyStoredObject(customer, intent);
     if (!integrity.ok) { jsonResponse(response, integrity.status || 409, { error: integrity.error }); return true; }
+    if (intent.request_json?.category === 'AIRBAG') {
+      for (const [photo, label] of [[intent.request_json.modulePhoto, 'Airbag module photo'], [intent.request_json.partNumberPhoto, 'Airbag part-number photo']]) {
+        const photoCheck = await verifyStagedAirbagPhoto(intent, photo, label);
+        if (!photoCheck.ok) { jsonResponse(response, photoCheck.status || 409, { error: photoCheck.error }); return true; }
+      }
+    }
     const patch = await supabaseRequest(serviceToken(), `rest/v1/checkout_intents?id=eq.${encodeURIComponent(intent.id)}&customer_id=eq.${encodeURIComponent(customer.id)}`, { method: 'PATCH', prefer: 'return=representation', body: { status: 'FILE_STAGED', file_staged_at: new Date().toISOString() }, timeoutMs: 15000 });
     if (!patch.ok) throw new Error('The secure file stage could not be saved.');
     const rows = await patch.json();
@@ -1062,7 +1119,7 @@ async function flushNotificationOutbox() {
   notificationWorkerRunning = true;
   try {
     const token = serviceToken();
-    const response = await supabaseRequest(token, 'rest/v1/notification_outbox?select=id,order_id,event_type,attempts,next_attempt_at&status=in.(PENDING,RETRY)&next_attempt_at=lte.now()&order=created_at.asc&limit=10', { timeoutMs: 15000 });
+    const response = await supabaseRequest(token, 'rest/v1/notification_outbox?select=id,order_id,event_type,event_key,payload,attempts,next_attempt_at&status=in.(PENDING,RETRY)&next_attempt_at=lte.now()&order=created_at.asc&limit=10', { timeoutMs: 15000 });
     if (!response.ok) return;
     const rows = await response.json();
     for (const row of rows) {
@@ -1070,7 +1127,7 @@ async function flushNotificationOutbox() {
       if (!claim.ok) continue;
       const claimedRows = await claim.json().catch(() => []);
       if (!Array.isArray(claimedRows) || !claimedRows.length) continue;
-      const orderResponse = await supabaseRequest(token, `rest/v1/orders?select=id,category,vehicle_brand,vehicle_model,vehicle_year,contact_name,contact_phone,contact_email,payment_status,status,payment_provider,provider_order_id,provider_payment_id,created_at,ecu_manufacturer,ecu_model,reading_tool,selected_services,notes,verification_amount_paise&id=eq.${encodeURIComponent(row.order_id)}&limit=1`, { timeoutMs: 15000 });
+      const orderResponse = await supabaseRequest(token, `rest/v1/orders?select=id,category,vehicle_brand,vehicle_model,vehicle_year,contact_name,contact_phone,contact_email,payment_status,status,payment_provider,provider_order_id,provider_payment_id,created_at,ecu_manufacturer,ecu_model,reading_tool,selected_services,notes,module_details,verification_amount_paise&id=eq.${encodeURIComponent(row.order_id)}&limit=1`, { timeoutMs: 15000 });
       if (!orderResponse.ok) {
         await supabaseRequest(token, `rest/v1/notification_outbox?id=eq.${encodeURIComponent(row.id)}&status=eq.SENDING`, { method:'PATCH', prefer:'return=minimal', body:{ status:'RETRY', next_attempt_at:new Date(Date.now()+15*60*1000).toISOString(), last_error:'Order lookup failed before email delivery.', updated_at:new Date().toISOString() }, timeoutMs:15000 }).catch(()=>{});
         continue;
@@ -1083,45 +1140,60 @@ async function flushNotificationOutbox() {
       const fileResponse = await supabaseRequest(token, `rest/v1/order_files?select=original_name&order_id=eq.${encodeURIComponent(order.id)}&kind=eq.original&limit=1`, { timeoutMs: 15000 });
       const fileInfo = fileResponse.ok ? (await fileResponse.json())?.[0] : null;
       const originalFileName = fileInfo?.original_name || 'N/A';
-
       const esc = (val) => String(val || '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
       const formatAmount = (paise) => paise ? `₹${(Number(paise)/100).toFixed(2)}` : 'N/A';
       const services = Array.isArray(order.selected_services) ? order.selected_services.join(', ') : 'None';
       const vehicle = [order.vehicle_year, order.vehicle_brand, order.vehicle_model].filter(Boolean).join(' ');
-      const ecuDetails = order.category === 'ECU' ? `
-        <p><strong>ECU:</strong> ${esc(order.ecu_manufacturer || 'N/A')} ${esc(order.ecu_model || 'N/A')}</p>
-        <p><strong>Reading Tool:</strong> ${esc(order.reading_tool || 'N/A')}</p>
-      ` : '';
-
-      const html = `
-        <div style="font-family: sans-serif; line-height: 1.5;">
-          <h2 style="color: #333;">New Order Received – ECU File Service India</h2>
-          <p><strong>Order ID:</strong> ${esc(order.id)}</p>
-          <p><strong>Status:</strong> ${esc(order.status)}</p>
-          <p><strong>Payment Status:</strong> ${esc(order.payment_status)} (${esc(order.payment_provider || 'N/A')})</p>
-          <p><strong>Amount Paid:</strong> ${formatAmount(order.verification_amount_paise)}</p>
-          <hr/>
-          <p><strong>Customer:</strong> ${esc(order.contact_name)}</p>
-          <p><strong>Email:</strong> ${esc(order.contact_email || 'N/A')}</p>
-          <p><strong>Phone:</strong> ${esc(order.contact_phone)}</p>
-          <hr/>
-          <p><strong>Vehicle:</strong> ${esc(vehicle)}</p>
-          <p><strong>Category:</strong> ${esc(order.category)}</p>
-          ${ecuDetails}
-          <p><strong>Services:</strong> ${esc(services)}</p>
-          <p><strong>Original File:</strong> ${esc(originalFileName)}</p>
-          <p><strong>Created:</strong> ${esc(new Date(order.created_at).toLocaleString())}</p>
-          <p><strong>Notes:</strong> ${esc(order.notes || 'None')}</p>
-        </div>
+      const ecuDetails = order.category === 'ECU' ? `<p><strong>ECU:</strong> ${esc(order.ecu_manufacturer || 'N/A')} ${esc(order.ecu_model || 'N/A')}</p><p><strong>Reading tool:</strong> ${esc(order.reading_tool || 'N/A')}</p>` : '';
+      const rowPayload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+      const eventType = ['new_order','paid_order','status_change'].includes(row.event_type) ? row.event_type : 'new_order';
+      const previousStatus = rowPayload.previous_status || '—';
+      const currentStatus = rowPayload.status || order.status || 'New';
+      const eventTitle = eventType === 'paid_order' ? 'Payment Confirmed' : eventType === 'status_change' ? `Order Status Updated: ${currentStatus}` : 'New Order Received';
+      const adminSubject = eventType === 'paid_order' ? 'Payment Confirmed – ECU File Service India' : eventType === 'status_change' ? `Order Status Updated: ${currentStatus} – ECU File Service India` : 'New Order Received – ECU File Service India';
+      const customerSubject = eventType === 'paid_order' ? 'Payment received – ECU SOLUTION' : eventType === 'status_change' ? `Your order status is now ${currentStatus} – ECU SOLUTION` : 'We received your order – ECU SOLUTION';
+      const eventIntro = eventType === 'paid_order'
+        ? 'Payment has been verified by the server and the order is confirmed.'
+        : eventType === 'status_change'
+          ? `The order status changed from ${esc(previousStatus)} to ${esc(currentStatus)}.`
+          : 'A new customer order was successfully created after verified checkout.';
+      const detailHtml = `
+        <p><strong>Order ID:</strong> ${esc(order.id)}</p>
+        <p><strong>Current status:</strong> ${esc(eventType === 'status_change' ? currentStatus : (order.status || currentStatus))}</p>
+        <p><strong>Payment:</strong> ${esc(order.payment_status)} (${esc(order.payment_provider || 'N/A')})</p>
+        <p><strong>Verification fee:</strong> ${formatAmount(order.verification_amount_paise)}</p>
+        <hr/>
+        <p><strong>Customer:</strong> ${esc(order.contact_name)}</p>
+        <p><strong>Email:</strong> ${esc(order.contact_email || 'N/A')}</p>
+        <p><strong>Phone:</strong> ${esc(order.contact_phone)}</p>
+        <hr/>
+        <p><strong>Vehicle:</strong> ${esc(vehicle)}</p>
+        <p><strong>Category:</strong> ${esc(order.category)}</p>
+        ${ecuDetails}
+        ${order.category === 'AIRBAG' ? `<p><strong>Airbag module details:</strong> ${esc(order.module_details || 'N/A')}</p>` : ''}
+        <p><strong>Service:</strong> ${esc(services)}</p>
+        <p><strong>Original file:</strong> ${esc(originalFileName)}</p>
+        <p><strong>Created:</strong> ${esc(new Date(order.created_at).toLocaleString())}</p>
+        <p><strong>Notes:</strong> ${esc(order.notes || 'None')}</p>
       `.trim();
-      const subject = `New Order Received – ECU File Service India`;
+      const appUrl = (process.env.PUBLIC_APP_URL || 'https://ecufileservice.in').replace(/\/$/, '');
+      const adminHtml = `<div style="font-family:sans-serif;line-height:1.5"><h2>${esc(eventTitle)} – ECU File Service India</h2><p>${eventIntro}</p>${detailHtml}<p><a href="${esc(appUrl)}/admin.html">Open Admin Orders</a></p></div>`;
+      const customerHtml = `<div style="font-family:sans-serif;line-height:1.5"><h2>${esc(eventTitle)} – ECU SOLUTION</h2><p>Hi ${esc(order.contact_name || 'Customer')},</p><p>${eventType === 'status_change' ? `Your order status has changed from ${esc(previousStatus)} to <strong>${esc(currentStatus)}</strong>.` : eventType === 'paid_order' ? 'We have verified your payment successfully. Your order is confirmed.' : 'We have received your order successfully. Our team will review it and update you as it progresses.'}</p>${detailHtml}<p>Sign in to your account at <a href="${esc(appUrl)}/">${esc(appUrl)}</a> to review your order.</p><p>Regards,<br>ECU SOLUTION · ECU File Service India</p></div>`;
+      const eventKey = String(row.event_key || `${row.order_id}:${eventType}`).replace(/[^a-zA-Z0-9._:/-]/g, '_').slice(0, 180);
       try {
-        const emailResponse = await requestHttps('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json', 'Idempotency-Key': `efsi/${row.event_type}/${row.order_id}` },
-          body: JSON.stringify({ from: emailFrom, to: [adminNotificationEmail], subject, html }), timeoutMs: 15000
-        });
-        if (!emailResponse.ok) throw new Error((await emailResponse.text()).slice(0, 300));
+        const sendEmail = async (recipient, subject, html, recipientLabel) => {
+          const emailResponse = await requestHttps('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json', 'Idempotency-Key': `efsi/${eventKey}/${recipientLabel}` },
+            body: JSON.stringify({ from: emailFrom, to: [recipient], subject, html }), timeoutMs: 15000
+          });
+          if (!emailResponse.ok) throw new Error((await emailResponse.text()).slice(0, 300));
+        };
+        // Recipient-scoped idempotency keys allow a retry to safely resume if one send succeeded.
+        await sendEmail(adminNotificationEmail, adminSubject, adminHtml, 'admin');
+        if (order.contact_email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(order.contact_email))) {
+          await sendEmail(order.contact_email, customerSubject, customerHtml, 'customer');
+        }
         await supabaseRequest(token, `rest/v1/notification_outbox?id=eq.${encodeURIComponent(row.id)}`, { method: 'PATCH', prefer: 'return=minimal', body: { status: 'SENT', sent_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }, timeoutMs: 15000 });
       } catch (error) {
         const attempts = Number(row.attempts || 0) + 1;
@@ -1189,7 +1261,6 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/admin/payment-status') return handleAdminPaymentStatus(request, response);
   if (url.pathname === '/api/admin/orders/second-stage-amount' || url.pathname === '/api/admin/orders/set-second-stage' || url.pathname === '/api/admin/orders/second-stage/create-payment-link') return handleAdminCreateSecondStagePaymentLink(request, response);
   if (url.pathname === '/api/admin/orders/second-stage/mark-paid') return handleAdminMarkSecondStagePaid(request, response);
-  if (url.pathname === '/api/admin/orders/second-stage/mark-unpaid') return handleAdminMarkSecondStageUnpaid(request, response);
   if (url.pathname === '/api/admin/orders/second-stage/mark-unpaid') return handleAdminMarkSecondStageUnpaid(request, response);
   if (url.pathname === '/api/orders/messages' && request.method === 'GET') return handleGetMessages(request, response, url);
   if (url.pathname === '/api/orders/messages' && request.method === 'POST') return handleSendMessage(request, response);
