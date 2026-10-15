@@ -8,6 +8,10 @@
   const brandInput = document.querySelector('#brand');
   const brandResults = document.querySelector('#brand-results');
   const maxFileSize = 50 * 1024 * 1024;
+  const maxAirbagPhotoBytes = 10 * 1024 * 1024;
+  const allowedPhotoTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+  const modulePhotoInput = document.querySelector('#airbag-module-photo');
+  const partNumberPhotoInput = document.querySelector('#airbag-part-photo');
   const brands = ['Ather','Bajaj','BYD','Citroën','Daewoo','Datsun','Eicher','Force Motors','Honda','Hyundai','Isuzu','JCB','Jeep','Kia','Kubota','Land Rover','Mahindra','Mahindra Truck and Bus','Mahindra Tractors','Maruti Suzuki','Mercedes-Benz','MG Motor','Mitsubishi','Nissan','OLA Electric','Piaggio Commercial Vehicles','Porsche','Renault','Royal Enfield','Scania Industrial','Skoda','SML Isuzu','Sonalika','Suzuki','Tata Motors','Tata Motors Commercial Vehicles','TAFE','Toyota','TVS','Volkswagen','Volvo Construction Equipment','VST Tillers Tractors','Yanmar','Other / Not Listed'];
   let currentPage = 0;
   let activeBrandOption = -1;
@@ -35,7 +39,7 @@
       category,
       vehicleBrand: String(data.get('brand') || '').trim(), vehicleType: String(data.get('vehicleType') || '').trim(), vehicleModel: String(data.get('vehicleModel') || '').trim(), vehicleYear: String(data.get('year') || '').trim(),
       ecuManufacturer: isEcu ? String(data.get('ecuManufacturer') || '').trim() : '', ecuModel: isEcu ? String(data.get('ecuModel') || '').trim() : '', readingTool: isEcu ? String(data.get('readingTool') || '').trim() : '',
-      selectedServices: data.getAll('service'), notes: String(data.get('notes') || '').trim(), contactName: String(data.get('name') || '').trim(), contactPhone: String(data.get('phone') || '').trim(), contactEmail: String(data.get('email') || '').trim()
+      selectedServices: data.getAll('service'), moduleDetails: category === 'AIRBAG' ? String(data.get('moduleDetails') || '').trim() : '', notes: String(data.get('notes') || '').trim(), contactName: String(data.get('name') || '').trim(), contactPhone: String(data.get('phone') || '').trim(), contactEmail: String(data.get('email') || '').trim()
     };
   }
 
@@ -45,20 +49,31 @@
     if (index === 1) {
       const year = values.vehicleYear;
       if (!values.vehicleBrand || !values.vehicleType || !values.vehicleModel) { setError(index, 'Brand, vehicle type and model are required.'); return false; }
-      if (values.category !== 'ECU' && !year) { setError(index, 'Year is required for Airbag and Dashboard requests.'); return false; }
+      if (values.category === 'AIRBAG' && !year) { setError(index, 'Year is required for Airbag Crash Clear requests.'); return false; }
       if (year && (!/^\d{4}$/.test(year) || Number(year)<1950 || Number(year)>2100)) { setError(index, 'Enter a valid vehicle year.'); return false; }
     }
-    if (index === 2 && values.category === 'ECU') { /* optional ECU details */ }
+    if (index === 2 && values.category === 'AIRBAG') {
+      if (!values.moduleDetails || values.moduleDetails.length > 1200) { setError(index, 'Enter the airbag module details.'); return false; }
+      for (const [input, label] of [[modulePhotoInput, 'module photo'], [partNumberPhotoInput, 'part-number photo']]) {
+        const file = input?.files?.[0];
+        const savedPhoto = input === modulePhotoInput ? activeIntent?.request_json?.modulePhoto : activeIntent?.request_json?.partNumberPhoto;
+        if (!file && !(fileStagedInStorage && savedPhoto?.sha256)) { setError(index, `Select the required airbag ${label}.`); return false; }
+        if (file && (!allowedPhotoTypes.has(file.type) || file.size < 1 || file.size > maxAirbagPhotoBytes)) { setError(index, `The airbag ${label} must be a JPG, PNG or WEBP image up to 10 MB.`); return false; }
+      }
+    }
     if (index === 3 && !values.selectedServices.length) { setError(index, 'Select at least one file service.'); return false; }
     if (index === 4) {
       if (!fileInput.files[0] && !fileStagedInStorage) { setError(index, 'Select your original file before continuing.'); return false; }
       if (fileInput.files[0] && fileInput.files[0].size > maxFileSize) { setError(index, 'The original file must be 50 MB or smaller.'); return false; }
       if (!values.contactName || !values.contactPhone) { setError(index, 'Your name and phone are required.'); return false; }
+      if (!values.contactEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.contactEmail)) { setError(index, 'Enter a valid email address to receive order updates.'); return false; }
           }
     if (index === 5) {
       if (!values.vehicleBrand || !values.vehicleType || !values.vehicleModel || !values.selectedServices.length) { setError(index, 'Complete the required request details before payment.'); return false; }
       if (!values.contactName || !values.contactPhone) { setError(index, 'Your name and phone are required before payment.'); return false; }
-      if (values.category !== 'ECU' && !values.vehicleYear) { setError(index, 'Year is required for this category.'); return false; }
+      if (values.category === 'AIRBAG' && !values.vehicleYear) { setError(index, 'Year is required for Airbag Crash Clear.'); return false; }
+      if (!values.contactEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.contactEmail)) { setError(index, 'Enter a valid email address to receive order updates.'); return false; }
+      if (values.category === 'AIRBAG' && values.selectedServices.some(service => service !== 'Crash Clear')) { setError(index, 'Airbag requests support Crash Clear only.'); return false; }
     }
     return true;
   }
@@ -66,22 +81,31 @@
   function applyCategoryFields() {
     const category = String(new FormData(form).get('category') || 'ECU');
     const ecu = category === 'ECU';
+    const airbag = category === 'AIRBAG';
     document.querySelectorAll('.ecu-only').forEach(el => { el.hidden = !ecu; el.querySelectorAll('input,select,textarea').forEach(control => { control.disabled = !ecu; if (!ecu) control.value = ''; }); });
     const tool = document.querySelector('.tool-field');
     if (tool) { tool.hidden = !ecu; const select = tool.querySelector('select'); if (select) { select.disabled = !ecu; if (!ecu) select.value = ''; } }
+    document.querySelectorAll('.airbag-only').forEach(el => { el.hidden = !airbag; el.querySelectorAll('input,select,textarea').forEach(control => { control.disabled = !airbag; if (!airbag) control.value = ''; }); });
+    document.querySelectorAll('.ecu-service-option').forEach(el => { el.hidden = airbag; const input = el.querySelector('input'); if (input) { input.disabled = airbag; if (airbag) input.checked = false; } });
+    const crash = document.querySelector('.airbag-service-option');
+    if (crash) { crash.hidden = !airbag; const input = crash.querySelector('input'); if (input) { input.disabled = !airbag; if (!airbag) input.checked = false; } }
+    document.querySelectorAll('.airbag-review').forEach(el => { el.hidden = !airbag; });
     const thirdStep = document.querySelector('[data-page="2"]');
-    if (thirdStep) { const kicker = thirdStep.querySelector('.form-kicker'); const title = thirdStep.querySelector('h3'); const intro = thirdStep.querySelector('.form-title p'); if (kicker && title && intro) { if (ecu) { kicker.textContent='STEP 03 OF 06'; title.textContent='Select ECU / module'; intro.textContent='Add the controller details and the tool used to read the file.'; } else { kicker.textContent='STEP 03 OF 06'; title.textContent='Confirm module'; intro.textContent='For this service category, only the selected vehicle/module details are collected.'; } } }
-    document.querySelector('.sum-module').textContent = ecu ? ([new FormData(form).get('ecuManufacturer'),new FormData(form).get('ecuModel')].filter(Boolean).join(' · ') || 'Not specified') : 'Not applicable';
+    if (thirdStep) { const title = thirdStep.querySelector('h3'); const intro = thirdStep.querySelector('.form-title p'); if (title && intro) { if (ecu) { title.textContent='Select ECU / module'; intro.textContent='Add the controller details and the tool used to read the file.'; } else { title.textContent='Airbag module details'; intro.textContent='Enter the module details and attach a module photo plus a clear part-number label photo.'; } } }
+    const moduleLabel = document.querySelector('.progress-step:nth-of-type(5) b');
+    if (moduleLabel) moduleLabel.textContent = 'Upload';
+    const marker = document.querySelector('.year-required-marker');
+    if (marker) marker.textContent = airbag ? '*' : 'OPTIONAL';
   }
 
   function updateSummary() {
     applyCategoryFields();
     const data = normalizeFormData({ includeFile:false });
     const vehicle = [data.vehicleYear,data.vehicleBrand,data.vehicleType,data.vehicleModel].filter(Boolean).join(' · ');
-    const module = data.category === 'ECU' ? ([data.ecuManufacturer,data.ecuModel].filter(Boolean).join(' · ') || 'Not specified') : 'Not applicable';
+    const module = data.category === 'ECU' ? ([data.ecuManufacturer,data.ecuModel].filter(Boolean).join(' · ') || 'Not specified') : data.category === 'AIRBAG' ? (data.moduleDetails || 'Add airbag module details') : 'Not applicable';
     document.querySelector('.sum-category').textContent = data.category;
     document.querySelector('.review-category').textContent = data.category;
-    document.querySelector('.summary-symbol').textContent = data.category === 'AIRBAG' ? '◈' : data.category === 'DASHBOARD' ? '▤' : '▦';
+    document.querySelector('.summary-symbol').textContent = data.category === 'AIRBAG' ? '◈' : '▦';
     document.querySelector('.sum-vehicle').textContent = vehicle || 'Add vehicle details';
     document.querySelector('.sum-module').textContent = module;
     document.querySelector('.sum-services').innerHTML = data.selectedServices.length ? data.selectedServices.map(s=>`<span>${escapeHtml(s)}</span>`).join('') : '<span class="sum-empty">Choose services to see them here</span>';
@@ -89,7 +113,11 @@
     const fee = fileVerificationPricePaise === null ? 'Price unavailable' : formatINR(fileVerificationPricePaise);
     document.querySelector('.sum-verification').textContent = fee;
     document.querySelector('.review-vehicle').textContent = vehicle || 'Add vehicle details';
-    document.querySelector('.review-module').textContent = module;
+    document.querySelector('.review-module').textContent = data.category === 'AIRBAG' ? 'See airbag module details below' : module;
+    const airbagDetailsReview = document.querySelector('.review-airbag-details'); if (airbagDetailsReview) airbagDetailsReview.textContent = data.category === 'AIRBAG' ? (data.moduleDetails || 'Not specified') : 'Not applicable';
+    const modulePhoto = modulePhotoInput?.files?.[0]; const partPhoto = partNumberPhotoInput?.files?.[0];
+    const photoSummary = [modulePhoto?.name || activeIntent?.request_json?.modulePhoto?.name, partPhoto?.name || activeIntent?.request_json?.partNumberPhoto?.name].filter(Boolean).join(' · ');
+    const photoReview = document.querySelector('.review-airbag-photos'); if (photoReview) photoReview.textContent = data.category === 'AIRBAG' ? (photoSummary || 'Photos not attached') : 'Not applicable';
     document.querySelector('.review-tool').textContent = data.category === 'ECU' ? (data.readingTool || 'Not specified') : 'N/A';
     document.querySelector('.review-services').textContent = data.selectedServices.join(', ') || 'Not selected';
     document.querySelector('.review-verification').textContent = fee;
@@ -112,9 +140,10 @@
   brandInput.addEventListener('keydown',event=>{const options=[...brandResults.querySelectorAll('.brand-option')]; if (!options.length) return; if (event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();activeBrandOption=(activeBrandOption+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;options.forEach((o,i)=>o.classList.toggle('keyboard-active',i===activeBrandOption));options[activeBrandOption]?.scrollIntoView({block:'nearest'});} else if(event.key==='Enter'&&activeBrandOption>=0){event.preventDefault();options[activeBrandOption].click();} else if(event.key==='Escape') closeBrandResults();});
   brandResults.addEventListener('click',event=>{const button=event.target.closest('.brand-option');if(!button)return;brandInput.value=button.dataset.brand;closeBrandResults();updateSummary();});
   document.addEventListener('click',event=>{if(!event.target.closest('.brand-search-wrap'))closeBrandResults();});
-  document.querySelectorAll('input[name="category"]').forEach(radio=>radio.addEventListener('change',()=>{document.querySelectorAll('.choice-card').forEach(card=>card.classList.toggle('selected',card.querySelector('input')?.checked));fileStagedInStorage=false;activeIntent=null;updateSummary();}));
-  document.querySelectorAll('input[name="service"],#vehicle-type,#vehicle-model,#vehicle-year,#ecu-maker,#ecu-model,#reading-tool,#customer-name,#customer-phone,#customer-email,#request-notes').forEach(el=>el.addEventListener('input',updateSummary));
+  document.querySelectorAll('input[name="category"]').forEach(radio=>radio.addEventListener('change',()=>{document.querySelectorAll('.choice-card').forEach(card=>card.classList.toggle('selected',card.querySelector('input')?.checked));fileStagedInStorage=false;activeIntent=null;originalFileSha256='';updateSummary();}));
+  document.querySelectorAll('input[name="service"],#vehicle-type,#vehicle-model,#vehicle-year,#ecu-maker,#ecu-model,#reading-tool,#customer-name,#customer-phone,#customer-email,#request-notes,#airbag-module-details').forEach(el=>el.addEventListener('input',updateSummary));
   document.querySelector('#original-file').addEventListener('change',()=>{fileStagedInStorage=false;activeIntent=null;originalFileSha256=''; const label=document.querySelector('.file-selected'); if(label) label.textContent=fileInput.files[0] ? `${fileInput.files[0].name} · ${formatSize(fileInput.files[0].size)}` : ''; updateSummary();});
+  for (const [input, labelSelector] of [[modulePhotoInput, '.module-photo-selected'], [partNumberPhotoInput, '.part-photo-selected']]) input?.addEventListener('change',()=>{fileStagedInStorage=false;activeIntent=null;const label=document.querySelector(labelSelector);if(label)label.textContent=input.files[0]?`${input.files[0].name} · ${formatSize(input.files[0].size)}`:'';updateSummary();});
   function formatSize(bytes){return bytes<1024*1024?`${Math.max(1,Math.round(bytes/1024))} KB`:`${(bytes/(1024*1024)).toFixed(1)} MB`;}
 
   function loadRazorpayCheckout(timeoutMs=12000){
@@ -125,29 +154,69 @@
   }
   async function hashFile(file){const buffer=await file.arrayBuffer();const digest=await crypto.subtle.digest('SHA-256',buffer);return [...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('');}
   async function fetchJson(url,options={},timeoutMs=30000){const response=await fetch(url,{...options,signal:AbortSignal.timeout(timeoutMs)});let result=null;try{result=await response.json();}catch{}return {response,result};}
-  function requestDataFromForm(file){const data=normalizeFormData({includeFile:false});return {...data,originalName:file?.name || String(activeIntent?.original_name || ''),originalMime:file?.type || String(activeIntent?.original_mime || 'application/octet-stream'),originalSize:file?.size || Number(activeIntent?.original_size || 0),originalSha256:originalFileSha256 || String(activeIntent?.original_sha256 || '')};}
+  async function requestDataFromForm(file, savedRequest = {}) {
+    const data=normalizeFormData({includeFile:false});
+    const originalFile = file || null;
+    const originalName = originalFile?.name || String(savedRequest.originalName || activeIntent?.original_name || '');
+    const originalMime = originalFile?.type || String(savedRequest.originalMime || activeIntent?.original_mime || 'application/octet-stream');
+    const originalSize = originalFile?.size || Number(savedRequest.originalSize || activeIntent?.original_size || 0);
+    const originalSha256 = originalFile ? await hashFile(originalFile) : (originalFileSha256 || String(savedRequest.originalSha256 || activeIntent?.original_sha256 || ''));
+    async function photoMetadata(input, saved) {
+      const photo = input?.files?.[0];
+      if (photo) {
+        const sha256 = await hashFile(photo);
+        return { name: photo.name.slice(0,255), mime: photo.type, size: photo.size, sha256, storagePath: `content/${sha256}` };
+      }
+      return saved && typeof saved === 'object' ? saved : null;
+    }
+    const modulePhoto = data.category === 'AIRBAG' ? await photoMetadata(modulePhotoInput, savedRequest.modulePhoto) : null;
+    const partNumberPhoto = data.category === 'AIRBAG' ? await photoMetadata(partNumberPhotoInput, savedRequest.partNumberPhoto) : null;
+    return { ...data, moduleDetails: data.category === 'AIRBAG' ? data.moduleDetails : null, modulePhoto, partNumberPhoto,
+      originalName: originalName.slice(0,255), originalMime: originalMime, originalSize, originalSha256 };
+  }
+
+  function stableCheckoutData(value) {
+    const data = { ...value };
+    const yearText = String(data.vehicleYear ?? '').trim();
+    data.vehicleYear = yearText ? Number(yearText) : null;
+    for (const key of ['ecuManufacturer','ecuModel','readingTool','notes']) data[key] = data[key] ? String(data[key]).trim() : null;
+    data.moduleDetails = data.category === 'AIRBAG' ? String(data.moduleDetails || '').trim() : null;
+    for (const key of ['modulePhoto','partNumberPhoto']) {
+      const photo = data[key];
+      data[key] = data.category === 'AIRBAG' && photo ? { name:photo.name, mime:photo.mime, size:Number(photo.size), sha256:photo.sha256, storagePath:photo.storagePath } : null;
+    }
+    return JSON.stringify(data);
+  }
 
   async function ensureCheckoutIntent() {
+    let savedForRetry = activeIntent?.request_json || {};
     if (activeIntent?.id && fileStagedInStorage && (activeIntent.status==='FILE_STAGED'||activeIntent.status==='PAYMENT_PENDING')) {
-      const current = requestDataFromForm(null);
-      const saved = activeIntent.request_json || {};
-      const same = JSON.stringify(current) === JSON.stringify(saved);
-      if (same) return activeIntent;
+      const current = await requestDataFromForm(null, savedForRetry);
+      if (stableCheckoutData(current) === stableCheckoutData(savedForRetry)) return activeIntent;
       activeIntent = null; fileStagedInStorage = false; originalFileSha256 = ''; updateSummary();
     }
     const file=fileInput.files[0];
     if (!file) throw new Error('Select your original file before starting checkout.');
     if (file.size>maxFileSize) throw new Error('The original file must be 50 MB or smaller.');
     const backend=window.EfsiSupabase; if(!backend?.getSession()?.user?.id) throw new Error('Sign in to your customer account before payment.');
-    const request=requestDataFromForm(file);
-    if(!originalFileSha256) originalFileSha256=await hashFile(file);
-    request.originalSha256=originalFileSha256;
+    const request=await requestDataFromForm(file, savedForRetry);
+    originalFileSha256=request.originalSha256;
+    if (request.category === 'AIRBAG') {
+      for (const [meta, label] of [[request.modulePhoto,'module photo'],[request.partNumberPhoto,'part-number photo']]) {
+        if (!meta || !meta.name || !allowedPhotoTypes.has(meta.mime) || !Number.isSafeInteger(meta.size) || meta.size < 1 || meta.size > maxAirbagPhotoBytes || !/^[a-f0-9]{64}$/.test(meta.sha256 || '') || meta.storagePath !== `content/${meta.sha256}`) throw new Error(`Choose a valid airbag ${label} (JPG, PNG or WEBP, maximum 10 MB).`);
+      }
+    }
     const token=await backend.getAccessToken(); if(!token) throw new Error('Your customer session expired. Sign in again.');
     const created=await fetchJson('/api/checkout/intents',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({request})},30000);
     if(!created.response.ok) throw new Error(created.result?.error||'Secure checkout could not be saved.');
-    activeIntent={id:created.result.intentId,status:created.result.status,amount_paise:created.result.amount,currency:created.result.currency,storage_path:created.result.storagePath,expires_at:created.result.expiresAt,request_sha256:created.result.requestSha256,original_sha256:originalFileSha256,original_name:file.name,original_size:file.size,request_json:request};
+    activeIntent={id:created.result.intentId,status:created.result.status,amount_paise:created.result.amount,currency:created.result.currency,storage_path:created.result.storagePath,expires_at:created.result.expiresAt,request_sha256:created.result.requestSha256,original_sha256:request.originalSha256,original_name:file.name,original_size:file.size,request_json:request};
     const encoded=activeIntent.storage_path.split('/').map(encodeURIComponent).join('/');
     await backend.upload(`private-ecu-files/${encoded}`,file);
+    if (request.category === 'AIRBAG') {
+      for (const [input,meta] of [[modulePhotoInput,request.modulePhoto],[partNumberPhotoInput,request.partNumberPhoto]]) {
+        if (input?.files?.[0]) await backend.upload(`private-ecu-files/${meta.storagePath}`, input.files[0]);
+      }
+    }
     const staged=await fetchJson(`/api/checkout/intents/${encodeURIComponent(activeIntent.id)}/stage`,{method:'POST',headers:{Authorization:`Bearer ${token}`}},30000);
     if(!staged.response.ok) throw new Error(staged.result?.error||'Private file staging could not be confirmed.');
     activeIntent={...activeIntent,status:'FILE_STAGED'};fileStagedInStorage=true;updateSummary();return activeIntent;
@@ -166,7 +235,7 @@
     const backend=window.EfsiSupabase;const token=await backend.getAccessToken();const {response,result}=await fetchJson('/api/payment/paypal/create-order',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({intentId:intent.id})},40000);if(!response.ok)throw new Error(result?.error||'PayPal checkout could not be created.');if(!result.approvalUrl)throw new Error('PayPal did not return an approval link.');activeProvider='paypal';window.location.assign(result.approvalUrl);
   }
   async function resumePaypalReturn(){const query=new URLSearchParams(location.search);if(query.get('paypal_return')!=='1')return;const intentId=query.get('intent');const token=query.get('token');history.replaceState(null,document.title,location.pathname);if(!intentId||!token)return;const backend=window.EfsiSupabase;const session=backend?.getSession();if(!session?.user?.id){document.querySelector('.verification-status').textContent='Sign in to the account that started this PayPal checkout, then open My account to resume payment verification.';return;}try{document.querySelector('.verification-status').textContent='Confirming PayPal payment securely…';const access=await backend.getAccessToken();const {response,result}=await fetchJson('/api/payment/paypal/capture',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${access}`},body:JSON.stringify({intentId,paypalOrderId:token})},90000);if(!response.ok)throw new Error(result?.error||'PayPal payment could not be confirmed.');completeSuccess(result.orderId);}catch(error){document.querySelector('.verification-status').textContent=error.message;}}
-  async function resumeFromIntent(intent){activeIntent=intent;const req=intent.request_json||{};for(const [name,id] of [['brand','brand'],['vehicleType','vehicle-type'],['vehicleModel','vehicle-model'],['year','vehicle-year'],['ecuManufacturer','ecu-maker'],['ecuModel','ecu-model'],['readingTool','reading-tool'],['notes','request-notes'],['name','customer-name'],['phone','customer-phone']]){const el=document.getElementById(id);if(el)el.value=req[name]||'';}document.querySelectorAll('input[name="category"]').forEach(r=>r.checked=r.value===req.category);document.querySelectorAll('.choice-card').forEach(card=>card.classList.toggle('selected',card.querySelector('input')?.checked));document.querySelectorAll('input[name="service"]').forEach(cb=>cb.checked=(req.selectedServices||[]).includes(cb.value));fileStagedInStorage=true;originalFileSha256=intent.original_sha256||'';setPage(5);document.querySelector('.verification-status').textContent='This checkout is saved securely. Choose a payment method to continue.';updateSummary();}
+  async function resumeFromIntent(intent){activeIntent=intent;const req=intent.request_json||{};for(const [name,id] of [['brand','brand'],['vehicleType','vehicle-type'],['vehicleModel','vehicle-model'],['year','vehicle-year'],['ecuManufacturer','ecu-maker'],['ecuModel','ecu-model'],['readingTool','reading-tool'],['moduleDetails','airbag-module-details'],['notes','request-notes'],['name','customer-name'],['phone','customer-phone'],['email','customer-email']]){const el=document.getElementById(id);if(el)el.value=req[name]||'';}document.querySelectorAll('input[name="category"]').forEach(r=>r.checked=r.value===req.category);document.querySelectorAll('.choice-card').forEach(card=>card.classList.toggle('selected',card.querySelector('input')?.checked));document.querySelectorAll('input[name="service"]').forEach(cb=>cb.checked=(req.selectedServices||[]).includes(cb.value));fileStagedInStorage=true;originalFileSha256=intent.original_sha256||'';setPage(5);document.querySelector('.verification-status').textContent='This checkout is saved securely. Choose a payment method to continue.';updateSummary();}
   function completeSuccess(orderId){activeIntent=null;fileStagedInStorage=false;document.querySelector('.verification-submit').disabled=true;document.querySelector('.verification-status').textContent='Payment verified and your order is now available in My account.';document.querySelector('.success-state > p').textContent='Payment verified successfully. Your order and private original file are now available to our service team.';document.querySelector('.paid-order-reference').textContent=`Order reference: ${orderId}`;setPage(6);}
   function updatePaymentButtons(){const razor=document.querySelector('#pay-razorpay');const paypal=document.querySelector('#pay-paypal');if(razor)razor.disabled=!providerReadiness.razorpay||checkoutStarting;if(paypal)paypal.disabled=!providerReadiness.paypal||checkoutStarting;}
   async function beginPayment(provider){if(checkoutStarting)return;if(!validatePage(5))return;if(!providerReadiness[provider]){setError(5,`${provider==='paypal'?'PayPal':'Razorpay'} is not configured yet.`);return;}const consent=form.querySelector('input[name=consent]');if(!consent?.checked){setError(5,'Please confirm you are authorised to request this service.');return;}const button=document.querySelector('.verification-submit');const status=document.querySelector('.verification-status');const backend=window.EfsiSupabase;if(!backend?.getSession()?.user?.id){setError(5,'Sign in to your customer account before payment.');return;}checkoutStarting=true;updatePaymentButtons();clearError(5);status.textContent='Saving your checkout and securely staging the original file…';try{const intent=await ensureCheckoutIntent();status.textContent=provider==='paypal'?'Opening secure PayPal approval…':'Opening secure Razorpay Checkout…';if(provider==='paypal')await startPayPal(intent);else await startRazorpay(intent);}catch(error){status.textContent=error.message||'Checkout could not be started.';setError(5,status.textContent);checkoutStarting=false;updatePaymentButtons();}}
@@ -175,10 +244,15 @@
   document.querySelectorAll('.button-back').forEach(button=>button.addEventListener('click',()=>setPage(Math.max(0,currentPage-1))));
   document.querySelector('#pay-razorpay')?.addEventListener('click',()=>beginPayment('razorpay'));
   document.querySelector('#pay-paypal')?.addEventListener('click',()=>beginPayment('paypal'));
-  document.querySelector('.start-over')?.addEventListener('click',()=>{form.reset();activeIntent=null;fileStagedInStorage=false;originalFileSha256='';document.querySelectorAll('input[name="category"]').forEach(r=>r.checked=r.value==='ECU');document.querySelectorAll('.choice-card').forEach((card,i)=>card.classList.toggle('selected',i===0));const fs=document.querySelector('.file-selected');if(fs)fs.textContent='';setPage(0);updateSummary();});
+  document.querySelector('.start-over')?.addEventListener('click',()=>{form.reset();activeIntent=null;fileStagedInStorage=false;originalFileSha256='';document.querySelectorAll('input[name="category"]').forEach(r=>r.checked=r.value==='ECU');document.querySelectorAll('.choice-card').forEach((card,i)=>card.classList.toggle('selected',i===0));const fs=document.querySelector('.file-selected');if(fs)fs.textContent='';document.querySelector('.module-photo-selected').textContent='';document.querySelector('.part-photo-selected').textContent='';setPage(0);updateSummary();});
   window.addEventListener('efsi:resume-checkout',event=>resumeFromIntent(event.detail));
   fetch('/api/health',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(health=>{providerReadiness={razorpay:Boolean(health?.paymentReadiness?.razorpay),paypal:Boolean(health?.paymentReadiness?.paypal)};paymentReady=Boolean(health?.paymentConfigured);const status=document.querySelector('.verification-status');const gateways=document.querySelector('.payment-gateway-note');if(gateways)gateways.textContent=health?.paymentReadiness?.razorpay&&health?.paymentReadiness?.paypal?'Razorpay or PayPal secure checkout is available.':health?.paymentReadiness?.razorpay?'Razorpay secure checkout is available.':health?.paymentReadiness?.paypal?'PayPal secure checkout is available.':'Secure payment is not configured yet.';updatePaymentButtons();}).catch(()=>{paymentReady=false;updatePaymentButtons();});
   fetch('/api/pricing',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(pricing=>{if(!pricing)throw new Error('pricing');fileVerificationPricePaise=pricing.fileVerificationPricePaise;const fee=formatINR(fileVerificationPricePaise);verificationPriceLabel.textContent=fee;document.querySelectorAll('[data-fee-inline]').forEach(el=>el.textContent=fee);updateSummary();}).catch(()=>{verificationPriceLabel.textContent='Price unavailable';document.querySelector('.verification-status').dataset.error='true';document.querySelector('.verification-status').textContent='The verification fee could not be loaded. Reload and retry.';});
+  const queryCategory = new URLSearchParams(location.search).get('category');
+  if (queryCategory === 'ECU' || queryCategory === 'AIRBAG') {
+    const requested = document.querySelector(`input[name="category"][value="${queryCategory}"]`);
+    if (requested) { requested.checked = true; document.querySelectorAll('.choice-card').forEach(card=>card.classList.toggle('selected',card.querySelector('input')?.checked)); if (queryCategory === 'AIRBAG') setPage(1); }
+  }
   updateSummary();
   resumePaypalReturn();
 })();
