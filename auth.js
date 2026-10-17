@@ -280,21 +280,33 @@
       const rows = await rest(`checkout_intents?select=id,status,request_json,original_name,original_mime,original_size,original_sha256,storage_path,amount_paise,currency,payment_provider,provider_order_id,provider_payment_id,expires_at,updated_at&status=in.(DRAFT,FILE_STAGED,PAYMENT_PENDING)&id=eq.${encodeURIComponent(button.dataset.intentId)}&customer_id=eq.${encodeURIComponent(session?.user?.id || '')}&limit=1`);
       const intent = rows?.[0];
       if (!intent) throw new Error('Saved checkout was not found. It may have expired.');
-      let recovered = false;
-      if (intent.payment_provider && intent.provider_order_id) {
+      if (intent.payment_provider || intent.provider_order_id) {
+        if (!intent.payment_provider || !intent.provider_order_id) {
+          message.textContent = 'This saved checkout has an incomplete payment reference. It has not been reopened for payment to avoid a duplicate charge. Please retry recovery later or contact support.';
+          return;
+        }
+        let response;
+        let result;
         try {
           const access = await accessToken();
-          const response = await fetch('/api/payment/reconcile', { method:'POST', headers:{'Content-Type':'application/json', ...(access ? {Authorization:`Bearer ${access}`} : {})}, body:JSON.stringify({intentId:intent.id}) });
-          const result = await response.json().catch(() => null);
-          if (response.ok && result?.status === 'PAID') {
-            recovered = true;
-            await loadCustomerOrders();
-            await loadPendingCheckouts();
-            message.textContent = `Payment recovered. Order ${result.orderId || ''} is now available in your account.`;
-          }
-        } catch {}
+          response = await fetch('/api/payment/reconcile', { method:'POST', headers:{'Content-Type':'application/json', ...(access ? {Authorization:`Bearer ${access}`} : {})}, body:JSON.stringify({intentId:intent.id}) });
+          result = await response.json().catch(() => null);
+        } catch (error) {
+          message.textContent = 'Payment status could not be checked. Do not pay again if your bank/UPI shows a debit. Your saved checkout was left unchanged; retry recovery later.';
+          return;
+        }
+        if (response.ok && result?.status === 'PAID') {
+          await loadCustomerOrders();
+          await loadPendingCheckouts();
+          message.textContent = `Payment recovered. Order ${result.orderId || ''} is now available in your account.`;
+          dialog.close();
+          return;
+        }
+        const reason = String(result?.error || `Payment recovery failed (HTTP ${response.status}).`);
+        message.textContent = `${reason} The checkout was not reopened for another payment. If your bank/UPI shows a debit, do not pay again; retry recovery or contact support.`;
+        return;
       }
-      if (!recovered) window.dispatchEvent(new CustomEvent('efsi:resume-checkout', { detail: intent }));
+      window.dispatchEvent(new CustomEvent('efsi:resume-checkout', { detail: intent }));
       dialog.close();
     } catch (error) {
       message.textContent = error.message || 'The saved checkout could not be resumed.';

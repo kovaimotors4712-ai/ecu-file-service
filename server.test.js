@@ -1189,8 +1189,8 @@ test('regression test: role="admin" is preserved when getUser() returns a user w
 
 test('regression test: index.html references auth.js with version parameter and server serves static assets correctly', async () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-  assert.ok(indexHtml.includes('auth.js?v=ba583d0'));
-  assert.ok(indexHtml.includes('app.js?v=ba583d0'));
+  assert.ok(indexHtml.includes('auth.js?v=payment-recovery-20261017'));
+  assert.ok(indexHtml.includes('app.js?v=payment-recovery-20261017'));
   assert.ok(indexHtml.includes('supabase.js?v=ba583d0'));
 });
 
@@ -1317,4 +1317,37 @@ test('comprehensive second-stage security, validation, error, idempotency, and r
   // Test that database trigger function logic would detect this (tested via direct function or simulated rejection rule)
   assert.equal(orderRow.status, 'Processing');
 
+});
+
+
+test('saved payment checkout errors do not silently reopen a second payment attempt', () => {
+  const authSource = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  assert.match(authSource, /if \(intent\.payment_provider \|\| intent\.provider_order_id\)/);
+  assert.match(authSource, /The checkout was not reopened for another payment/);
+  assert.match(authSource, /Do not pay again if your bank\/UPI shows a debit/);
+  assert.match(authSource, /\/api\/payment\/reconcile/);
+});
+
+test('Razorpay callback failure invokes recovery and disables repeat payment actions', () => {
+  const appSource = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');
+  assert.match(appSource, /\/api\/payment\/reconcile/);
+  assert.match(appSource, /paymentRecoveryRequired=true/);
+  assert.match(appSource, /paymentRecoveryRequired/);
+  assert.match(appSource, /Do not pay again/);
+});
+
+test('payment finalization and notification failures are visible in safe operational logs', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  assert.match(serverSource, /\[payment-finalization\] Supabase RPC failed/);
+  assert.match(serverSource, /\[payment-recovery\] Failed/);
+  assert.match(serverSource, /\[payment-recovery\] No captured Razorpay payment matched the saved checkout/);
+  assert.match(serverSource, /\[notification-worker\] Outbox query failed/);
+  assert.match(serverSource, /\[notification-worker\] Email delivery failed/);
+});
+test('updated customer and admin scripts use cache-busted recovery assets', () => {
+  const indexSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  const adminSource = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
+  assert.match(indexSource, /auth\.js\?v=payment-recovery-20261017/);
+  assert.match(indexSource, /app\.js\?v=payment-recovery-20261017/);
+  assert.match(adminSource, /auth\.js\?v=payment-recovery-20261017/);
 });

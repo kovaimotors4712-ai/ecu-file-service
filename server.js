@@ -600,6 +600,7 @@ async function finalizePaidCheckout(customer, intent, payment) {
   const response = await supabaseRequest(customer.token, 'rest/v1/rpc/efsi_finalize_paid_checkout', { method: 'POST', body, timeoutMs: 20000 });
   if (!response.ok) {
     const details = await response.json().catch(() => null);
+    console.error('[payment-finalization] Supabase RPC failed', { intentId: intent.id, status: response.status, message: String(details?.message || 'No error message returned').slice(0, 300), code: details?.code || null });
     const error = new Error(details?.message || 'Payment was verified, but the order could not be finalized. Keep your account open and retry; do not pay again.');
     error.statusCode = response.status >= 500 ? 502 : 400;
     throw error;
@@ -681,11 +682,13 @@ async function handleCapturePayPal(request, response, { reconcile = false, bodyD
 
 async function handleReconcilePayment(request, response) {
   if (request.method !== 'POST') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
+  let recoveryIntentId = null;
   try {
     const customer = await requireCustomer(request);
     if (!customer) { jsonResponse(response, 401, { error: 'Sign in to recover your checkout.' }); return true; }
     const body = await readJson(request);
-    const intent = await fetchIntent(customer, body?.intentId);
+    recoveryIntentId = String(body?.intentId || '');
+    const intent = await fetchIntent(customer, recoveryIntentId);
     if (!intent) { jsonResponse(response, 404, { error: 'Checkout request could not be recovered.' }); return true; }
     if (intent.status === 'PAID' && intent.payment_status === 'PAID') { jsonResponse(response, 200, { status: 'PAID', orderId: intent.order_id || intent.id }); return true; }
     if (intent.payment_provider === 'razorpay') {
@@ -695,7 +698,16 @@ async function handleReconcilePayment(request, response) {
         const payments = await razorpayApi(`orders/${encodeURIComponent(providerOrderId)}/payments`);
         const candidates = Array.isArray(payments?.items) ? payments.items.filter(item => item?.status === 'captured' && Number(item.amount) === Number(intent.amount_paise) && item.currency === intent.currency && item.order_id === providerOrderId) : [];
         const payment = candidates[0];
-        if (!payment?.id) { jsonResponse(response, 409, { error:'No captured Razorpay payment was found for this saved checkout yet.' }); return true; }
+        if (!payment?.id) {
+          console.warn('[payment-recovery] No captured Razorpay payment matched the saved checkout', {
+            intentId: intent.id,
+            providerOrderId,
+            paymentCount: Array.isArray(payments?.items) ? payments.items.length : 0,
+            paymentStatuses: Array.isArray(payments?.items) ? payments.items.map(item => String(item?.status || 'unknown')).slice(0, 8) : []
+          });
+          jsonResponse(response, 409, { error:'No captured Razorpay payment was found for this saved checkout yet.' });
+          return true;
+        }
         body.razorpay_payment_id = payment.id;
         body.razorpay_order_id = providerOrderId;
       }
@@ -703,7 +715,10 @@ async function handleReconcilePayment(request, response) {
     }
     if (intent.payment_provider === 'paypal') return handleCapturePayPal(request, response, { reconcile: true, bodyData: body });
     jsonResponse(response, 409, { error: 'This checkout has not started payment yet.' });
-  } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Payment recovery failed.' }); }
+  } catch (error) {
+    console.error('[payment-recovery] Failed', { intentId: recoveryIntentId, statusCode: error.statusCode || null, code: error.code || null, message: String(error.message || 'Payment recovery failed.').slice(0, 300) });
+    jsonResponse(response, error.statusCode || 400, { error: error.message || 'Payment recovery failed.' });
+  }
   return true;
 }
 
@@ -1119,12 +1134,18 @@ async function flushNotificationOutbox() {
   notificationWorkerRunning = true;
   try {
     const token = serviceToken();
-    const response = await supabaseRequest(token, 'rest/v1/notification_outbox?select=id,order_id,event_type,event_key,payload,attempts,next_attempt_at&status=in.(PENDING,RETRY)&next_attempt_at=lte.now()&order=created_at.asc&limit=10', { timeoutMs: 15000 });
-    if (!response.ok) return;
+    const dueBefore = encodeURIComponent(new Date().toISOString());
+    const response = await supabaseRequest(token, `rest/v1/notification_outbox?select=id,order_id,event_type,event_key,payload,attempts,next_attempt_at&status=in.(PENDING,RETRY)&next_attempt_at=lte.${dueBefore}&order=created_at.asc&limit=10`, { timeoutMs: 15000 });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      console.error('[notification-worker] Outbox query failed', { status: response.status, detail: String(detail || '').slice(0, 300) });
+      return;
+    }
     const rows = await response.json();
+    if (Array.isArray(rows) && rows.length) console.log('[notification-worker] Queue batch found', { count: rows.length });
     for (const row of rows) {
       const claim = await supabaseRequest(token, `rest/v1/notification_outbox?id=eq.${encodeURIComponent(row.id)}&status=in.(PENDING,RETRY)`, { method: 'PATCH', prefer: 'return=representation', body: { status: 'SENDING', attempts: Number(row.attempts || 0) + 1, updated_at: new Date().toISOString() }, timeoutMs: 15000 });
-      if (!claim.ok) continue;
+      if (!claim.ok) { const detail = await claim.text().catch(() => ''); console.error('[notification-worker] Could not claim outbox row', { id: row.id, eventType: row.event_type, status: claim.status, detail: String(detail || '').slice(0, 300) }); continue; }
       const claimedRows = await claim.json().catch(() => []);
       if (!Array.isArray(claimedRows) || !claimedRows.length) continue;
       const orderResponse = await supabaseRequest(token, `rest/v1/orders?select=id,category,vehicle_brand,vehicle_model,vehicle_year,contact_name,contact_phone,contact_email,payment_status,status,payment_provider,provider_order_id,provider_payment_id,created_at,ecu_manufacturer,ecu_model,reading_tool,selected_services,notes,module_details,verification_amount_paise&id=eq.${encodeURIComponent(row.order_id)}&limit=1`, { timeoutMs: 15000 });
@@ -1196,6 +1217,7 @@ async function flushNotificationOutbox() {
         }
         await supabaseRequest(token, `rest/v1/notification_outbox?id=eq.${encodeURIComponent(row.id)}`, { method: 'PATCH', prefer: 'return=minimal', body: { status: 'SENT', sent_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }, timeoutMs: 15000 });
       } catch (error) {
+        console.error('[notification-worker] Email delivery failed', { id: row.id, eventType, message: String(error.message || 'Email failed').slice(0, 300) });
         const attempts = Number(row.attempts || 0) + 1;
         await supabaseRequest(token, `rest/v1/notification_outbox?id=eq.${encodeURIComponent(row.id)}`, { method: 'PATCH', prefer: 'return=minimal', body: { status: attempts >= 8 ? 'FAILED' : 'RETRY', next_attempt_at: new Date(Date.now() + Math.min(6 * 60 * 60 * 1000, attempts * 10 * 60 * 1000)).toISOString(), last_error: String(error.message || 'Email failed').slice(0, 500), updated_at: new Date().toISOString() }, timeoutMs: 15000 });
       }
@@ -1213,9 +1235,13 @@ function triggerCleanupWorker(delay = 2000) {
 }
 
 function triggerNotificationWorker(delay = 500) {
-  if (!supabaseServiceRoleKey || notificationWorkerTimer) return;
+  if (notificationWorkerTimer) return;
+  if (!supabaseServiceRoleKey || !hasResendConfig()) {
+    console.error('[notification-worker] Not scheduled: configuration incomplete', { serviceRoleAvailable: Boolean(supabaseServiceRoleKey), resendKeyFormatValid: /^re_[A-Za-z0-9_-]{10,}$/.test(resendApiKey), senderConfigured: emailFrom.includes('@'), adminRecipientConfigured: adminNotificationEmail.includes('@') });
+    return;
+  }
   const run = async () => {
-    await flushNotificationOutbox().catch(() => {});
+    await flushNotificationOutbox().catch((error) => console.error('[notification-worker] Run failed', { message: String(error.message || error).slice(0, 300) }));
     notificationWorkerTimer = setTimeout(run, 30000);
     notificationWorkerTimer.unref();
   };
