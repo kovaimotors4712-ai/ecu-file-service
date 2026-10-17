@@ -1364,3 +1364,12 @@ test('saved checkout shows immediate payment-check feedback and bounded recovery
   const indexSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   assert.match(indexSource, /auth\.js\?v=payment-recovery-feedback-20261017/);
 });
+test('second-stage trigger permits normal first-stage paid-order inserts with default pending state', () => {
+  const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261017_fix_second_stage_insert_guard.sql'), 'utf8');
+  assert.match(migration, /create or replace function public\.enforce_second_stage_payment_state/i);
+  assert.match(migration, /TG_OP = 'INSERT'/i);
+  assert.match(migration, /NEW\.second_stage_amount IS NULL/i);
+  assert.match(migration, /NEW\.second_stage_payment_link IS NULL/i);
+  assert.match(migration, /NEW\.second_stage_status IS NULL OR NEW\.second_stage_status = 'pending'/i);
+  assert.match(migration, /BEFORE INSERT OR UPDATE ON public\.orders/i);
+});
