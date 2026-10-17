@@ -813,39 +813,21 @@ async function handleAdminCreateSecondStagePaymentLink(request, response) {
       return true;
     }
 
-    const plPayload = {
-      amount: amountPaise,
-      currency: 'INR',
-      accept_partial: false,
-      description: `Second-stage payment for order ${orderId}`,
-      customer: {
-        name: order.contact_name || 'Customer',
-        email: order.contact_email || undefined,
-        contact: order.contact_phone || undefined
-      },
-      notify: { sms: false, email: false },
-      reminder_enable: true,
-      notes: { order_id: orderId, type: 'second_stage' }
-    };
-
-    const plResponse = await razorpayApi('payment_links', { method: 'POST', body: plPayload });
-    const paymentLinkUrl = String(plResponse?.short_url || plResponse?.payment_link_url || plResponse?.url || '');
+    // Save the Razorpay payment link entered by the admin; do not create a different link.
+    const paymentLinkUrl = String(body?.paymentLink || body?.payment_link || '').trim();
     try {
       const parsedUrl = new URL(paymentLinkUrl);
-      if (parsedUrl.protocol !== 'https:' || !/(?:^|\.)(rzp\.io|razorpay\.com)$/i.test(parsedUrl.hostname)) {
+      if (!paymentLinkUrl || parsedUrl.protocol !== 'https:' || !/(?:^|\.)(?:rzp\.io|razorpay\.com)$/i.test(parsedUrl.hostname) || parsedUrl.username || parsedUrl.password) {
         throw new Error('Invalid payment link URL domain');
       }
     } catch {
-      throw Object.assign(new Error('Razorpay returned an invalid payment link URL.'), { statusCode: 502 });
+      throw Object.assign(new Error('Enter a valid HTTPS Razorpay payment link URL (rzp.io or razorpay.com).'), { statusCode: 400 });
     }
-
     const patchBody = {
       second_stage_amount: amountPaise,
       second_stage_payment_link: paymentLinkUrl,
       second_stage_status: 'pending',
-      second_stage_paid_at: null,
-      second_stage_razorpay_order_id: null,
-      second_stage_razorpay_payment_id: null
+      second_stage_paid_at: null
     };
 
     const updated = await supabaseRequest(admin.token, `rest/v1/orders?id=eq.${encodeURIComponent(orderId)}&select=*`, {

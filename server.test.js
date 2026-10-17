@@ -1242,6 +1242,30 @@ test('second-stage payment complete flow: admin creates payment link, customer m
   assert.equal(orderRecord.payment_status, 'PAID');
 });
 
+test('second-stage save persists the admin-supplied Razorpay link and avoids non-migrated columns', async () => {
+  const created = await paidRazorpayIntent();
+  const orderId = created.verify.payload.orderId;
+  await call('/api/admin/orders/status', { method: 'POST', token: tokens.admin, body: { orderId, status: 'Possible' } });
+
+  const invalid = await call('/api/admin/orders/second-stage/create-payment-link', {
+    method: 'POST', token: tokens.admin,
+    body: { orderId, amountPaise: 15000, paymentLink: 'https://example.invalid/pay/123' }
+  });
+  assert.equal(invalid.response.status, 400);
+  assert.equal(state.orders.get(orderId).second_stage_payment_link, undefined);
+
+  const suppliedLink = 'https://rzp.io/i/customerLink123';
+  const saved = await call('/api/admin/orders/second-stage/create-payment-link', {
+    method: 'POST', token: tokens.admin,
+    body: { orderId, amountPaise: 15000, paymentLink: suppliedLink }
+  });
+  assert.equal(saved.response.status, 200);
+  assert.equal(saved.payload.order.second_stage_amount, 15000);
+  assert.equal(saved.payload.order.second_stage_payment_link, suppliedLink);
+  assert.equal(state.orders.get(orderId).second_stage_payment_link, suppliedLink);
+  assert.equal(state.orders.get(orderId).second_stage_razorpay_order_id, undefined);
+  assert.equal(state.orders.get(orderId).second_stage_razorpay_payment_id, undefined);
+});
 test('comprehensive second-stage security, validation, error, idempotency, and retry edge cases', async () => {
   const created = await paidRazorpayIntent();
   const orderId = created.verify.payload.orderId;
