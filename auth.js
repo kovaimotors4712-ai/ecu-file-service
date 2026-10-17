@@ -207,6 +207,13 @@
       await loadCustomerNotifications();
     } catch {}
   }
+  function withStatusTimeout(promise, milliseconds, timeoutMessage) {
+    let timer;
+    return Promise.race([
+      Promise.resolve(promise),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(timeoutMessage)), milliseconds); })
+    ]).finally(() => clearTimeout(timer));
+  }
   async function loadPendingCheckouts() {
     const customerId = session?.user?.id;
     const list = document.querySelector('#pending-checkout-list');
@@ -275,25 +282,44 @@
   document.querySelector('#pending-checkout-list')?.addEventListener('click', async event => {
     const button = event.target.closest('.resume-checkout');
     if (!button) return;
+    const originalButtonText = button.textContent;
     button.disabled = true;
+    button.textContent = 'Checking payment...';
+    message.setAttribute('role', 'status');
+    message.setAttribute('aria-live', 'polite');
+    message.style.fontSize = '13px';
+    message.style.fontWeight = '600';
+    message.textContent = 'Checking saved checkout and payment status. Please wait; do not pay again during this check.';
     try {
-      const rows = await rest(`checkout_intents?select=id,status,request_json,original_name,original_mime,original_size,original_sha256,storage_path,amount_paise,currency,payment_provider,provider_order_id,provider_payment_id,expires_at,updated_at&status=in.(DRAFT,FILE_STAGED,PAYMENT_PENDING)&id=eq.${encodeURIComponent(button.dataset.intentId)}&customer_id=eq.${encodeURIComponent(session?.user?.id || '')}&limit=1`);
+      const rows = await withStatusTimeout(
+        rest(`checkout_intents?select=id,status,request_json,original_name,original_mime,original_size,original_sha256,storage_path,amount_paise,currency,payment_provider,provider_order_id,provider_payment_id,expires_at,updated_at&status=in.(DRAFT,FILE_STAGED,PAYMENT_PENDING)&id=eq.${encodeURIComponent(button.dataset.intentId)}&customer_id=eq.${encodeURIComponent(session?.user?.id || '')}&limit=1`),
+        20000,
+        'Loading the saved checkout timed out. No new payment was started; retry the check.'
+      );
       const intent = rows?.[0];
       if (!intent) throw new Error('Saved checkout was not found. It may have expired.');
       if (intent.payment_provider || intent.provider_order_id) {
+        message.textContent = 'Checking the existing payment reference with the payment provider. Do not pay again while this check runs.';
+        button.textContent = 'Verifying payment...';
         if (!intent.payment_provider || !intent.provider_order_id) {
           message.textContent = 'This saved checkout has an incomplete payment reference. It has not been reopened for payment to avoid a duplicate charge. Please retry recovery later or contact support.';
           return;
         }
         let response;
         let result;
+        const recoveryController = new AbortController();
+        const recoveryTimer = setTimeout(() => recoveryController.abort(), 45000);
         try {
           const access = await accessToken();
-          response = await fetch('/api/payment/reconcile', { method:'POST', headers:{'Content-Type':'application/json', ...(access ? {Authorization:`Bearer ${access}`} : {})}, body:JSON.stringify({intentId:intent.id}) });
+          response = await fetch('/api/payment/reconcile', { method:'POST', headers:{'Content-Type':'application/json', ...(access ? {Authorization:`Bearer ${access}`} : {})}, body:JSON.stringify({intentId:intent.id}), signal: recoveryController.signal });
           result = await response.json().catch(() => null);
         } catch (error) {
-          message.textContent = 'Payment status could not be checked. Do not pay again if your bank/UPI shows a debit. Your saved checkout was left unchanged; retry recovery later.';
+          message.textContent = error.name === 'AbortError'
+            ? 'Payment status check timed out after 45 seconds. No new payment was started. If your bank/UPI shows a debit, do not pay again; retry recovery later.'
+            : 'Payment status could not be checked. No new payment was started. Do not pay again if your bank/UPI shows a debit; retry recovery later.';
           return;
+        } finally {
+          clearTimeout(recoveryTimer);
         }
         if (response.ok && result?.status === 'PAID') {
           await loadCustomerOrders();
@@ -312,6 +338,7 @@
       message.textContent = error.message || 'The saved checkout could not be resumed.';
     } finally {
       button.disabled = false;
+      button.textContent = originalButtonText;
     }
   });
   document.querySelector('#customer-orders .customer-order-list')?.addEventListener('click', async event => {

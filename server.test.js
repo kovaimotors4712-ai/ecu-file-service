@@ -1189,8 +1189,8 @@ test('regression test: role="admin" is preserved when getUser() returns a user w
 
 test('regression test: index.html references auth.js with version parameter and server serves static assets correctly', async () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-  assert.ok(indexHtml.includes('auth.js?v=payment-recovery-20261017'));
-  assert.ok(indexHtml.includes('app.js?v=payment-recovery-20261017'));
+  assert.ok(indexHtml.includes('auth.js?v=payment-recovery-feedback-20261017'));
+  assert.ok(indexHtml.includes('app.js?v=payment-recovery-feedback-20261017'));
   assert.ok(indexHtml.includes('supabase.js?v=ba583d0'));
 });
 
@@ -1347,7 +1347,20 @@ test('payment finalization and notification failures are visible in safe operati
 test('updated customer and admin scripts use cache-busted recovery assets', () => {
   const indexSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   const adminSource = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
-  assert.match(indexSource, /auth\.js\?v=payment-recovery-20261017/);
-  assert.match(indexSource, /app\.js\?v=payment-recovery-20261017/);
-  assert.match(adminSource, /auth\.js\?v=payment-recovery-20261017/);
+  assert.match(indexSource, /auth\.js\?v=payment-recovery-feedback-20261017/);
+  assert.match(indexSource, /app\.js\?v=payment-recovery-feedback-20261017/);
+  assert.match(adminSource, /auth\.js\?v=payment-recovery-feedback-20261017/);
+});
+
+test('saved checkout shows immediate payment-check feedback and bounded recovery timeouts', () => {
+  const authSource = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  assert.match(authSource, /button\.textContent = 'Checking payment\.\.\.'/);
+  assert.match(authSource, /Checking saved checkout and payment status/);
+  assert.match(authSource, /Checking the existing payment reference/);
+  assert.match(authSource, /new AbortController\(\)/);
+  assert.match(authSource, /button\.textContent = originalButtonText/);
+  assert.match(authSource, /Loading the saved checkout timed out/);
+  assert.match(authSource, /No new payment was started/);
+  const indexSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  assert.match(indexSource, /auth\.js\?v=payment-recovery-feedback-20261017/);
 });
