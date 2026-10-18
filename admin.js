@@ -204,7 +204,7 @@
           '<div><small>FILE VERIFICATION FEE</small><b>'+(order.verification_amount_paise!=null?escape(formatINR(order.verification_amount_paise)):'—')+'</b></div>'+
           '<div><small>PAYMENT STATUS</small><b>'+escape(payment)+'<br><span style="font-family:var(--mono);font-size:9px;color:#7f8a84">Ref: '+escape(paymentRef)+'</span></b></div>'+
           '<div><small>RESULT AVAILABILITY</small><b>'+(processedFile?'<span style="color:#586b24">Processed Result Ready</span>':'<span style="color:#a87a2a">Result Pending</span>')+'</b></div>'+
-          (order.status==='Possible' ? ('<div class="admin-second-stage-wrap" style="grid-column:1/-1;border-top:1px solid #e3e8df;margin-top:8px;padding-top:8px"><small style="display:block;font:800 8px var(--mono);color:#7d8983;letter-spacing:0.1em;margin-bottom:3px">SECOND-STAGE PAYMENT</small><div style="display:flex;gap:8px;align-items:center"><input type="number" id="stage-amount-'+escape(order.id)+'" value="'+(order.second_stage_amount||'')+'" placeholder="Amount (paise)" style="padding:4px;width:100px;font-size:11px"><input type="text" id="stage-link-'+escape(order.id)+'" value="'+escape(order.second_stage_payment_link||'')+'" placeholder="Payment Link URL" style="padding:4px;width:150px;font-size:11px"><button class="button button-dark" type="button" onclick="window.handleAdminSetSecondStage(\''+escape(order.id)+'\')">Save</button>'+(order.second_stage_status==='paid'?'<span style="color:#586b24;font-size:11px;margin-left:8px">✓ Paid</span><button class="button button-ghost" style="font-size:9px;padding:2px 5px;margin-left:8px" type="button" onclick="window.handleAdminMarkSecondStageUnpaid(\''+escape(order.id)+'\')">Unmark</button>':'<button class="button button-ghost" type="button" onclick="window.handleAdminMarkSecondStagePaid(\''+escape(order.id)+'\')">Mark Paid</button>')+'</div></div>') : '')+
+          (order.status==='Possible' ? ('<div class="admin-second-stage-wrap" style="grid-column:1/-1;border-top:1px solid #e3e8df;margin-top:8px;padding-top:8px"><small style="display:block;font:800 8px var(--mono);color:#7d8983;letter-spacing:0.1em;margin-bottom:3px">SECOND-STAGE PAYMENT</small><div style="display:flex;gap:8px;align-items:center"><input type="number" id="stage-amount-'+escape(order.id)+'" value="'+(order.second_stage_amount?Math.round(order.second_stage_amount/100):'')+'" placeholder="Amount (₹ rupees)" style="padding:4px;width:120px;font-size:11px"><button class="button button-dark" type="button" onclick="window.handleAdminSetSecondStage(\''+escape(order.id)+'\')">Create Payment Link</button>'+(order.second_stage_status==='paid'?'<span style="color:#586b24;font-size:11px;margin-left:8px">✓ Paid</span><button class="button button-ghost" style="font-size:9px;padding:2px 5px;margin-left:8px" type="button" onclick="window.handleAdminMarkSecondStageUnpaid(\''+escape(order.id)+'\')">Unmark</button>':'<button class="button button-ghost" type="button" onclick="window.handleAdminMarkSecondStagePaid(\''+escape(order.id)+'\')">Mark Paid</button>')+'</div></div>') : '')+
         '</div>'+
         (order.notes?('<div style="margin-bottom:14px;padding:10px 14px;background:#f9fbf7;border:1px solid #e8ede3;font-size:11px"><small style="display:block;font:800 8px var(--mono);color:#7d8983;letter-spacing:0.1em;margin-bottom:3px">CUSTOMER NOTES</small>'+escape(order.notes)+'</div>'):'')+
         '<div class="admin-files-box">'+
@@ -323,25 +323,23 @@
   window.handleAdminSetSecondStage = async function(id) {
     const card = document.querySelector('[data-order-id="'+CSS.escape(id)+'"]');
     const inputAmount = document.querySelector('#stage-amount-'+CSS.escape(id));
-    const inputLink = document.querySelector('#stage-link-'+CSS.escape(id));
     const local = card?.querySelector('.admin-message');
     const amountVal = Number(inputAmount?.value);
-    const linkVal = inputLink?.value.trim();
-    if (!Number.isFinite(amountVal) || amountVal <= 0 || !linkVal) {
-      if (local) { local.textContent = 'Enter a valid positive amount and payment link.'; local.classList.add('admin-error'); }
+    if (!Number.isFinite(amountVal) || amountVal <= 0) {
+      if (local) { local.textContent = 'Enter a valid positive amount in rupees.'; local.classList.add('admin-error'); }
       return;
     }
-    if (local) { local.textContent = 'Saving second-stage payment details…'; local.classList.remove('admin-error'); }
+    if (local) { local.textContent = 'Creating Razorpay Payment Link…'; local.classList.remove('admin-error'); }
     try {
       const token = await backend.getAccessToken();
       const response = await fetch('/api/admin/orders/second-stage/create-payment-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer '+token },
-        body: JSON.stringify({ orderId: id, amountPaise: Math.round(amountVal), paymentLink: linkVal })
+        body: JSON.stringify({ orderId: id, amountRupees: amountVal })
       });
       const result = await parseJson(response);
-      if (!response.ok) throw new Error(result.error || 'Second-stage payment details could not be saved.');
-      if (local) local.textContent = 'Second-stage payment saved successfully.';
+      if (!response.ok) throw new Error(result.error || 'Second-stage payment link could not be created.');
+      if (local) local.textContent = 'Second-stage payment link created successfully.';
       await loadOrders();
     } catch (error) {
       if (local) {

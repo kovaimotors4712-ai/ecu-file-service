@@ -792,9 +792,29 @@ async function handleAdminCreateSecondStagePaymentLink(request, response) {
     const body = await readJson(request);
     const orderId = String(body?.orderId || '');
     if (!/^[0-9a-f-]{36}$/i.test(orderId)) { jsonResponse(response, 400, { error: 'Invalid order reference.' }); return true; }
-    const amountPaise = Number(body?.amountPaise ?? body?.amount);
+
+    let amountPaise;
+    if (body?.amountRupees !== undefined) {
+      const rupees = Number(body.amountRupees);
+      if (!Number.isFinite(rupees) || rupees <= 0) {
+        jsonResponse(response, 400, { error: 'Enter a valid positive amount in rupees.' });
+        return true;
+      }
+      amountPaise = Math.round(rupees * 100);
+    } else if (body?.amountPaise !== undefined || body?.amount !== undefined) {
+      const val = Number(body.amountPaise ?? body.amount);
+      if (!Number.isSafeInteger(val) || val <= 0) {
+        jsonResponse(response, 400, { error: 'Enter a valid positive amount.' });
+        return true;
+      }
+      amountPaise = body.amountPaise !== undefined ? Number(body.amountPaise) : (val <= 100000 && !body.amountPaise ? Math.round(val * 100) : val);
+    } else {
+      jsonResponse(response, 400, { error: 'Enter a valid amount in rupees.' });
+      return true;
+    }
+
     if (!Number.isSafeInteger(amountPaise) || amountPaise <= 0) {
-      jsonResponse(response, 400, { error: 'Enter a valid positive integer amount in paise.' });
+      jsonResponse(response, 400, { error: 'Enter a valid positive amount.' });
       return true;
     }
 
@@ -807,22 +827,40 @@ async function handleAdminCreateSecondStagePaymentLink(request, response) {
       jsonResponse(response, 409, { error: 'Second-stage payment can only be created when the order is in Possible status.' });
       return true;
     }
-    // Allow creating/updating payment link even if previous one was paid (for modifications)
     if (String(order.payment_status || '').toUpperCase() !== 'PAID') {
       jsonResponse(response, 400, { error: 'Original payment must be completed before creating second-stage payment.' });
       return true;
     }
 
-    // Save the Razorpay payment link entered by the admin; do not create a different link.
-    const paymentLinkUrl = String(body?.paymentLink || body?.payment_link || '').trim();
+    // Call Razorpay Payment Links API using server-side credentials
+    const plinkRes = await razorpayApi('payment_links', {
+      method: 'POST',
+      body: {
+        amount: amountPaise,
+        currency: 'INR',
+        accept_partial: false,
+        description: `Second-stage payment for order ${order.id}`,
+        customer: {
+          name: order.contact_name || 'Customer',
+          email: order.contact_email || undefined,
+          contact: order.contact_phone || undefined
+        },
+        notify: { sms: true, email: true },
+        reminder_enable: true,
+        notes: { order_id: order.id, type: 'second_stage' }
+      }
+    });
+
+    const paymentLinkUrl = String(plinkRes?.short_url || plinkRes?.url || '').trim();
     try {
       const parsedUrl = new URL(paymentLinkUrl);
       if (!paymentLinkUrl || parsedUrl.protocol !== 'https:' || !/(?:^|\.)(?:rzp\.io|razorpay\.com)$/i.test(parsedUrl.hostname) || parsedUrl.username || parsedUrl.password) {
         throw new Error('Invalid payment link URL domain');
       }
     } catch {
-      throw Object.assign(new Error('Enter a valid HTTPS Razorpay payment link URL (rzp.io or razorpay.com).'), { statusCode: 400 });
+      throw Object.assign(new Error('Razorpay returned an invalid payment link URL.'), { statusCode: 502 });
     }
+
     const patchBody = {
       second_stage_amount: amountPaise,
       second_stage_payment_link: paymentLinkUrl,

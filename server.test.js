@@ -1222,8 +1222,8 @@ test('second-stage payment complete flow: admin creates payment link, customer m
   // 1. Admin sets status to 'Possible'
   await call('/api/admin/orders/status', { method: 'POST', token: tokens.admin, body: { orderId, status: 'Possible' } });
 
-  // 2. Admin creates second-stage payment link (e.g. ₹150.00 = 15000 paise)
-  const setAmount = await call('/api/admin/orders/second-stage/create-payment-link', { method: 'POST', token: tokens.admin, body: { orderId, amountPaise: 15000, paymentLink: 'https://rzp.io/i/test123' } });
+  // 2. Admin creates second-stage payment link by entering amount in rupees (e.g. ₹150.00 -> 15000 paise via Razorpay Payment Links API)
+  const setAmount = await call('/api/admin/orders/second-stage/create-payment-link', { method: 'POST', token: tokens.admin, body: { orderId, amountRupees: 150 } });
   assert.equal(setAmount.response.status, 200);
   assert.equal(setAmount.payload.order.second_stage_amount, 15000);
   assert.equal(setAmount.payload.order.second_stage_payment_link, 'https://rzp.io/i/test123');
@@ -1242,27 +1242,26 @@ test('second-stage payment complete flow: admin creates payment link, customer m
   assert.equal(orderRecord.payment_status, 'PAID');
 });
 
-test('second-stage save persists the admin-supplied Razorpay link and avoids non-migrated columns', async () => {
+test('second-stage backend calls Razorpay Payment Links API and persists returned short_url', async () => {
   const created = await paidRazorpayIntent();
   const orderId = created.verify.payload.orderId;
   await call('/api/admin/orders/status', { method: 'POST', token: tokens.admin, body: { orderId, status: 'Possible' } });
 
   const invalid = await call('/api/admin/orders/second-stage/create-payment-link', {
     method: 'POST', token: tokens.admin,
-    body: { orderId, amountPaise: 15000, paymentLink: 'https://example.invalid/pay/123' }
+    body: { orderId, amountRupees: -10 }
   });
   assert.equal(invalid.response.status, 400);
   assert.equal(state.orders.get(orderId).second_stage_payment_link, undefined);
 
-  const suppliedLink = 'https://rzp.io/i/customerLink123';
   const saved = await call('/api/admin/orders/second-stage/create-payment-link', {
     method: 'POST', token: tokens.admin,
-    body: { orderId, amountPaise: 15000, paymentLink: suppliedLink }
+    body: { orderId, amountRupees: 150 }
   });
   assert.equal(saved.response.status, 200);
   assert.equal(saved.payload.order.second_stage_amount, 15000);
-  assert.equal(saved.payload.order.second_stage_payment_link, suppliedLink);
-  assert.equal(state.orders.get(orderId).second_stage_payment_link, suppliedLink);
+  assert.equal(saved.payload.order.second_stage_payment_link, 'https://rzp.io/i/test123');
+  assert.equal(state.orders.get(orderId).second_stage_payment_link, 'https://rzp.io/i/test123');
   assert.equal(state.orders.get(orderId).second_stage_razorpay_order_id, undefined);
   assert.equal(state.orders.get(orderId).second_stage_razorpay_payment_id, undefined);
 });
@@ -1271,20 +1270,20 @@ test('comprehensive second-stage security, validation, error, idempotency, and r
   const orderId = created.verify.payload.orderId;
 
   // 1. Admin Authorization check for setting second-stage amount
-  const unauthSet = await call('/api/admin/orders/second-stage-amount', { method: 'POST', token: null, body: { orderId, amountPaise: 10000 } });
+  const unauthSet = await call('/api/admin/orders/second-stage/create-payment-link', { method: 'POST', token: null, body: { orderId, amountRupees: 100 } });
   assert.equal(unauthSet.response.status, 403);
 
-  const customerSet = await call('/api/admin/orders/second-stage-amount', { method: 'POST', token: tokens.customer, body: { orderId, amountPaise: 10000 } });
+  const customerSet = await call('/api/admin/orders/second-stage/create-payment-link', { method: 'POST', token: tokens.customer, body: { orderId, amountRupees: 100 } });
   assert.equal(customerSet.response.status, 403);
 
-  // 2. Amount validation: negative amount, non-numeric, or zero when order not Possible
-  const negativeSet = await call('/api/admin/orders/second-stage-amount', { method: 'POST', token: tokens.admin, body: { orderId, amountPaise: -500 } });
+  // 2. Amount validation: negative amount or non-numeric
+  const negativeSet = await call('/api/admin/orders/second-stage/create-payment-link', { method: 'POST', token: tokens.admin, body: { orderId, amountRupees: -50 } });
   assert.equal(negativeSet.response.status, 400);
 
   // 3. Order ownership verification for second-stage payment creation & verification
   // Set order to Possible and set amount first
   await call('/api/admin/orders/status', { method: 'POST', token: tokens.admin, body: { orderId, status: 'Possible' } });
-  await call('/api/admin/orders/second-stage/create-payment-link', { method: 'POST', token: tokens.admin, body: { orderId, amountPaise: 12000, paymentLink: 'https://rzp.io/i/test123' } });
+  await call('/api/admin/orders/second-stage/create-payment-link', { method: 'POST', token: tokens.admin, body: { orderId, amountRupees: 120 } });
 
   const otherCreate = await call('/api/payment/second-stage/create-order', { method: 'POST', token: tokens.other, body: { orderId } });
   assert.equal(otherCreate.response.status, 404);
@@ -1306,33 +1305,33 @@ test('comprehensive second-stage security, validation, error, idempotency, and r
   const zeroAmountRes = await call('/api/admin/orders/second-stage/create-payment-link', {
     method: 'POST',
     token: tokens.admin,
-    body: { orderId, amountPaise: 0, paymentLink: 'https://rzp.io/i/test0' }
+    body: { orderId, amountRupees: 0 }
   });
   assert.equal(zeroAmountRes.response.status, 400);
 
   const negativeAmountRes = await call('/api/admin/orders/second-stage/create-payment-link', {
     method: 'POST',
     token: tokens.admin,
-    body: { orderId, amountPaise: -100, paymentLink: 'https://rzp.io/i/testneg' }
+    body: { orderId, amountRupees: -10 }
   });
   assert.equal(negativeAmountRes.response.status, 400);
 
-  // 6. Test creating/changing payment link when order is NOT in Possible status
+  // 6. Test creating payment link when order is NOT in Possible status
   await call('/api/admin/orders/status', { method: 'POST', token: tokens.admin, body: { orderId, status: 'Processing' } });
   const notPossibleRes = await call('/api/admin/orders/second-stage/create-payment-link', {
     method: 'POST',
     token: tokens.admin,
-    body: { orderId, amountPaise: 5000, paymentLink: 'https://rzp.io/i/testnotpossible' }
+    body: { orderId, amountRupees: 50 }
   });
   assert.equal(notPossibleRes.response.status, 409);
 
   // 7. Test modifying a payment link while changing status away from 'Possible'
   await call('/api/admin/orders/status', { method: 'POST', token: tokens.admin, body: { orderId, status: 'Possible' } });
-  // Set initial valid second-stage amount & link
+  // Set initial valid second-stage amount & link via Razorpay Payment Links API
   await call('/api/admin/orders/second-stage/create-payment-link', {
     method: 'POST',
     token: tokens.admin,
-    body: { orderId, amountPaise: 12000, paymentLink: 'https://rzp.io/i/test123' }
+    body: { orderId, amountRupees: 120 }
   });
   // Simulate database constraint/trigger rejection or simulation check for status transition away from Possible while updating payment link/amount
   const orderRow = state.orders.get(orderId);
