@@ -1826,3 +1826,11 @@ test('advertising quote acceptance, Razorpay verification, mismatch rejection, a
   assert.equal(duplicate.payload.status,'paid');
   assert.equal([...state.advertisingPayments.values()].length,1);
 });
+
+
+test('advertising foreign-key performance indexes cover audit and content attribution', () => {
+  const sql = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180500_advertising_fk_indexes.sql'), 'utf8');
+  assert.match(sql, /advertising_payment_audit_actor_user_id_idx/i);
+  assert.match(sql, /advertising_quotes_created_by_idx/i);
+  assert.match(sql, /site_announcements_created_by_idx/i);
+});
