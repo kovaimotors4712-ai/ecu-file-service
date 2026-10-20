@@ -1308,6 +1308,11 @@ function announcementPayload(body, adminId, partial = false) {
   if (!partial || body.kind !== undefined) { if (!kinds.includes(body.kind)) throw Object.assign(new Error('Choose announcement, offer or ad.'), { statusCode: 400 }); out.kind = body.kind; }
   if (!partial || body.title !== undefined) { out.title = cleanSiteText(body.title, 180); if (!out.title) throw Object.assign(new Error('A title is required.'), { statusCode: 400 }); }
   if (!partial || body.body !== undefined) { out.body = cleanSiteText(body.body, 4000); }
+  if (!partial || body.advertising_quote_id !== undefined) {
+    const quoteId = cleanSiteText(body.advertising_quote_id, 36);
+    if (quoteId && !/^[0-9a-f-]{36}$/i.test(quoteId)) throw Object.assign(new Error('Select a valid paid advertising quote.'), { statusCode:400 });
+    out.advertising_quote_id = quoteId || null;
+  }
   for (const field of ['image_url','cta_url']) {
     if (!partial || body[field] !== undefined) {
       const value = cleanSiteText(body[field], 1000);
@@ -1326,6 +1331,7 @@ function announcementPayload(body, adminId, partial = false) {
   }
   if (out.starts_at && out.ends_at && new Date(out.ends_at) <= new Date(out.starts_at)) throw Object.assign(new Error('End date must be after start date.'), { statusCode: 400 });
   if (!partial || body.is_published !== undefined) out.is_published = body.is_published === true;
+  if (out.kind === 'ad' && out.is_published === true && !out.advertising_quote_id) throw Object.assign(new Error('A paid advertising quote is required before publishing an advertisement.'), { statusCode:400 });
   if (adminId && !partial) out.created_by = adminId;
   out.updated_at = new Date().toISOString();
   return out;
