@@ -1647,3 +1647,19 @@ test('advertising quote/payment schema prevents multiple active attempts and kee
   assert.match(finalizer, /revoke all on function public\.efsi_finalize_advertising_payment/i);
   assert.match(finalizer, /grant execute on function public\.efsi_finalize_advertising_payment.*to service_role/i);
 });
+
+
+test('advertising quote administration is denied without a trusted admin session', async () => {
+  const result = await call('/api/admin/advertising/quotes');
+  assert.equal(result.response.status, 403);
+  assert.match(result.payload.error, /Administrator role is required/);
+});
+
+test('advertising payment endpoints reject unsupported HTTP methods', async () => {
+  for (const pathname of ['/api/advertising/payment/create-order','/api/advertising/payment/verify','/api/advertising/payment/reconcile']) {
+    const result = await call(pathname, { method:'GET' });
+    assert.equal(result.response.status, 405, pathname);
+  }
+  const quote = await call('/api/advertising/quote', { method:'GET' });
+  assert.equal(quote.response.status, 405);
+});
