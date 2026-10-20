@@ -1336,6 +1336,11 @@ async function handleApi(request, response, url) {
 
 function createHttpServer() {
   const server = http.createServer((request, response) => {
+    // Baseline browser hardening on every response, including API and error paths.
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('X-Frame-Options', 'DENY');
+    response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    response.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
     const requestUrl = new URL(request.url, 'http://localhost');
     const origin = request.headers.origin;
     if (origin) {

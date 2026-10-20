@@ -12,6 +12,8 @@ Production branch: `main`
 - Supabase SQL Editor showed `notification_outbox` exists. Manual grant of `SELECT, UPDATE` to `service_role` succeeded; follow-up privilege query returned `can_select=true`, `can_update=true`.
 - Render's last observed worker log after the grant showed `Queue batch found { count: 10 }`. An earlier 403 was from the previous worker attempt; keep monitoring for recurrence.
 - Original ECU checkout and private result delivery code were not changed by the CI-only release.
+- Public diagnostic Guides page is live at `/guides.html`; its stylesheet, homepage navigation, sitemap entry and regression tests were merged after push and PR CI passed.
+- The latest inspected Render log window had no new `notification_outbox` permission error after the manual grant; continue monitoring actual notification delivery.
 
 ## In progress
 - Safe public diagnostic-guides page: add only the educational page, its stylesheet, navigation, server static allowlist, sitemap entry and regression tests. Do not link to the Forum/Store until those pages are actually integrated and tested.

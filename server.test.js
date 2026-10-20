@@ -529,6 +529,12 @@ test('serves customer and admin pages', async () => {
   assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
   assert.match(airbagSeo.payload,/canonical.*airbag-crash-clear\.html/);
   assert.match(customer.response.headers.get('content-type') || '', /text\/html/);
+  assert.equal(customer.response.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(customer.response.headers.get('x-frame-options'), 'DENY');
+  assert.equal(customer.response.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
+  assert.match(customer.response.headers.get('permissions-policy') || '', /camera=\(self\)/);
+  assert.match(customer.response.headers.get('permissions-policy') || '', /microphone=\(\)/);
+  assert.match(customer.response.headers.get('permissions-policy') || '', /geolocation=\(\)/);
   assert.match(adminJs.response.headers.get('content-type') || '', /text\/javascript/);
 });
 
