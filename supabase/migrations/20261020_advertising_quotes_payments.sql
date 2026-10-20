@@ -40,7 +40,7 @@ create table if not exists public.advertising_payments (
   quote_id uuid not null references public.advertising_quotes(id) on delete restrict,
   provider text not null default 'razorpay' check (provider = 'razorpay'),
   status text not null default 'created'
-    check (status in ('created','authorized','captured','verified','failed','cancelled')),
+    check (status in ('creating','created','authorized','captured','verified','failed','cancelled')),
   amount_paise bigint not null check (amount_paise between 1 and 100000000000),
   currency text not null default 'INR' check (currency = 'INR'),
   provider_order_id text unique check (provider_order_id is null or provider_order_id ~ '^order_[A-Za-z0-9]+$'),
@@ -80,3 +80,8 @@ create index if not exists advertising_payment_audit_quote_created_idx
 create index if not exists advertising_payment_audit_payment_created_idx
   on public.advertising_payment_audit (payment_id, created_at desc);
 alter table public.advertising_payment_audit enable row level security;
+
+-- Only one unresolved payment attempt may exist for a quote at a time.
+create unique index if not exists advertising_payments_one_active_attempt_uidx
+  on public.advertising_payments (quote_id)
+  where status in ('creating','created','authorized','captured');
