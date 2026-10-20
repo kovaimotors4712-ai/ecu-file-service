@@ -674,6 +674,17 @@ test('trigger-function hardening migration revokes only direct RPC execute privi
   assert.doesNotMatch(sql, /efsi_create_paid_order|efsi_finalize_paid_checkout|orders|checkout_intents|order_files/i);
 });
 
+test('legacy paid-order RPC is removed from client-callable roles', () => {
+  const sql = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_revoke_legacy_paid_order_rpc.sql'), 'utf8');
+  const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  assert.ok(sql.includes('REVOKE ALL ON FUNCTION public.efsi_create_paid_order(uuid, text, text, bigint, text, text, text)'));
+  assert.ok(sql.includes('FROM PUBLIC, anon, authenticated;'));
+  assert.doesNotMatch(sql, /\b(GRANT|DROP|TRUNCATE|ALTER TABLE|DELETE FROM|UPDATE public|INSERT INTO)\b/i);
+  assert.ok(!server.includes('rpc/efsi_create_paid_order'));
+  assert.ok(server.includes('rpc/efsi_finalize_paid_checkout'));
+  assert.doesNotMatch(sql, /REVOKE[^;]*efsi_finalize_paid_checkout/i);
+});
+
 test('forum moderator helper uses invoker rights and only checks the trusted JWT role', () => {
   const sql = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_forum_moderator_invoker.sql'), 'utf8');
   assert.match(sql, /SECURITY INVOKER/i);
