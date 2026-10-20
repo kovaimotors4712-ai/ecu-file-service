@@ -623,6 +623,24 @@ test('keeps forum assets unavailable until its database migration is verified', 
   assert.match(migration, /forum_is_moderator/i);
 });
 
+test('forum verification SQL is read-only and checks the required security controls', () => {
+  const verifier = fs.readFileSync(path.join(__dirname, 'supabase/verify_forum_core.sql'), 'utf8');
+  assert.doesNotMatch(verifier, /^\\s*(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|GRANT|REVOKE|BEGIN|COMMIT|TRUNCATE|CALL|NOTIFY)\\b/im);
+  for (const required of [
+    'forum_categories_read_active',
+    'forum_profiles_insert_owner',
+    'forum_topics_insert_owner',
+    'forum_replies_insert_owner',
+    'forum_reports_read_own_or_moderator',
+    'forum_topics_rate_limit',
+    'forum_reports_validate_target',
+    'forum_enforce_rate_limit',
+    'has_table_privilege',
+    'has_function_privilege',
+    'at_least_six_seeded_categories'
+  ]) assert.ok(verifier.includes(required), 'forum verifier is missing ' + required);
+});
+
 test('serves exact Google verification file googlea2bbe9d2fd8bede2.html and blocks arbitrary html files', async () => {
   const good = await fetch(`${baseUrl}/googlea2bbe9d2fd8bede2.html`);
   assert.equal(good.status, 200);
