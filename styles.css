@@ -28,3 +28,5 @@
 .airbag-only input[type="file"] { width: 100%; max-width: 100%; padding: 12px; border: 1px solid var(--line, #dfe5dc); border-radius: 4px; background: #fff; }
 .module-photo-selected, .part-photo-selected { display: block; margin-top: 6px; color: var(--ink-soft, #58645e); font-size: 12px; overflow-wrap: anywhere; }
 .admin-airbag-photo { width: 160px; max-height: 110px; object-fit: contain; background: #fff; border: 1px solid #e3e8df; border-radius: 4px; padding: 4px; }
+
+.footer-guides-link{text-decoration:underline;text-underline-offset:3px;white-space:nowrap}

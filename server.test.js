@@ -513,11 +513,19 @@ test('serves customer and admin pages', async () => {
   const adminJs = await call('/admin.js');
   const ecuSeo = await call('/ecu-file-services.html');
   const airbagSeo = await call('/airbag-crash-clear.html');
+  const guides = await call('/guides.html');
+  const guidesCss = await call('/guides.css');
   assert.equal(customer.response.status, 200);
   assert.equal(admin.response.status, 200);
   assert.equal(adminJs.response.status, 200);
   assert.equal(ecuSeo.response.status, 200);
   assert.equal(airbagSeo.response.status, 200);
+  assert.equal(guides.response.status, 200);
+  assert.equal(guidesCss.response.status, 200);
+  assert.match(guides.response.headers.get('content-type') || '', /text\/html/);
+  assert.match(guidesCss.response.headers.get('content-type') || '', /text\/css/);
+  assert.match(guides.payload, /canonical.*guides\.html/);
+  assert.match(guides.payload, /WORKSHOP SAFETY/);
   assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
   assert.match(airbagSeo.payload,/canonical.*airbag-crash-clear\.html/);
   assert.match(customer.response.headers.get('content-type') || '', /text\/html/);
@@ -539,6 +547,7 @@ test('serves robots.txt and sitemap.xml with correct headers and content', async
   assert.match(robots.payload, /Disallow: \/api\//);
   assert.match(robots.payload, /Sitemap: https:\/\/ecufileservice\.in\/sitemap\.xml/);
   assert.match(sitemap.payload, /<loc>https:\/\/ecufileservice\.in\/<\/loc>/);
+  assert.match(sitemap.payload, /<loc>https:\/\/ecufileservice\.in\/guides\.html<\/loc>/);
 });
 
 test('allows the custom domain CORS origin and rejects an unrelated origin', async () => {
