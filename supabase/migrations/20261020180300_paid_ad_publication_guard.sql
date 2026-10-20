@@ -1,7 +1,7 @@
 -- Link partner advertisements to the exact paid quote that authorizes their placement.
 alter table public.site_announcements
   add column if not exists advertising_quote_id uuid references public.advertising_quotes(id) on delete restrict;
-create index if not exists site_announcements_advertising_quote_idx
+create unique index if not exists site_announcements_advertising_quote_uidx
   on public.site_announcements (advertising_quote_id)
   where advertising_quote_id is not null;
 
@@ -15,6 +15,9 @@ declare
   q public.advertising_quotes%rowtype;
   should_validate boolean := false;
 begin
+  if NEW.advertising_quote_id is not null and NEW.kind <> 'ad' then
+    raise exception 'Advertising quotes can only be linked to partner advertisement content';
+  end if;
   if NEW.kind = 'ad' and NEW.is_published then
     if TG_OP = 'INSERT' then
       should_validate := true;
