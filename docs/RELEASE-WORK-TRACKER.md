@@ -1,46 +1,45 @@
 # ECU File Service India — Release Work Tracker
 Updated: 2026-10-20
 
-Repository: https://github.com/kovaimotors4712-ai/ecu-file-service
-Production domain: https://ecufileservice.in
+Repository: https://github.com/kovaimotors4712-ai/ecu-file-service  
+Production domain: https://ecufileservice.in  
 Production branch: `main`
-Working branch: `codex/global-forum-release-2026-10-20`
-Base commit: `fb3c494446b9c0b9d7e9d51939460e2427ca683d`
 
-## Completed safely
-- [x] GitHub connector write access verified by creating and reading the working branch.
-- [x] `main` remains unchanged; Render auto-deploy is configured for `main`, not this working branch.
-- [x] Prepared release candidate for Forum/Guides/SEO/Admin, licensed Store and fixed-term Membership.
-- [x] Release candidate static checks passed: 29 combined release checks and 41 Store/Membership checks. These are package/static checks, not a live database verification or full production-source test.
-- [x] Prepared a narrow notification-worker permission migration for review. It has **not** been applied to Supabase.
+## Completed
+- GitHub Actions now runs `npm test` and syntax checks for the main JavaScript files. CI-only PR #3 was merged after push and pull-request checks passed.
+- The CI-only commit deployed successfully to Render.
+- Live `/api/health` returned configured=true, paymentConfigured=true, razorpay=true, schemaReady=true, and serviceRoleAvailable=true.
+- Supabase SQL Editor showed `notification_outbox` exists. Manual grant of `SELECT, UPDATE` to `service_role` succeeded; follow-up privilege query returned `can_select=true`, `can_update=true`.
+- Render's last observed worker log after the grant showed `Queue batch found { count: 10 }`. An earlier 403 was from the previous worker attempt; keep monitoring for recurrence.
+- Original ECU checkout and private result delivery code were not changed by the CI-only release.
 
-## Pending — in priority order
+## In progress
+- Safe public diagnostic-guides page: add only the educational page, its stylesheet, navigation, server static allowlist, sitemap entry and regression tests. Do not link to the Forum/Store until those pages are actually integrated and tested.
 
-### P0 — Supabase connection and notification worker
-- [ ] Restore an eligible ChatGPT Supabase connector link for the actual project `kbpdapxpvcyysjilmhch`. The latest connector call returns `link_id must identify an eligible linked account`; earlier calls denied project access.
-- [ ] Confirm this project is the same database used by Render, and verify project status, migrations, tables and RLS.
-- [ ] Take/verify a recovery point before DDL.
-- [ ] Apply the prepared notification-outbox permission migration only after the checks above; then inspect Render logs and confirm the `notification_outbox` 403 stops.
+## Pending — do not bypass these gates
+### P0 — database and notifications
+- Supabase connector calls still return `link_id must identify an eligible linked account`; inspect the database through the authenticated Supabase dashboard until connector access is repaired.
+- Confirm the production project and review migration history, core tables, RLS and storage policies.
+- Create/verify a recovery point before applying any schema migration.
+- Continue checking Render logs to ensure `notification_outbox` permission errors do not recur; update the migration tracking only after deciding how to reconcile the manual grant with migration history.
 
-### P1 — Forum / learning guides
-- [ ] Install the forum and guide UI into the app with correct navigation.
-- [ ] Apply the forum core migration only after migration history/schema checks.
-- [ ] Verify account ownership, RLS, reporting, moderation, search and rate limits against the real database.
+### P1 — Forum and educational platform
+- Integrate Forum UI and endpoints only after verifying current auth, ownership checks, RLS, report/moderation flow, spam/rate limits and search against the real database.
+- Do not publish UI links to endpoints that still return 404.
 
-### P1 — Licensed Store / Membership
-- [ ] Integrate Store UI and server handlers without changing the existing ECU checkout/payment finalizer.
-- [ ] Verify the `licensed-store-files` bucket remains private; test verified Razorpay payment, invalid/duplicate callbacks, amount mismatch, ownership, download limits and membership expiry.
-- [ ] Publish no product until evidence of lawful redistribution rights is recorded. No products are seeded.
+### P1 — Licensed Store and Membership
+- Integrate store server handlers without changing the existing ECU checkout/payment finalizer.
+- Keep `licensed-store-files` private and test verified payment, amount mismatch, duplicate callbacks, user ownership, download limits and expiry.
+- Publish no product until lawful commercial redistribution authorization is documented. No product binaries or plans are seeded.
 
-### P2 — SEO / policies / launch
-- [ ] Connect SEO sitemap/canonical/meta and policy pages to the actual public routes; validate sitemap URLs on the live domain.
-- [ ] Review Privacy, Terms and Refund policy drafts against the real business and applicable legal obligations before publication.
-- [ ] Run the real repository `npm test` after integration; review the diff, then merge only after all release gates pass.
-- [ ] Verify Render deployment, `/api/health`, payments, private file delivery, notifications, mobile/desktop UI and rollback readiness.
+### P2 — SEO, legal pages and release
+- Validate sitemap URLs after the Guides page deploys.
+- Privacy, Terms and Refund pages remain drafts until reviewed against actual business practices and applicable legal requirements.
+- Run actual repository tests and inspect PR diff before merging each feature. Recheck Render health, existing Razorpay flow and private file download after deployment.
 
-## Guardrails
-- Never commit directly to `main` or trigger production deploy during this staged work.
-- Never apply SQL to the inactive/unverified project `jxwjjuvnwtjmdxruoohy`.
-- Do not rerun historical/base migrations blindly.
-- Do not expose or request Supabase service-role keys, database passwords, Razorpay secrets or other credentials in chat.
-- Preserve the existing `private-ecu-files` bucket, order/payment tables and verified checkout flow.
+## Security guardrails
+- Keep `https://ecufileservice.in` unchanged.
+- Never expose, request in chat, or commit service-role keys, database passwords, Razorpay secrets or customer files.
+- Do not apply migrations blindly or to an inactive/unverified project.
+- Preserve the `private-ecu-files` bucket, order/payment tables and existing checkout flow.
+- A passing static/package test is not a substitute for database integration, authorization, or end-to-end production testing.
