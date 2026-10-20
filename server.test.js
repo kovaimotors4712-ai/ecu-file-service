@@ -1617,7 +1617,7 @@ test('advertising quote flow keeps tokens out of URLs and verifies Razorpay paym
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/payment\/create-order'/);
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/payment\/verify'/);
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/payment\/reconcile'/);
-  assert.match(serverSource, /createHmac\('sha256', razorpayKeySecret\)\.update\(providerOrderId\+'\\|'\+providerPaymentId\)/);
+  assert.ok(serverSource.includes("createHmac('sha256', razorpayKeySecret).update(providerOrderId+'|'+providerPaymentId)"));
   assert.match(serverSource, /rpc\/efsi_finalize_advertising_payment/);
   assert.match(serverSource, /status:'creating'/);
   assert.match(serverSource, /A paid advertising quote is required before publishing an advertisement/);
