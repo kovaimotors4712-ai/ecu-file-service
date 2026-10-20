@@ -25,6 +25,7 @@ begin
     if NEW.status is distinct from OLD.status and not (
       (OLD.status = 'draft' and NEW.status in ('issued','declined','cancelled'))
       or (OLD.status = 'issued' and NEW.status in ('accepted','declined','expired','cancelled'))
+      or (OLD.status = 'issued' and NEW.status = 'draft' and NEW.acceptance_token_hash is null and NEW.issued_at is null and not exists (select 1 from public.advertising_payments p where p.quote_id = OLD.id))
       or (OLD.status = 'accepted' and NEW.status in ('payment_pending','paid','payment_failed','expired','cancelled'))
       or (OLD.status = 'payment_pending' and NEW.status in ('paid','payment_failed','expired','cancelled'))
       or (OLD.status = 'payment_failed' and NEW.status in ('accepted','expired','cancelled'))
