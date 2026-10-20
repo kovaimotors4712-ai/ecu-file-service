@@ -1544,35 +1544,25 @@ async function handleAdminAdvertisingQuotes(request, response) {
   jsonResponse(response, 405, { error:'Method Not Allowed' }); return true;
 }
 async function handlePublicAdvertisingQuote(request, response) {
+  if (request.method !== 'POST') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
   if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'Advertising quotes are temporarily unavailable.' }); return true; }
   try {
-    if (request.method === 'GET') {
-      const token = String(new URL(request.url, 'http://localhost').searchParams.get('token') || '');
-      const quote = await findAdvertisingQuoteByToken(token);
-      if (!quote || new Date(quote.expires_at).getTime() <= Date.now() || ['declined','expired','cancelled','payment_failed'].includes(quote.status)) { jsonResponse(response, 404, { error:'This quote is unavailable or has expired.' }); return true; }
-      const inquiryResult = await supabaseRequest(serviceToken(), 'rest/v1/advertising_inquiries?select=business_name&id=eq.'+encodeURIComponent(quote.inquiry_id)+'&limit=1', { timeoutMs:12000 });
-      const inquiry = inquiryResult.ok ? (await inquiryResult.json())?.[0] : null;
-      jsonResponse(response, 200, { quote:{ id:quote.id, version:quote.quote_version, status:quote.status, amountPaise:quote.amount_paise, currency:quote.currency, placement:quote.placement, startsAt:quote.starts_at, endsAt:quote.ends_at, expiresAt:quote.expires_at, terms:quote.terms_snapshot, creativeRequirements:quote.creative_requirements, businessName:inquiry?.business_name || 'Advertiser' } }); return true;
-    }
-    if (request.method === 'POST') {
-      const body = await readJson(request, 4096);
-      const token = String(body?.token || '');
-      const quote = await findAdvertisingQuoteByToken(token);
-      if (!quote || new Date(quote.expires_at).getTime() <= Date.now() || ['declined','expired','cancelled','payment_failed'].includes(quote.status)) { jsonResponse(response, 404, { error:'This quote is unavailable or has expired.' }); return true; }
-      const inquiryResult = await supabaseRequest(serviceToken(), 'rest/v1/advertising_inquiries?select=business_name&id=eq.'+encodeURIComponent(quote.inquiry_id)+'&limit=1', { timeoutMs:12000 });
-      const inquiry = inquiryResult.ok ? (await inquiryResult.json())?.[0] : null;
-      const publicQuote = { id:quote.id, version:quote.quote_version, status:quote.status, amountPaise:quote.amount_paise, currency:quote.currency, placement:quote.placement, startsAt:quote.starts_at, endsAt:quote.ends_at, expiresAt:quote.expires_at, terms:quote.terms_snapshot, creativeRequirements:quote.creative_requirements, businessName:inquiry?.business_name || 'Advertiser' };
-      if (body.action === 'view') { jsonResponse(response, 200, { quote:publicQuote }); return true; }
-      if (body.action !== 'accept') { jsonResponse(response, 400, { error:'Unsupported quote action.' }); return true; }
-      if (quote.status === 'accepted' || quote.status === 'payment_pending' || quote.status === 'paid') { jsonResponse(response, 200, { status:quote.status }); return true; }
-      if (quote.status !== 'issued') { jsonResponse(response, 409, { error:'This quote cannot be accepted in its current state.' }); return true; }
-      const result = await supabaseRequest(serviceToken(), 'rest/v1/advertising_quotes?id=eq.'+encodeURIComponent(quote.id)+'&status=eq.issued&expires_at=gt.'+encodeURIComponent(new Date().toISOString())+'&select=id,status', { method:'PATCH', prefer:'return=representation', body:{ status:'accepted', accepted_at:new Date().toISOString(), updated_at:new Date().toISOString() }, timeoutMs:12000 });
-      const rows = result.ok ? await result.json() : [];
-      if (!rows?.length) { jsonResponse(response, 409, { error:'Quote changed or expired before acceptance. Refresh the quote.' }); return true; }
-      await writeAdvertisingAudit('quote_accepted', quote.id, null, null, { quote_version:quote.quote_version });
-      jsonResponse(response, 200, { status:'accepted' }); return true;
-    }
-    jsonResponse(response, 405, { error:'Method Not Allowed' }); return true;
+    const body = await readJson(request, 4096);
+    const token = String(body?.token || '');
+    const quote = await findAdvertisingQuoteByToken(token);
+    if (!quote || new Date(quote.expires_at).getTime() <= Date.now() || ['declined','expired','cancelled','payment_failed'].includes(quote.status)) { jsonResponse(response, 404, { error:'This quote is unavailable or has expired.' }); return true; }
+    const inquiryResult = await supabaseRequest(serviceToken(), 'rest/v1/advertising_inquiries?select=business_name&id=eq.'+encodeURIComponent(quote.inquiry_id)+'&limit=1', { timeoutMs:12000 });
+    const inquiry = inquiryResult.ok ? (await inquiryResult.json())?.[0] : null;
+    const publicQuote = { id:quote.id, version:quote.quote_version, status:quote.status, amountPaise:quote.amount_paise, currency:quote.currency, placement:quote.placement, startsAt:quote.starts_at, endsAt:quote.ends_at, expiresAt:quote.expires_at, terms:quote.terms_snapshot, creativeRequirements:quote.creative_requirements, businessName:inquiry?.business_name || 'Advertiser' };
+    if (body.action === 'view') { jsonResponse(response, 200, { quote:publicQuote }); return true; }
+    if (body.action !== 'accept') { jsonResponse(response, 400, { error:'Unsupported quote action.' }); return true; }
+    if (quote.status === 'accepted' || quote.status === 'payment_pending' || quote.status === 'paid') { jsonResponse(response, 200, { status:quote.status }); return true; }
+    if (quote.status !== 'issued') { jsonResponse(response, 409, { error:'This quote cannot be accepted in its current state.' }); return true; }
+    const result = await supabaseRequest(serviceToken(), 'rest/v1/advertising_quotes?id=eq.'+encodeURIComponent(quote.id)+'&status=eq.issued&expires_at=gt.'+encodeURIComponent(new Date().toISOString())+'&select=id,status', { method:'PATCH', prefer:'return=representation', body:{ status:'accepted', accepted_at:new Date().toISOString(), updated_at:new Date().toISOString() }, timeoutMs:12000 });
+    const rows = result.ok ? await result.json() : [];
+    if (!rows?.length) { jsonResponse(response, 409, { error:'Quote changed or expired before acceptance. Refresh the quote.' }); return true; }
+    await writeAdvertisingAudit('quote_accepted', quote.id, null, null, { quote_version:quote.quote_version });
+    jsonResponse(response, 200, { status:'accepted' }); return true;
   } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Advertising quote request failed.' }); return true; }
 }
 async function handleCreateAdvertisingPayment(request, response) {
