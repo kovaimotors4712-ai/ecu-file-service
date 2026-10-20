@@ -1746,6 +1746,19 @@ test('advertising quote administration is denied without a trusted admin session
   assert.match(result.payload.error, /Administrator role is required/);
 });
 
+test('advertising quote and payment endpoints reject malformed private tokens before provider access', async () => {
+  const beforeOrderCalls = state.razorOrderCalls;
+  const quote = await call('/api/advertising/quote', { method:'POST', body:{ action:'view', token:'not-a-valid-private-token' } });
+  const create = await call('/api/advertising/payment/create-order', { method:'POST', body:{ token:'not-a-valid-private-token' } });
+  const verify = await call('/api/advertising/payment/verify', { method:'POST', body:{ token:'not-a-valid-private-token', razorpay_order_id:'order_TestLocal01', razorpay_payment_id:'pay_TestLocal01', razorpay_signature:'0'.repeat(64) } });
+  const reconcile = await call('/api/advertising/payment/reconcile', { method:'POST', body:{ token:'not-a-valid-private-token' } });
+  assert.equal(quote.response.status, 404);
+  assert.equal(create.response.status, 404);
+  assert.equal(verify.response.status, 404);
+  assert.equal(reconcile.response.status, 404);
+  assert.equal(state.razorOrderCalls, beforeOrderCalls);
+});
+
 test('advertising payment endpoints reject unsupported HTTP methods', async () => {
   for (const pathname of ['/api/advertising/payment/create-order','/api/advertising/payment/verify','/api/advertising/payment/reconcile']) {
     const result = await call(pathname, { method:'GET' });
