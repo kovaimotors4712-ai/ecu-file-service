@@ -1753,3 +1753,62 @@ test('advertising payment endpoints reject unsupported HTTP methods', async () =
   const quote = await call('/api/advertising/quote', { method:'GET' });
   assert.equal(quote.response.status, 405);
 });
+
+
+test('advertising quote acceptance, Razorpay verification, mismatch rejection, and idempotent finalization work end to end', async () => {
+  const inquiryId='41000000-0000-4000-8000-000000000001';
+  state.advertisingInquiries.set(inquiryId,{id:inquiryId,business_name:'Test ECU Workshop',contact_name:'Workshop Owner',email:'advertiser@example.invalid',phone:'+919999999999',ad_type:'banner',message:'A test advertising enquiry with sufficient detail.',status:'contacted',created_at:new Date().toISOString(),updated_at:new Date().toISOString()});
+  const startsAt=new Date(Date.now()+24*60*60*1000).toISOString();
+  const endsAt=new Date(Date.now()+8*24*60*60*1000).toISOString();
+  const expiresAt=new Date(Date.now()+12*60*60*1000).toISOString();
+  const created=await call('/api/admin/advertising/quotes',{method:'POST',token:tokens.admin,body:{inquiryId,amountPaise:12500,placement:'banner',startsAt,endsAt,expiresAt,terms:'Test quote terms agreed with the advertiser.',creativeRequirements:'Use an approved HTTPS image and destination.'}});
+  assert.equal(created.response.status,201,JSON.stringify(created.payload));
+  assert.equal(created.payload.item.amount_paise,12500);
+  assert.equal(created.payload.item.quote_version,1);
+  const quoteId=created.payload.item.id;
+
+  const issued=await call('/api/admin/advertising/quotes',{method:'PATCH',token:tokens.admin,body:{id:quoteId,action:'issue'}});
+  assert.equal(issued.response.status,200,JSON.stringify(issued.payload));
+  assert.equal(state.resendCalls,1);
+  const token=state.lastResendRequest.body.html.match(/advertising-quote\.html#([A-Za-z0-9_-]{43})/)?.[1];
+  assert.ok(token,'quote email must contain the one-time token in the URL fragment');
+  assert.equal([...state.advertisingQuotes.values()][0].acceptance_token_hash,hash(token));
+  assert.equal([...state.advertisingQuotes.values()][0].status,'issued');
+
+  const viewed=await call('/api/advertising/quote',{method:'POST',body:{action:'view',token}});
+  assert.equal(viewed.response.status,200);
+  assert.equal(viewed.payload.quote.amountPaise,12500);
+  const accepted=await call('/api/advertising/quote',{method:'POST',body:{action:'accept',token}});
+  assert.equal(accepted.response.status,200);
+  assert.equal(accepted.payload.status,'accepted');
+
+  const order=await call('/api/advertising/payment/create-order',{method:'POST',body:{token}});
+  assert.equal(order.response.status,200,JSON.stringify(order.payload));
+  assert.equal(order.payload.amount,12500);
+  assert.equal(state.razorOrderCalls,1);
+  assert.equal([...state.advertisingQuotes.values()][0].status,'payment_pending');
+  const signature=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update('order_TestLocal01|pay_TestLocal01').digest('hex');
+
+  const badSignature=await call('/api/advertising/payment/verify',{method:'POST',body:{token,razorpay_order_id:'order_TestLocal01',razorpay_payment_id:'pay_TestLocal01',razorpay_signature:'invalid'}});
+  assert.equal(badSignature.response.status,402);
+  assert.equal([...state.advertisingQuotes.values()][0].status,'payment_pending');
+
+  state.razorPaymentAmount=12400;
+  const wrongAmount=await call('/api/advertising/payment/verify',{method:'POST',body:{token,razorpay_order_id:'order_TestLocal01',razorpay_payment_id:'pay_TestLocal01',razorpay_signature:signature}});
+  assert.equal(wrongAmount.response.status,402);
+  assert.equal([...state.advertisingQuotes.values()][0].status,'payment_pending');
+
+  state.razorPaymentAmount=12500;
+  const verified=await call('/api/advertising/payment/verify',{method:'POST',body:{token,razorpay_order_id:'order_TestLocal01',razorpay_payment_id:'pay_TestLocal01',razorpay_signature:signature}});
+  assert.equal(verified.response.status,200,JSON.stringify(verified.payload));
+  assert.equal(verified.payload.status,'paid');
+  assert.equal([...state.advertisingQuotes.values()][0].status,'paid');
+  const payment=[...state.advertisingPayments.values()][0];
+  assert.equal(payment.status,'verified');
+  assert.equal(payment.provider_evidence_verified,true);
+
+  const duplicate=await call('/api/advertising/payment/verify',{method:'POST',body:{token,razorpay_order_id:'order_TestLocal01',razorpay_payment_id:'pay_TestLocal01',razorpay_signature:signature}});
+  assert.equal(duplicate.response.status,200);
+  assert.equal(duplicate.payload.status,'paid');
+  assert.equal([...state.advertisingPayments.values()].length,1);
+});
