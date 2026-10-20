@@ -1595,8 +1595,17 @@ async function handleCreateAdvertisingPayment(request, response) {
       paymentRow = (await inserted.json())?.[0];
     }
     if (!paymentRow?.id) { jsonResponse(response, 502, { error:'Payment session could not be reserved safely.' }); return true; }
-    const order = await razorpayApi('orders', { method:'POST', body:{ amount:quote.amount_paise, currency:'INR', receipt:'adq_'+quote.id.replaceAll('-','').slice(0,24), notes:{ advertising_quote_id:quote.id, advertising_payment_id:paymentRow.id, quote_version:String(quote.quote_version) } } });
-    if (!/^order_[A-Za-z0-9]+$/.test(String(order?.id || '')) || Number(order.amount)!==Number(quote.amount_paise) || order.currency!=='INR' || order?.notes?.advertising_quote_id!==quote.id || order?.notes?.advertising_payment_id!==paymentRow.id) throw Object.assign(new Error('Razorpay returned an invalid advertising payment order.'), { statusCode:502 });
+    let order;
+    try {
+      order = await razorpayApi('orders', { method:'POST', body:{ amount:quote.amount_paise, currency:'INR', receipt:'adq_'+quote.id.replaceAll('-','').slice(0,24), notes:{ advertising_quote_id:quote.id, advertising_payment_id:paymentRow.id, quote_version:String(quote.quote_version) } } });
+    } catch (error) {
+      await supabaseRequest(token, 'rest/v1/advertising_payments?id=eq.'+encodeURIComponent(paymentRow.id)+'&status=eq.creating', { method:'PATCH', prefer:'return=minimal', body:{ status:'failed', failure_code:String(error.code||'ORDER_CREATE_FAILED').slice(0,80), failure_message:'Razorpay order creation failed; no checkout session was returned.', updated_at:new Date().toISOString() }, timeoutMs:12000 }).catch(()=>{});
+      throw error;
+    }
+    if (!/^order_[A-Za-z0-9]+$/.test(String(order?.id || '')) || Number(order.amount)!==Number(quote.amount_paise) || order.currency!=='INR' || order?.notes?.advertising_quote_id!==quote.id || order?.notes?.advertising_payment_id!==paymentRow.id) {
+      await supabaseRequest(token, 'rest/v1/advertising_payments?id=eq.'+encodeURIComponent(paymentRow.id)+'&status=eq.creating', { method:'PATCH', prefer:'return=minimal', body:{ status:'failed', failure_code:'INVALID_PROVIDER_ORDER', failure_message:'Razorpay returned an order that did not match the saved quote.', updated_at:new Date().toISOString() }, timeoutMs:12000 }).catch(()=>{});
+      throw Object.assign(new Error('Razorpay returned an invalid advertising payment order.'), { statusCode:502 });
+    }
     const update = await supabaseRequest(token, 'rest/v1/advertising_payments?id=eq.'+encodeURIComponent(paymentRow.id)+'&status=eq.creating&select=id', { method:'PATCH', prefer:'return=representation', body:{ status:'created', provider_order_id:order.id, updated_at:new Date().toISOString() }, timeoutMs:12000 });
     if (!update.ok || !(await update.json())?.length) throw Object.assign(new Error('Payment order could not be saved. Please retry safely.'), { statusCode:502 });
     await supabaseRequest(token, 'rest/v1/advertising_quotes?id=eq.'+encodeURIComponent(quote.id)+'&status=eq.accepted', { method:'PATCH', prefer:'return=minimal', body:{ status:'payment_pending', updated_at:new Date().toISOString() }, timeoutMs:12000 });
