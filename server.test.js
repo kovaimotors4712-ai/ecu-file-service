@@ -1621,8 +1621,8 @@ test('advertising quote flow keeps tokens out of URLs and verifies Razorpay paym
   assert.match(serverSource, /status:'creating'/);
   assert.match(serverSource, /A paid advertising quote is required before publishing an advertisement/);
   assert.match(quotePage, /history\.replaceState/);
-  assert.match(quotePage, /api\('/api/advertising/quote'/);
-  assert.match(quotePage, /api\('/api/advertising/payment/reconcile'/);
+  assert.ok(quotePage.includes("api('/api/advertising/quote'"));
+  assert.ok(quotePage.includes("api('/api/advertising/payment/reconcile'"));
   assert.match(adminPage, /advertising-quote-form/);
   assert.match(adminSource, /data-issue-quote/);
   assert.match(finalizer, /for update/i);
