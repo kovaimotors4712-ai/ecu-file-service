@@ -1616,7 +1616,7 @@ test('advertising quote flow keeps tokens out of URLs and verifies Razorpay paym
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/payment\/create-order'/);
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/payment\/verify'/);
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/payment\/reconcile'/);
-  assert.match(serverSource, /createHmac\('sha256'\)\.update\(providerOrderId\+'\|'\+providerPaymentId\)/);
+  assert.match(serverSource, /createHmac\('sha256', razorpayKeySecret\)\.update\(providerOrderId\+'\\|'\+providerPaymentId\)/);
   assert.match(serverSource, /rpc\/efsi_finalize_advertising_payment/);
   assert.match(serverSource, /status:'creating'/);
   assert.match(serverSource, /A paid advertising quote is required before publishing an advertisement/);
@@ -1637,7 +1637,7 @@ test('advertising quote/payment schema prevents multiple active attempts and kee
   const grants = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_grant_advertising_quotes_payments.sql'), 'utf8');
   const finalizer = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_finalize_advertising_payment.sql'), 'utf8');
   assert.match(schema, /advertising_payments_one_active_attempt_uidx/i);
-  assert.match(schema, /status in \('creating','created','authorized','captured'\)/i);
+  assert.match(schema, /status in \('creating','created','authorized','captured','verified'/i);
   assert.match(grants, /revoke all on table public\.advertising_payment_audit from public, anon, authenticated/i);
   assert.match(finalizer, /revoke all on function public\.efsi_finalize_advertising_payment/i);
   assert.match(finalizer, /grant execute on function public\.efsi_finalize_advertising_payment.*to service_role/i);
