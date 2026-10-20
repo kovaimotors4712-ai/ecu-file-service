@@ -37,7 +37,7 @@ begin
   if NEW.status = 'paid' and not exists (
     select 1 from public.advertising_payments p
     where p.quote_id = NEW.id and p.status = 'verified'
-      and p.provider_signature_verified = true
+      and p.provider_evidence_verified = true
       and p.amount_paise = NEW.amount_paise and p.currency = NEW.currency
       and p.provider_order_id is not null and p.provider_payment_id is not null
       and p.verified_at is not null
@@ -73,7 +73,7 @@ begin
     if NEW.provider_payment_id is distinct from OLD.provider_payment_id and NEW.status <> 'verified' then
       raise exception 'Payment reference can only be attached during verified finalization';
     end if;
-    if NEW.provider_signature_verified and NEW.status <> 'verified' then
+    if NEW.provider_evidence_verified and NEW.status <> 'verified' then
       raise exception 'Only verified payments may set the verification flag';
     end if;
     if NEW.status is distinct from OLD.status and not (
