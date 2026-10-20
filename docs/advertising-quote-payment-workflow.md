@@ -2,7 +2,7 @@
 
 ## Status
 
-Design plan only. This document does not enable advertising payments or change production behavior. The current advertiser enquiry form remains an enquiry-only flow.
+Implementation is in progress on an isolated feature branch and is not live in production. The current production advertiser enquiry form remains enquiry-only. Do not merge or deploy until the migration chain, CI, test-mode payment flow, and production configuration are verified.
 
 ## Goals
 
@@ -50,13 +50,11 @@ Declined, expired, cancelled, and failed-payment states must be explicit. A quot
 
 ## Implementation sequence
 
-1. Add migration and schema tests for the isolated quote/payment tables and service-role-only grants.
-2. Add server-side quote CRUD endpoints guarded by `requireAdmin`, with strict validation and immutable quote snapshots.
-3. Add advertiser quote viewing/acceptance using an opaque, expiring token; store only a hash of the token.
-4. Add Razorpay order creation and verification dedicated to advertising, with idempotency and amount/currency checks.
-5. Add admin UI for quote management, payment status, creative approval, and scheduled publication.
-6. Add tests for unauthorized access, quote expiry/version changes, amount tampering, signature failures, duplicate callbacks/webhooks, payment mismatch, unapproved creative, and publication windows.
-7. Deploy only after CI and test-mode end-to-end checks pass. Keep the existing ECU-file checkout regression suite green.
+1. Dedicated quote/payment/audit tables, server-only grants, a serialized payment-finalization RPC, and a paid-publication trigger.
+2. Admin draft/issue/decline endpoints and quote form; issued quotes use a random one-time token whose hash is stored, and email links keep the token in the URL fragment.
+3. Public quote review/acceptance, Razorpay order creation, server-side signature/order/payment verification, and captured-payment reconciliation.
+4. Public and admin quote pages are present on the feature branch; publication is guarded by the exact paid quote, placement, and date window.
+5. Remaining before release: verify every migration against the target Supabase project, finish dynamic/integration tests for expiry/races/provider failures and payment recovery, run test-mode end-to-end checks, then deploy separately from existing ECU checkout.
 
 ## Explicitly out of scope until confirmed
 
@@ -68,3 +66,8 @@ Declined, expired, cancelled, and failed-payment states must be explicit. A quot
 ## Schema implementation checkpoint
 
 The isolated database migration is being prepared on the feature branch. Quote amounts are stored as integer paise and INR only; quote versions are unique per enquiry; accepted/paid states require lifecycle timestamps; payment references and idempotency keys are unique; verified payment rows require signature verification and provider references. RLS is enabled and browser roles are explicitly revoked in the companion grants migration. These schema files must be applied and verified in the target Supabase project before any endpoints are enabled.
+
+
+## Migration order
+
+Apply the new timestamped migrations only after the existing `20261020_site_announcements_advertising.sql` and `20261020_grant_site_content_service_role.sql` migrations are confirmed applied. The new migration files are timestamped after the existing date-only migrations so they execute after their referenced tables exist.
