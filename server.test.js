@@ -606,21 +606,37 @@ test('does not expose project secrets, fixtures, or migration files', async () =
   }
 });
 
-test('keeps forum assets unavailable until its database migration is verified', async () => {
-  for (const name of ['forum.html', 'forum.css', 'forum.js', 'supabase/migrations/20261020_forum_core.sql', 'supabase/verify_forum_core.sql']) {
-    const res = await fetch(baseUrl + '/' + name);
-    assert.equal(res.status, 404, name);
-  }
+test('serves the forum beta after verified RLS migration and keeps SQL files private', async () => {
+  const forum = await call('/forum.html');
+  const forumCss = await call('/forum.css');
+  const forumJs = await call('/forum.js');
+  assert.equal(forum.response.status, 200);
+  assert.equal(forumCss.response.status, 200);
+  assert.equal(forumJs.response.status, 200);
+  assert.match(forum.response.headers.get('content-type') || '', /text\/html/);
+  assert.match(forumCss.response.headers.get('content-type') || '', /text\/css/);
+  assert.match(forumJs.response.headers.get('content-type') || '', /javascript/);
+  assert.match(forum.payload, /canonical.*forum\.html/);
+  assert.match(forum.payload, /forum-auth-form/);
+  assert.match(forum.payload, /workshop topics|discussion board/i);
+  assert.match(forumJs.payload, /escapeHtml/);
+  assert.match(forumJs.payload, /forum_reports/);
+  assert.match(forumCss.payload, /forum-page/);
+
   const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   const forumSource = fs.readFileSync(path.join(__dirname, 'forum.js'), 'utf8');
   const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_forum_core.sql'), 'utf8');
-  assert.ok(!serverSource.includes('forum.html') && !serverSource.includes('forum.css') && !serverSource.includes('forum.js'));
-  assert.match(forumSource, /escapeHtml/);
-  assert.match(forumSource, /forum_reports/);
+  assert.match(serverSource, /'forum.html', 'forum.css', 'forum.js'/);
   assert.ok(!forumSource.includes('storage/v1/object') && !forumSource.includes('forum_files'));
   assert.match(migration, /ENABLE ROW LEVEL SECURITY/i);
   assert.match(migration, /forum_enforce_rate_limit/i);
-  assert.match(migration, /forum_is_moderator/i);
+  assert.match(migration, /pg_advisory_xact_lock/i);
+  assert.match(migration, /forum_reports_read_own_or_moderator/i);
+
+  for (const name of ['supabase/migrations/20261020_forum_core.sql', 'supabase/verify_forum_core.sql']) {
+    const res = await fetch(baseUrl + '/' + name);
+    assert.equal(res.status, 404, name);
+  }
 });
 
 test('forum verification SQL is read-only and checks the required security controls', () => {
