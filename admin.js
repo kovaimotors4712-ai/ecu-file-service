@@ -437,7 +437,17 @@
     const list = document.querySelector('#site-content-list');
     try {
       const result = await adminApi('/api/admin/site-content');
-      list.innerHTML = (result.items||[]).map(item => '<article class="admin-order-card" style="padding:14px;margin-bottom:10px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><div><span class="form-kicker">'+escape(item.kind)+' · '+escape(item.placement)+'</span><h3>'+escape(item.title)+'</h3><p>'+escape(item.body||'')+'</p><small>'+escape(item.is_published?'Published':'Draft / hidden')+' · Starts '+escape(item.starts_at?new Date(item.starts_at).toLocaleString():'now')+(item.ends_at?' · Ends '+escape(new Date(item.ends_at).toLocaleString()):'')+'</small></div><button type="button" class="button button-ghost" data-content-id="'+escape(item.id)+'" data-published="'+String(Boolean(item.is_published))+'">'+(item.is_published?'Hide':'Publish')+'</button></div></article>').join('') || '<p>No announcements, offers or ads have been created.</p>';
+      list.innerHTML = (result.items||[]).map(item => '<article class="admin-order-card" style="padding:14px;margin-bottom:10px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><div><span class="form-kicker">'+escape(item.kind)+' · '+escape(item.placement)+'</span><h3>'+escape(item.title)+'</h3><p>'+escape(item.body||'')+'</p><small>'+escape(item.is_published?'Published':'Draft / hidden')+' · Starts '+escape(item.starts_at?new Date(item.starts_at).toLocaleString():'now')+(item.ends_at?' · Ends '+escape(new Date(item.ends_at).toLocaleString()):'')+'</small></div><div style="display:flex;gap:8px;align-items:flex-start"><button type="button" class="button button-ghost" data-edit-content-id="'+escape(item.id)+'">Edit</button><button type="button" class="button button-ghost" data-content-id="'+escape(item.id)+'" data-published="'+String(Boolean(item.is_published))+'">'+(item.is_published?'Hide':'Publish')+'</button></div></div></article>').join('') || '<p>No announcements, offers or ads have been created.</p>';
+      list.querySelectorAll('button[data-edit-content-id]').forEach(button => button.addEventListener('click', () => {
+        const item=(result.items||[]).find(x=>x.id===button.dataset.editContentId); if(!item)return;
+        const set=(name,value)=>{const field=siteContentForm.elements.namedItem(name);if(field)field.value=value??'';};
+        set('id',item.id);set('kind',item.kind);set('placement',item.placement);set('title',item.title);set('body',item.body);set('image_url',item.image_url);set('cta_label',item.cta_label);set('cta_url',item.cta_url);set('starts_at',localDateTime(item.starts_at));set('ends_at',localDateTime(item.ends_at));
+        siteContentForm.elements.namedItem('is_published').checked=Boolean(item.is_published);
+        siteContentForm.querySelector('button[type="submit"]').textContent='Update website content →';
+        document.querySelector('#site-content-cancel-edit').hidden=false;
+        siteContentMessage.textContent='Editing: '+item.title;
+        siteContentForm.scrollIntoView({behavior:'smooth',block:'start'});
+      }));
       list.querySelectorAll('button[data-content-id]').forEach(button => button.addEventListener('click', async () => {
         button.disabled = true;
         try { await adminApi('/api/admin/site-content',{method:'PATCH',body:JSON.stringify({id:button.dataset.contentId,is_published:button.dataset.published!=='true'})}); await loadSiteContent(); }
@@ -446,6 +456,12 @@
       }));
     } catch(error) { list.textContent=error.message; }
   }
+  function resetSiteContentForm() {
+    siteContentForm.reset(); siteContentForm.elements.namedItem('id').value='';
+    siteContentForm.querySelector('button[type="submit"]').textContent='Save website content →';
+    document.querySelector('#site-content-cancel-edit').hidden=true;
+  }
+  document.querySelector('#site-content-cancel-edit')?.addEventListener('click',resetSiteContentForm);
   async function loadAdvertisingInquiries() {
     const list = document.querySelector('#advertising-inquiry-list');
     try {
@@ -460,10 +476,11 @@
   siteContentForm?.addEventListener('submit', async event => {
     event.preventDefault(); const button=siteContentForm.querySelector('button[type="submit"]');button.disabled=true;siteContentMessage.classList.remove('admin-error');siteContentMessage.textContent='Saving…';
     try {
-      const data=new FormData(siteContentForm);
+      const data=new FormData(siteContentForm), id=String(data.get('id')||'').trim();
       const value={kind:data.get('kind'),placement:data.get('placement'),title:data.get('title'),body:data.get('body'),image_url:data.get('image_url'),cta_label:data.get('cta_label'),cta_url:data.get('cta_url'),starts_at:data.get('starts_at')?new Date(data.get('starts_at')).toISOString():null,ends_at:data.get('ends_at')?new Date(data.get('ends_at')).toISOString():null,is_published:data.get('is_published')==='on'};
-      await adminApi('/api/admin/site-content',{method:'POST',body:JSON.stringify(value)});
-      siteContentForm.reset();siteContentMessage.textContent='Saved. The public page will show it when published and within its date window.';await loadSiteContent();
+      if(id)value.id=id;
+      await adminApi('/api/admin/site-content',{method:id?'PATCH':'POST',body:JSON.stringify(value)});
+      resetSiteContentForm();siteContentMessage.textContent='Saved. The public page will show it when published and within its date window.';await loadSiteContent();
     } catch(error) { siteContentMessage.textContent=error.message;siteContentMessage.classList.add('admin-error'); }
     finally { button.disabled=false; }
   });
