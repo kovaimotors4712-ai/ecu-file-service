@@ -64,3 +64,7 @@ Declined, expired, cancelled, and failed-payment states must be explicit. A quot
 - GST/tax treatment, refund/cancellation policy, ad guarantees, or legal terms.
 - Automatic publication immediately after payment.
 - Changes to the existing ECU-file checkout or customer order tables.
+
+## Schema implementation checkpoint
+
+The isolated database migration is being prepared on the feature branch. Quote amounts are stored as integer paise and INR only; quote versions are unique per enquiry; accepted/paid states require lifecycle timestamps; payment references and idempotency keys are unique; verified payment rows require signature verification and provider references. RLS is enabled and browser roles are explicitly revoked in the companion grants migration. These schema files must be applied and verified in the target Supabase project before any endpoints are enabled.
