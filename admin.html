@@ -59,6 +59,7 @@
         <form id="site-content-form" class="pricing-form" style="margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
           <label>Type<select name="kind" required><option value="announcement">Important announcement</option><option value="offer">Offer / promotion</option><option value="ad">Partner advertisement</option></select></label>
           <label>Placement<select name="placement" required><option value="banner">Announcement strip</option><option value="homepage">Homepage card</option><option value="sidebar">Sidebar slot</option></select></label>
+          <label>Paid advertising quote<select name="advertising_quote_id" id="site-content-advertising-quote"><option value="">Not linked (announcements/offers only)</option></select></label>
           <label style="grid-column:1/-1">Title<input name="title" maxlength="180" required></label>
           <label style="grid-column:1/-1">Message / details<textarea name="body" maxlength="4000" rows="3" style="width:100%"></textarea></label>
           <label>Image URL (HTTPS)<input name="image_url" type="url" placeholder="https://…"></label>
