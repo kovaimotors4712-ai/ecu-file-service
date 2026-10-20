@@ -330,8 +330,10 @@ async function createCheckoutIntent(customer, order) {
   }
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
-    console.error('Diagnostic [Supabase Insert checkout_intents]:', response.status, JSON.stringify(errorData));
-    throw new Error(`The secure checkout could not be saved (Supabase ${response.status}: ${JSON.stringify(errorData)}). Please retry.`);
+    const errorCode = typeof errorData?.code === 'string' ? errorData.code.slice(0, 32) : 'UNKNOWN';
+    console.error('[checkout] Supabase insert rejected', { status: response.status, code: errorCode });
+    // Never return PostgREST details, schema names, constraint text or other internals to the customer.
+    throw new Error('The secure checkout could not be saved. Please retry.');
   }
   const rows = await response.json();
   return rows?.[0] || payload;

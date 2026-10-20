@@ -13,6 +13,7 @@ Production branch: `main`
 - Render's last observed worker log after the grant showed `Queue batch found { count: 10 }`. An earlier 403 was from the previous worker attempt; keep monitoring for recurrence.
 - Original ECU checkout and private result delivery code were not changed by the CI-only release.
 - Public diagnostic Guides page is live at `/guides.html`; its stylesheet, homepage navigation, sitemap entry and regression tests were merged after push and PR CI passed.
+- Checkout insert failure messages now return a generic customer-safe error; diagnostic logging retains only HTTP status and a bounded error code instead of raw PostgREST error details.
 - The latest inspected Render log window had no new `notification_outbox` permission error after the manual grant; continue monitoring actual notification delivery.
 
 ## In progress
