@@ -37,7 +37,7 @@ begin
 
   if q.status = 'paid' and p.status = 'verified'
      and p.provider_payment_id = p_provider_payment_id
-     and p.provider_signature_verified then
+     and p.provider_evidence_verified then
     return true;
   end if;
 
@@ -51,7 +51,7 @@ begin
   update public.advertising_payments
     set status = 'verified',
         provider_payment_id = p_provider_payment_id,
-        provider_signature_verified = true,
+        provider_evidence_verified = true,
         verified_at = now(),
         updated_at = now()
     where id = p.id;
