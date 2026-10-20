@@ -658,6 +658,14 @@ test('trigger-function hardening migration revokes only direct RPC execute privi
   assert.doesNotMatch(sql, /efsi_create_paid_order|efsi_finalize_paid_checkout|orders|checkout_intents|order_files/i);
 });
 
+test('forum moderator helper uses invoker rights and only checks the trusted JWT role', () => {
+  const sql = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_forum_moderator_invoker.sql'), 'utf8');
+  assert.match(sql, /SECURITY INVOKER/i);
+  assert.match(sql, /auth\.jwt\(\).*app_metadata/s);
+  assert.match(sql, /role.*admin.*moderator/s);
+  assert.doesNotMatch(sql, /SECURITY DEFINER|INSERT INTO|UPDATE public|DELETE FROM|DROP TABLE/i);
+});
+
 test('serves exact Google verification file googlea2bbe9d2fd8bede2.html and blocks arbitrary html files', async () => {
   const good = await fetch(`${baseUrl}/googlea2bbe9d2fd8bede2.html`);
   assert.equal(good.status, 200);
