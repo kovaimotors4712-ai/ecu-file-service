@@ -1582,8 +1582,8 @@ test('announcement and advertiser tables grant access only to the trusted servic
 
 
 test('advertising quote/payment schema is isolated, constrained, and server-role only', () => {
-  const schema = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_advertising_quotes_payments.sql'), 'utf8');
-  const grants = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_grant_advertising_quotes_payments.sql'), 'utf8');
+  const schema = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180000_advertising_quotes_payments.sql'), 'utf8');
+  const grants = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180200_grant_advertising_quotes_payments.sql'), 'utf8');
   assert.match(schema, /create table if not exists public\.advertising_quotes/i);
   assert.match(schema, /create table if not exists public\.advertising_payments/i);
   assert.match(schema, /create table if not exists public\.advertising_payment_audit/i);
@@ -1609,8 +1609,8 @@ test('advertising quote flow keeps tokens out of URLs and verifies Razorpay paym
   const quotePage = fs.readFileSync(path.join(__dirname, 'advertising-quote.html'), 'utf8');
   const adminPage = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
   const adminSource = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
-  const finalizer = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_finalize_advertising_payment.sql'), 'utf8');
-  const publicationGuard = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_paid_ad_publication_guard.sql'), 'utf8');
+  const finalizer = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180100_finalize_advertising_payment.sql'), 'utf8');
+  const publicationGuard = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180300_paid_ad_publication_guard.sql'), 'utf8');
   assert.match(serverSource, /url\.pathname === '\/api\/admin\/advertising\/quotes'/);
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/quote'/);
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/payment\/create-order'/);
@@ -1633,9 +1633,9 @@ test('advertising quote flow keeps tokens out of URLs and verifies Razorpay paym
 });
 
 test('advertising quote/payment schema prevents multiple active attempts and keeps database writes server-only', () => {
-  const schema = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_advertising_quotes_payments.sql'), 'utf8');
-  const grants = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_grant_advertising_quotes_payments.sql'), 'utf8');
-  const finalizer = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_finalize_advertising_payment.sql'), 'utf8');
+  const schema = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180000_advertising_quotes_payments.sql'), 'utf8');
+  const grants = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180200_grant_advertising_quotes_payments.sql'), 'utf8');
+  const finalizer = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180100_finalize_advertising_payment.sql'), 'utf8');
   assert.match(schema, /advertising_payments_one_active_attempt_uidx/i);
   assert.match(schema, /status in \('creating','created','authorized','captured','verified'/i);
   assert.match(grants, /revoke all on table public\.advertising_payment_audit from public, anon, authenticated/i);
