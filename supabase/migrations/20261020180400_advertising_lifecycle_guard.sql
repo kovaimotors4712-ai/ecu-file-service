@@ -2,7 +2,7 @@
 create or replace function public.enforce_advertising_quote_lifecycle()
 returns trigger
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 begin
@@ -56,7 +56,7 @@ revoke all on function public.enforce_advertising_quote_lifecycle() from public,
 create or replace function public.enforce_advertising_payment_lifecycle()
 returns trigger
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 begin
