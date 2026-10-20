@@ -42,7 +42,7 @@ begin
   end if;
 
   if q.status not in ('accepted','payment_pending')
-     or q.expires_at <= now()
+     or (q.expires_at <= now() and p.created_at > q.expires_at)
      or p.status not in ('created','authorized','captured')
      or p.provider_payment_id is not null and p.provider_payment_id <> p_provider_payment_id then
     raise exception 'Advertising quote/payment is not eligible for finalization';
