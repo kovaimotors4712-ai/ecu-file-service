@@ -1611,6 +1611,7 @@ test('advertising quote flow keeps tokens out of URLs and verifies Razorpay paym
   const adminSource = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
   const finalizer = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180100_finalize_advertising_payment.sql'), 'utf8');
   const publicationGuard = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180300_paid_ad_publication_guard.sql'), 'utf8');
+  const lifecycleGuard = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180400_advertising_lifecycle_guard.sql'), 'utf8');
   assert.match(serverSource, /url\.pathname === '\/api\/admin\/advertising\/quotes'/);
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/quote'/);
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/payment\/create-order'/);
@@ -1630,6 +1631,10 @@ test('advertising quote flow keeps tokens out of URLs and verifies Razorpay paym
   assert.match(finalizer, /status = 'paid'/i);
   assert.match(publicationGuard, /A verified paid advertising quote is required before publishing/i);
   assert.match(publicationGuard, /create trigger site_announcements_paid_ad_guard/i);
+  assert.match(lifecycleGuard, /Issued advertising quote snapshots are immutable/i);
+  assert.match(lifecycleGuard, /Invalid advertising quote status transition/i);
+  assert.match(lifecycleGuard, /Invalid advertising payment status transition/i);
+  assert.match(lifecycleGuard, /A verified matching advertising payment is required/i);
 });
 
 test('advertising quote/payment schema prevents multiple active attempts and keeps database writes server-only', () => {
