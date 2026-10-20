@@ -83,6 +83,14 @@ returns boolean language sql stable security invoker set search_path = ''
 as $$ select coalesce(auth.jwt() -> 'app_metadata' ->> 'role' = 'admin', false) $$;
 grant execute on function public.forum_is_admin() to anon, authenticated, service_role;
 
+create or replace function public.forum_touch_updated_at()
+returns trigger language plpgsql set search_path = '' as $
+begin
+  new.updated_at := now();
+  return new;
+end;
+$;
+
 create or replace function public.forum_guard_profile()
 returns trigger language plpgsql set search_path = '' as $$
 begin
