@@ -46,13 +46,13 @@ create table if not exists public.advertising_payments (
   provider_order_id text unique check (provider_order_id is null or provider_order_id ~ '^order_[A-Za-z0-9]+$'),
   provider_payment_id text unique check (provider_payment_id is null or provider_payment_id ~ '^pay_[A-Za-z0-9]+$'),
   idempotency_key text not null unique check (char_length(idempotency_key) between 16 and 200),
-  provider_signature_verified boolean not null default false,
+  provider_evidence_verified boolean not null default false,
   verified_at timestamptz,
   failure_code text,
   failure_message text check (failure_message is null or char_length(failure_message) <= 500),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint advertising_payments_verified_state check (status <> 'verified' or (provider_signature_verified and provider_order_id is not null and provider_payment_id is not null and verified_at is not null))
+  constraint advertising_payments_verified_state check (status <> 'verified' or (provider_evidence_verified and provider_order_id is not null and provider_payment_id is not null and verified_at is not null))
 );
 create index if not exists advertising_payments_quote_created_idx
   on public.advertising_payments (quote_id, created_at desc);
