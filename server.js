@@ -1552,7 +1552,7 @@ async function handlePublicAdvertisingQuote(request, response) {
     const body = await readJson(request, 4096);
     const token = String(body?.token || '');
     const quote = await findAdvertisingQuoteByToken(token);
-    if (!quote || new Date(quote.expires_at).getTime() <= Date.now() || ['declined','expired','cancelled','payment_failed'].includes(quote.status)) { jsonResponse(response, 404, { error:'This quote is unavailable or has expired.' }); return true; }
+    if (!quote || (new Date(quote.expires_at).getTime() <= Date.now() && !['payment_pending','paid'].includes(quote.status)) || ['declined','expired','cancelled','payment_failed'].includes(quote.status)) { jsonResponse(response, 404, { error:'This quote is unavailable or has expired.' }); return true; }
     const inquiryResult = await supabaseRequest(serviceToken(), 'rest/v1/advertising_inquiries?select=business_name&id=eq.'+encodeURIComponent(quote.inquiry_id)+'&limit=1', { timeoutMs:12000 });
     const inquiry = inquiryResult.ok ? (await inquiryResult.json())?.[0] : null;
     const publicQuote = { id:quote.id, version:quote.quote_version, status:quote.status, amountPaise:quote.amount_paise, currency:quote.currency, placement:quote.placement, startsAt:quote.starts_at, endsAt:quote.ends_at, expiresAt:quote.expires_at, terms:quote.terms_snapshot, creativeRequirements:quote.creative_requirements, businessName:inquiry?.business_name || 'Advertiser' };
@@ -1573,8 +1573,10 @@ async function handleCreateAdvertisingPayment(request, response) {
   try {
     const body = await readJson(request, 4096);
     const quote = await findAdvertisingQuoteByToken(String(body?.token || ''));
-    if (!quote || new Date(quote.expires_at).getTime() <= Date.now()) { jsonResponse(response, 404, { error:'This quote is unavailable or has expired.' }); return true; }
+    if (!quote) { jsonResponse(response, 404, { error:'This quote is unavailable or has expired.' }); return true; }
     if (quote.status === 'paid') { jsonResponse(response, 200, { status:'paid' }); return true; }
+    const quoteExpired = new Date(quote.expires_at).getTime() <= Date.now();
+    if (quoteExpired && quote.status !== 'payment_pending') { jsonResponse(response, 410, { error:'This quote has expired. Contact ECU SOLUTION for a renewed quote.' }); return true; }
     if (!['accepted','payment_pending'].includes(quote.status)) { jsonResponse(response, 409, { error:'Accept the valid quote before starting payment.' }); return true; }
     const token = serviceToken();
     const existingResult = await supabaseRequest(token, 'rest/v1/advertising_payments?select=id,status,amount_paise,currency,provider_order_id,provider_payment_id&id=not.is.null&quote_id=eq.'+encodeURIComponent(quote.id)+'&status=in.(creating,created,authorized,captured,verified)&order=created_at.desc&limit=1', { timeoutMs:12000 });
@@ -1585,6 +1587,7 @@ async function handleCreateAdvertisingPayment(request, response) {
       jsonResponse(response, 200, { provider:'razorpay', keyId:razorpayKeyId, providerOrderId:paymentRow.provider_order_id, amount:paymentRow.amount_paise, currency:paymentRow.currency, quoteId:quote.id }); return true;
     }
     if (paymentRow?.status === 'creating') { jsonResponse(response, 409, { error:'A payment session is being prepared. Retry in a few seconds.' }); return true; }
+    if (!paymentRow && quoteExpired) { jsonResponse(response, 410, { error:'The quote expired before a payment order was ready. Contact ECU SOLUTION; do not pay again.' }); return true; }
     if (!paymentRow) {
       const idempotencyKey = 'adquote:'+quote.id+':'+crypto.randomUUID();
       const inserted = await supabaseRequest(token, 'rest/v1/advertising_payments?select=id,status,amount_paise,currency,provider_order_id', { method:'POST', prefer:'return=representation', body:{ quote_id:quote.id, status:'creating', amount_paise:quote.amount_paise, currency:quote.currency, idempotency_key:idempotencyKey }, timeoutMs:12000 });
