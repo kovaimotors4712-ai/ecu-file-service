@@ -1602,3 +1602,43 @@ test('advertising quote/payment schema is isolated, constrained, and server-role
   assert.match(grants, /grant select, insert on table public\.advertising_payment_audit to service_role/i);
   assert.doesNotMatch(schema, /create policy/i);
 });
+
+
+test('advertising quote flow keeps tokens out of URLs and verifies Razorpay payments server-side', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const quotePage = fs.readFileSync(path.join(__dirname, 'advertising-quote.html'), 'utf8');
+  const adminPage = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
+  const adminSource = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const finalizer = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_finalize_advertising_payment.sql'), 'utf8');
+  const publicationGuard = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_paid_ad_publication_guard.sql'), 'utf8');
+  assert.match(serverSource, /url\\.pathname === '\\/api\\/admin\\/advertising\\/quotes'/);
+  assert.match(serverSource, /url\\.pathname === '\\/api\\/advertising\\/quote'/);
+  assert.match(serverSource, /url\\.pathname === '\\/api\\/advertising\\/payment\\/create-order'/);
+  assert.match(serverSource, /url\\.pathname === '\\/api\\/advertising\\/payment\\/verify'/);
+  assert.match(serverSource, /url\\.pathname === '\\/api\\/advertising\\/payment\\/reconcile'/);
+  assert.match(serverSource, /createHmac\\('sha256'\\)\\.update\\(providerOrderId\\+'\\|'\\+providerPaymentId\\)/);
+  assert.match(serverSource, /rpc\\/efsi_finalize_advertising_payment/);
+  assert.match(serverSource, /status:'creating'/);
+  assert.match(serverSource, /A paid advertising quote is required before publishing an advertisement/);
+  assert.match(quotePage, /history\\.replaceState/);
+  assert.match(quotePage, /api\\('/api/advertising/quote'/);
+  assert.match(quotePage, /api\\('/api/advertising/payment/reconcile'/);
+  assert.match(adminPage, /advertising-quote-form/);
+  assert.match(adminSource, /data-issue-quote/);
+  assert.match(finalizer, /for update/i);
+  assert.match(finalizer, /status = 'verified'/i);
+  assert.match(finalizer, /status = 'paid'/i);
+  assert.match(publicationGuard, /A verified paid advertising quote is required before publishing/i);
+  assert.match(publicationGuard, /create trigger site_announcements_paid_ad_guard/i);
+});
+
+test('advertising quote/payment schema prevents multiple active attempts and keeps database writes server-only', () => {
+  const schema = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_advertising_quotes_payments.sql'), 'utf8');
+  const grants = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_grant_advertising_quotes_payments.sql'), 'utf8');
+  const finalizer = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_finalize_advertising_payment.sql'), 'utf8');
+  assert.match(schema, /advertising_payments_one_active_attempt_uidx/i);
+  assert.match(schema, /status in \\('creating','created','authorized','captured'\\)/i);
+  assert.match(grants, /revoke all on table public\\.advertising_payment_audit from public, anon, authenticated/i);
+  assert.match(finalizer, /revoke all on function public\\.efsi_finalize_advertising_payment/i);
+  assert.match(finalizer, /grant execute on function public\\.efsi_finalize_advertising_payment.*to service_role/i);
+});
