@@ -2,9 +2,9 @@
 
 ## Release status
 
-This feature is isolated on `feature/advertising-quote-payment-plan` and is **not enabled in production**. The current live advertising form remains enquiry-only. Do not merge or deploy until the branch CI passes, the new migrations are reviewed/applied in the intended environment, and Razorpay Test Mode end-to-end checks pass.
+The quote/payment code is deployed to production and the Supabase schema is applied. The public advertiser form remains enquiry-only until an administrator creates and issues a quote. CI passed 78/78 tests, and live smoke checks confirmed health/configuration plus expected access-control responses. A real Razorpay Test Mode transaction has not yet been completed end-to-end, so treat the payment workflow as deployed but awaiting final transaction verification.
 
-## Implemented on the feature branch
+## Implemented and deployed
 
 - Admin can review advertising enquiries, create an INR quote draft, choose a placement and date window, record expiry and written terms, and issue/decline the quote.
 - Issuing generates a 256-bit one-time token; only its SHA-256 digest is stored. The token is sent in the URL fragment so it is not sent in HTTP requests or normal referrer headers. The quote page removes the fragment from the address bar before making API calls and is marked noindex/nofollow.
