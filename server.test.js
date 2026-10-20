@@ -648,9 +648,9 @@ test('trigger-function hardening migration revokes only direct RPC execute privi
   const targets = [...sql.matchAll(/REVOKE ALL ON FUNCTION public\.([a-z_]+)\(\) FROM PUBLIC, anon, authenticated;/g)].map((match) => match[1]).sort();
   assert.deepEqual(targets, [
     'create_profile_for_auth_user',
-    'enqueue_admin_order_notifications',
     'enforce_order_contact_email',
-    'enforce_second_stage_payment_state'
+    'enforce_second_stage_payment_state',
+    'enqueue_admin_order_notifications'
   ]);
   assert.match(sql, /^BEGIN;/m);
   assert.match(sql, /^COMMIT;/m);
