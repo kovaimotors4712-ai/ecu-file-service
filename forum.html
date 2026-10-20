@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101a19">
+  <meta name="description" content="ECU SOLUTION automotive forum for diagnostic trouble codes, ECU identification, wiring, scan tools and workshop knowledge.">
+  <link rel="canonical" href="https://ecufileservice.in/forum.html">
+  <meta property="og:title" content="Automotive Forum | ECU SOLUTION">
+  <meta property="og:description" content="Discuss ECU diagnostics, automotive electronics, fault codes and workshop repair methods.">
+  <meta property="og:url" content="https://ecufileservice.in/forum.html">
+  <meta property="og:type" content="website">
+  <title>Automotive Forum | ECU SOLUTION</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/forum.css">
+</head>
+<body class="forum-page">
+  <div class="announcement"><span class="status-dot"></span> AUTOMOTIVE KNOWLEDGE · COMMUNITY · DIAGNOSTICS <span class="announcement-right">INDIA · WORLDWIDE</span></div>
+  <header class="site-header forum-header">
+    <a class="brand" href="/" aria-label="ECU SOLUTION home"><span class="brand-mark" aria-hidden="true">E</span><span class="brand-name">ECU SOLUTION <b>AUTOMOTIVE FORUM</b></span></a>
+    <nav class="desktop-nav" aria-label="Main navigation"><a href="/">File services</a><a href="/ecu-file-services.html">ECU services</a><a href="/airbag-crash-clear.html">Airbag</a><a href="/forum.html" aria-current="page">Forum</a><a href="/guides.html">Guides</a></nav>
+    <a class="forum-back-link" href="/">Back to service</a>
+  </header>
+  <main class="forum-main">
+    <section class="forum-hero">
+      <div><p class="forum-kicker">WORKSHOP KNOWLEDGE BASE</p><h1>Diagnose together.<br><span>Learn from the community.</span></h1><p>Discuss ECU systems, DTCs, wiring, scan tools and repair methods. Share evidence, protect customer data and keep discussions respectful.</p></div>
+      <div class="forum-hero-mark" aria-hidden="true"><strong>ECU</strong><span>COMMUNITY / 01</span></div>
+    </section>
+    <p id="forum-status" class="forum-status" role="status" aria-live="polite">Connecting to the community…</p>
+    <div class="forum-layout">
+      <section class="forum-discussions" aria-labelledby="topics-heading">
+        <div class="forum-section-head"><div><p class="forum-kicker dark">COMMUNITY DISCUSSIONS</p><h2 id="topics-heading">Forum topics</h2></div><button class="button button-lime" id="forum-refresh" type="button">Refresh</button></div>
+        <form id="forum-search-form" class="forum-search" role="search"><label class="sr-only" for="forum-search">Search topics</label><input id="forum-search" type="search" maxlength="80" placeholder="Search DTC, ECU, symptom, tool…"><button class="button button-dark" type="submit">Search</button></form>
+        <div class="forum-filters"><label for="forum-category">Category</label><select id="forum-category"><option value="">All categories</option></select><label for="forum-sort">Sort</label><select id="forum-sort"><option value="updated_at">Recently active</option><option value="created_at">Newest first</option></select></div>
+        <div id="forum-topics" class="forum-topic-list" aria-live="polite"></div>
+      </section>
+      <aside class="forum-sidebar">
+        <section class="forum-panel" aria-labelledby="account-heading"><p class="forum-kicker dark">YOUR ACCOUNT</p><h2 id="account-heading">Join the discussion</h2><p id="forum-account-note">Sign in to post questions, reply and report inappropriate content.</p>
+          <div id="forum-auth-controls">
+            <div class="forum-auth-switch" role="group" aria-label="Account action"><button type="button" data-auth-mode="signin" aria-pressed="true">Sign in</button><button type="button" data-auth-mode="signup" aria-pressed="false">Create account</button></div>
+            <form id="forum-auth-form" class="forum-form"><label for="forum-email">Email</label><input id="forum-email" name="email" type="email" autocomplete="email" maxlength="254" required><label for="forum-password">Password</label><input id="forum-password" name="password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required><button class="button button-dark full-width" type="submit" id="forum-auth-submit">Sign in securely →</button></form>
+          </div>
+          <div id="forum-profile-setup" hidden><p class="forum-note">Choose a public username. Do not use a password, phone number, VIN or customer details.</p><form id="forum-profile-form" class="forum-form"><label for="forum-username">Username</label><input id="forum-username" name="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" autocomplete="nickname" required><label for="forum-display-name">Display name</label><input id="forum-display-name" name="display_name" minlength="1" maxlength="60" required><label for="forum-bio">Short bio (optional)</label><textarea id="forum-bio" name="bio" maxlength="280" rows="2"></textarea><button class="button button-dark full-width" type="submit">Save profile →</button></form></div>
+          <div id="forum-signed-in" hidden><p>Signed in as <strong id="forum-user-name"></strong></p><button id="forum-sign-out" class="forum-text-button" type="button">Sign out</button></div>
+          <p id="forum-auth-message" class="forum-message" role="status" aria-live="polite"></p>
+        </section>
+        <section class="forum-panel"><p class="forum-kicker dark">START A DISCUSSION</p><h2>Ask a useful question</h2><form id="forum-topic-form" class="forum-form"><label for="forum-new-category">Category</label><select id="forum-new-category" name="category_id" required><option value="">Loading categories…</option></select><label for="forum-new-title">Topic title</label><input id="forum-new-title" name="title" minlength="12" maxlength="140" placeholder="e.g. P0401 diagnosis on a diesel ECU" required><label for="forum-new-body">Details</label><textarea id="forum-new-body" name="body" minlength="20" maxlength="12000" rows="6" placeholder="Vehicle, year, ECU/module, DTCs, symptoms and checks already performed…" required></textarea><p class="forum-note">Publishing requires a signed-in account and forum profile. Never attach private customer files or credentials.</p><button id="forum-topic-submit" class="button button-dark full-width" type="submit" disabled>Publish topic →</button><p id="forum-topic-message" class="forum-message" role="status"></p></form></section>
+        <section class="forum-panel"><p class="forum-kicker dark">COMMUNITY GUIDELINES</p><h2>Keep it safe and useful</h2><ul class="forum-rules"><li>Share only tools, files and diagrams you may legally redistribute.</li><li>Remove VINs, registration numbers and customer information.</li><li>No spam, harassment, private download links or security credentials.</li><li>Follow manufacturer procedures for SRS, immobilizer and high-voltage work.</li></ul><p class="forum-note">Forum content is peer discussion, not a replacement for manufacturer service information.</p></section>
+        <section class="forum-panel forum-moderation" id="forum-moderation" hidden><p class="forum-kicker dark">TRUST & SAFETY</p><h2>Open reports</h2><div id="forum-reports"></div></section>
+      </aside>
+    </div>
+  </main>
+  <footer class="site-footer forum-footer"><a class="brand footer-brand" href="/"><span class="brand-mark" aria-hidden="true">E</span><span class="brand-name">ECU SOLUTION <b>AUTOMOTIVE FORUM</b></span></a><span class="footer-copy">Professional knowledge sharing for automotive specialists.</span><nav class="footer-links" aria-label="Community and guides"><a href="/guides.html">Diagnostic guides</a><a href="/">File services</a></nav><span class="footer-right">© <span id="forum-year">2026</span> ECU SOLUTION</span></footer>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/supabase.js"></script>
+  <script src="/auth.js"></script>
+  <script src="/forum.js"></script>
+</body>
+</html>

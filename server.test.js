@@ -540,6 +540,9 @@ test('serves customer and admin pages', async () => {
   const airbagSeo = await call('/airbag-crash-clear.html');
   const guides = await call('/guides.html');
   const guidesCss = await call('/guides.css');
+  const forum = await call('/forum.html');
+  const forumCss = await call('/forum.css');
+  const forumJs = await call('/forum.js');
   assert.equal(customer.response.status, 200);
   assert.equal(admin.response.status, 200);
   assert.equal(adminJs.response.status, 200);
@@ -547,10 +550,18 @@ test('serves customer and admin pages', async () => {
   assert.equal(airbagSeo.response.status, 200);
   assert.equal(guides.response.status, 200);
   assert.equal(guidesCss.response.status, 200);
+  assert.equal(forum.response.status, 200);
+  assert.equal(forumCss.response.status, 200);
+  assert.equal(forumJs.response.status, 200);
   assert.match(guides.response.headers.get('content-type') || '', /text\/html/);
   assert.match(guidesCss.response.headers.get('content-type') || '', /text\/css/);
   assert.match(guides.payload, /canonical.*guides\.html/);
   assert.match(guides.payload, /WORKSHOP SAFETY/);
+  assert.match(forum.payload, /canonical.*forum\\.html/);
+  assert.match(forum.payload, /AUTOMOTIVE FORUM/);
+  assert.match(forum.payload, /supabase.js/);
+  assert.match(forumJs.payload, /textContent/);
+  assert.match(forumJs.payload, /forum_reports/);
   assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
   assert.match(airbagSeo.payload,/canonical.*airbag-crash-clear\.html/);
   assert.match(customer.response.headers.get('content-type') || '', /text\/html/);

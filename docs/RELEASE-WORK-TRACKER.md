@@ -46,3 +46,10 @@ Production branch: `main`
 - Do not apply migrations blindly or to an inactive/unverified project.
 - Preserve the `private-ecu-files` bucket, order/payment tables and existing checkout flow.
 - A passing static/package test is not a substitute for database integration, authorization, or end-to-end production testing.
+
+
+## Forum staged release (2026-10-20)
+- A dedicated forum branch is being prepared with public topic/category reading, sign-in/profile flow, topic/reply creation, private abuse reports, moderator actions, and an additive forum-only migration.
+- The forum page, CSS and JavaScript are allowlisted explicitly; the existing static-file allowlist continues to block arbitrary files and migration paths.
+- The branch must not be merged/deployed until the forum migration is reviewed/applied on the verified production Supabase project and RLS, profile ownership, reply ownership, reporting privacy, moderation and rate limits are integration-tested.
+- No store purchase flow is included in this forum stage. Existing ECU checkout, Razorpay verification, order tables and private ECU file delivery are not intentionally modified.
