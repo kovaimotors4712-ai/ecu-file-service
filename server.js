@@ -1472,7 +1472,7 @@ async function handleAdminAdvertisingQuotes(request, response) {
   if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'Advertising quote management is unavailable.' }); return true; }
   const token = serviceToken();
   if (request.method === 'GET') {
-    const result = await supabaseRequest(token, 'rest/v1/advertising_quotes?select=*,advertising_inquiries(business_name,contact_name,email,phone,ad_type)&order=created_at.desc&limit=100', { timeoutMs:12000 });
+    const result = await supabaseRequest(token, 'rest/v1/advertising_quotes?select=id,inquiry_id,quote_version,status,amount_paise,currency,placement,starts_at,ends_at,expires_at,terms_snapshot,creative_requirements,issued_at,accepted_at,paid_at,created_by,created_at,updated_at,advertising_inquiries(business_name,contact_name,email,phone,ad_type)&order=created_at.desc&limit=100', { timeoutMs:12000 });
     if (!result.ok) { jsonResponse(response, 502, { error:'Advertising quotes could not be loaded.' }); return true; }
     jsonResponse(response, 200, { items:await result.json() }); return true;
   }
