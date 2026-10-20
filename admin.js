@@ -441,8 +441,9 @@
       list.querySelectorAll('button[data-edit-content-id]').forEach(button => button.addEventListener('click', () => {
         const item=(result.items||[]).find(x=>x.id===button.dataset.editContentId); if(!item)return;
         const set=(name,value)=>{const field=siteContentForm.elements.namedItem(name);if(field)field.value=value??'';};
-        set('id',item.id);set('kind',item.kind);set('placement',item.placement);set('title',item.title);set('body',item.body);set('image_url',item.image_url);set('cta_label',item.cta_label);set('cta_url',item.cta_url);set('starts_at',localDateTime(item.starts_at));set('ends_at',localDateTime(item.ends_at));
+        set('id',item.id);set('kind',item.kind);set('placement',item.placement);set('advertising_quote_id',item.advertising_quote_id);set('title',item.title);set('body',item.body);set('image_url',item.image_url);set('cta_label',item.cta_label);set('cta_url',item.cta_url);set('starts_at',localDateTime(item.starts_at));set('ends_at',localDateTime(item.ends_at));
         siteContentForm.elements.namedItem('is_published').checked=Boolean(item.is_published);
+        updateAdQuoteRequirement();
         siteContentForm.querySelector('button[type="submit"]').textContent='Update website content →';
         document.querySelector('#site-content-cancel-edit').hidden=false;
         siteContentMessage.textContent='Editing: '+item.title;
@@ -458,14 +459,34 @@
   }
   function resetSiteContentForm() {
     siteContentForm.reset(); siteContentForm.elements.namedItem('id').value='';
+    updateAdQuoteRequirement();
     siteContentForm.querySelector('button[type="submit"]').textContent='Save website content →';
     document.querySelector('#site-content-cancel-edit').hidden=true;
   }
   document.querySelector('#site-content-cancel-edit')?.addEventListener('click',resetSiteContentForm);
+  const contentKindField=siteContentForm?.elements.namedItem('kind');
+  const contentPublishedField=siteContentForm?.elements.namedItem('is_published');
+  const contentQuoteField=siteContentForm?.elements.namedItem('advertising_quote_id');
+  function updateAdQuoteRequirement(){
+    if(!contentQuoteField)return;
+    const required=contentKindField?.value==='ad'&&contentPublishedField?.checked;
+    contentQuoteField.required=Boolean(required);
+    contentQuoteField.setCustomValidity(required&&!contentQuoteField.value?'Select a paid quote before publishing an advertisement.':'');
+  }
+  contentKindField?.addEventListener('change',updateAdQuoteRequirement);
+  contentPublishedField?.addEventListener('change',updateAdQuoteRequirement);
+  contentQuoteField?.addEventListener('change',updateAdQuoteRequirement);
+
   async function loadAdvertisingInquiries() {
     const list = document.querySelector('#advertising-inquiry-list');
     try {
       const result = await adminApi('/api/admin/advertising/inquiries');
+      const inquirySelect=document.querySelector('#advertising-quote-inquiry');
+      if(inquirySelect){
+        const previous=inquirySelect.value;
+        inquirySelect.innerHTML='<option value="">Choose an enquiry…</option>'+(result.items||[]).filter(item=>!['declined','closed'].includes(item.status)).map(item=>'<option value="'+escape(item.id)+'">'+escape(item.business_name)+' — '+escape(item.email)+' ('+escape(item.status)+')</option>').join('');
+        if(previous)inquirySelect.value=previous;
+      }
       list.innerHTML = (result.items||[]).map(item => '<article class="admin-order-card" style="padding:14px;margin-bottom:10px"><span class="form-kicker">'+escape(item.ad_type)+' · '+escape(new Date(item.created_at).toLocaleString())+'</span><h3>'+escape(item.business_name)+'</h3><p>'+escape(item.contact_name)+' · '+escape(item.email)+' · '+escape(item.phone)+'</p>'+(item.website?'<p><a href="'+escape(item.website)+'" target="_blank" rel="noopener noreferrer">'+escape(item.website)+'</a></p>':'')+'<p>'+escape(item.message)+'</p><label>Status <select data-inquiry-id="'+escape(item.id)+'"><option value="new">New</option><option value="contacted">Contacted</option><option value="approved">Approved</option><option value="declined">Declined</option><option value="closed">Closed</option></select></label></article>').join('') || '<p>No advertiser enquiries received yet.</p>';
       list.querySelectorAll('select[data-inquiry-id]').forEach(select => {
         const item=(result.items||[]).find(x=>x.id===select.dataset.inquiryId); select.value=item?.status||'new';
@@ -473,11 +494,58 @@
       });
     } catch(error) { list.textContent=error.message; }
   }
+  const advertisingQuoteForm=document.querySelector('#advertising-quote-form');
+  const advertisingQuoteMessage=document.querySelector('#advertising-quote-message');
+  async function loadAdvertisingQuotes(){
+    const list=document.querySelector('#advertising-quote-list');if(!list)return;
+    try{
+      const result=await adminApi('/api/admin/advertising/quotes');
+      const adQuoteSelect=document.querySelector('#site-content-advertising-quote');
+      if(adQuoteSelect){
+        const previous=adQuoteSelect.value;
+        adQuoteSelect.innerHTML='<option value="">Not linked (announcements/offers only)</option>'+(result.items||[]).filter(item=>item.status==='paid').map(item=>'<option value="'+escape(item.id)+'">Paid quote v'+escape(item.quote_version)+' · '+escape((Number(item.amount_paise)/100).toLocaleString('en-IN',{style:'currency',currency:'INR'}))+' · '+escape(item.placement)+'</option>').join('');
+        if(previous)adQuoteSelect.value=previous;
+      }
+      list.innerHTML=(result.items||[]).map(item=>{
+        const inquiry=Array.isArray(item.advertising_inquiries)?item.advertising_inquiries[0]:item.advertising_inquiries;
+        const amount=(Number(item.amount_paise)/100).toLocaleString('en-IN',{style:'currency',currency:'INR'});
+        const payments=Array.isArray(item.advertising_payments)?item.advertising_payments:[];
+        const paymentInfo=payments.slice(0,5).map(p=>'<p><b>Payment '+escape(p.status)+'</b> · '+escape((Number(p.amount_paise)/100).toLocaleString('en-IN',{style:'currency',currency:'INR'}))+(p.verified_at?' · Verified '+escape(new Date(p.verified_at).toLocaleString()):'')+'<br><small>Order: '+escape(p.provider_order_id||'pending')+' · Payment: '+escape(p.provider_payment_id||'—')+'</small></p>').join('')||'<p>Payment: not started</p>';
+        return '<article class="admin-order-card" style="padding:14px;margin-bottom:10px"><span class="form-kicker">QUOTE V'+escape(item.quote_version)+' · '+escape(item.status)+'</span><h3>'+escape(inquiry?.business_name||'Advertiser enquiry')+' — '+escape(amount)+'</h3><p>'+escape(item.placement)+' · '+escape(new Date(item.starts_at).toLocaleString())+' to '+escape(new Date(item.ends_at).toLocaleString())+'</p><p>Expires '+escape(new Date(item.expires_at).toLocaleString())+'</p><p>'+escape(item.terms_snapshot)+'</p>'+paymentInfo+'<div style="display:flex;gap:8px;flex-wrap:wrap">'+(item.status==='draft'?'<button class="button button-dark" type="button" data-issue-quote="'+escape(item.id)+'">Issue & email quote</button>':'')+(['draft','issued'].includes(item.status)?'<button class="button button-ghost" type="button" data-decline-quote="'+escape(item.id)+'">Decline quote</button>':'')+'</div></article>';
+      }).join('')||'<p>No advertising quotes created yet.</p>';
+      list.querySelectorAll('[data-issue-quote]').forEach(button=>button.addEventListener('click',async()=>{
+        button.disabled=true;advertisingQuoteMessage.textContent='Issuing quote and sending secure link…';advertisingQuoteMessage.classList.remove('admin-error');
+        try{await adminApi('/api/admin/advertising/quotes',{method:'PATCH',body:JSON.stringify({id:button.dataset.issueQuote,action:'issue'})});advertisingQuoteMessage.textContent='Quote issued and email accepted by the delivery provider.';await loadAdvertisingQuotes();}
+        catch(error){advertisingQuoteMessage.textContent=error.message;advertisingQuoteMessage.classList.add('admin-error');}
+        finally{button.disabled=false;}
+      }));
+      list.querySelectorAll('[data-decline-quote]').forEach(button=>button.addEventListener('click',async()=>{
+        if(!confirm('Decline this quote? A new quote version can be created later.'))return;
+        button.disabled=true;
+        try{await adminApi('/api/admin/advertising/quotes',{method:'PATCH',body:JSON.stringify({id:button.dataset.declineQuote,action:'decline'})});advertisingQuoteMessage.textContent='Quote declined.';await loadAdvertisingQuotes();}
+        catch(error){advertisingQuoteMessage.textContent=error.message;advertisingQuoteMessage.classList.add('admin-error');}
+        finally{button.disabled=false;}
+      }));
+    }catch(error){list.textContent=error.message;}
+  }
+  advertisingQuoteForm?.addEventListener('submit',async event=>{
+    event.preventDefault();const button=advertisingQuoteForm.querySelector('button[type="submit"]');button.disabled=true;advertisingQuoteMessage.classList.remove('admin-error');advertisingQuoteMessage.textContent='Saving quote draft…';
+    try{
+      const data=new FormData(advertisingQuoteForm), amountText=String(data.get('amount')||'').trim();
+      if(!/^\d+(?:\.\d{1,2})?$/.test(amountText))throw new Error('Enter a valid amount with up to two decimal places.');
+      const parts=amountText.split('.'), amountPaise=Number(parts[0])*100+Number((parts[1]||'').padEnd(2,'0'));
+      if(!Number.isSafeInteger(amountPaise)||amountPaise<1)throw new Error('Enter a valid positive amount.');
+      const result=await adminApi('/api/admin/advertising/quotes',{method:'POST',body:JSON.stringify({inquiryId:data.get('inquiryId'),amountPaise,placement:data.get('placement'),startsAt:new Date(data.get('startsAt')).toISOString(),endsAt:new Date(data.get('endsAt')).toISOString(),expiresAt:new Date(data.get('expiresAt')).toISOString(),terms:data.get('terms'),creativeRequirements:data.get('creativeRequirements')})});
+      advertisingQuoteForm.reset();advertisingQuoteMessage.textContent='Draft quote saved. Review it below, then issue it to email a private acceptance link.';await loadAdvertisingQuotes();
+    }catch(error){advertisingQuoteMessage.textContent=error.message;advertisingQuoteMessage.classList.add('admin-error');}
+    finally{button.disabled=false;}
+  });
+
   siteContentForm?.addEventListener('submit', async event => {
     event.preventDefault(); const button=siteContentForm.querySelector('button[type="submit"]');button.disabled=true;siteContentMessage.classList.remove('admin-error');siteContentMessage.textContent='Saving…';
     try {
       const data=new FormData(siteContentForm), id=String(data.get('id')||'').trim();
-      const value={kind:data.get('kind'),placement:data.get('placement'),title:data.get('title'),body:data.get('body'),image_url:data.get('image_url'),cta_label:data.get('cta_label'),cta_url:data.get('cta_url'),starts_at:data.get('starts_at')?new Date(data.get('starts_at')).toISOString():null,ends_at:data.get('ends_at')?new Date(data.get('ends_at')).toISOString():null,is_published:data.get('is_published')==='on'};
+      const value={kind:data.get('kind'),placement:data.get('placement'),advertising_quote_id:data.get('advertising_quote_id')||null,title:data.get('title'),body:data.get('body'),image_url:data.get('image_url'),cta_label:data.get('cta_label'),cta_url:data.get('cta_url'),starts_at:data.get('starts_at')?new Date(data.get('starts_at')).toISOString():null,ends_at:data.get('ends_at')?new Date(data.get('ends_at')).toISOString():null,is_published:data.get('is_published')==='on'};
       if(id)value.id=id;
       await adminApi('/api/admin/site-content',{method:id?'PATCH':'POST',body:JSON.stringify(value)});
       resetSiteContentForm();siteContentMessage.textContent='Saved. The public page will show it when published and within its date window.';await loadSiteContent();
@@ -498,8 +566,9 @@
     document.querySelector('#admin-signout').hidden = false;
     await loadPricing();
     await loadOrders();
-    await loadSiteContent();
     await loadAdvertisingInquiries();
+    await loadAdvertisingQuotes();
+    await loadSiteContent();
     subscribeRealtime();
   }
 

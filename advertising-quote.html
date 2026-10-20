@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="theme-color" content="#101a19">
+<meta name="description" content="Review your ECU SOLUTION advertising quote and pay securely if you accept.">
+<title>Advertising Quote | ECU SOLUTION</title>
+<link rel="stylesheet" href="/styles.css">
+<style>
+.quote-wrap{max-width:820px;margin:56px auto;padding:0 20px 64px}.quote-card{background:#fff;border:1px solid #dce3dc;border-radius:18px;padding:clamp(20px,5vw,42px);box-shadow:0 18px 60px #101a1910}.quote-kicker{font:700 11px monospace;letter-spacing:.14em;color:#64756c}.quote-price{font-size:clamp(32px,7vw,52px);font-weight:800;letter-spacing:-.04em;margin:10px 0}.quote-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin:26px 0}.quote-grid div{background:#f4f7f2;border-radius:10px;padding:14px}.quote-grid small{display:block;color:#64756c;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}.quote-grid b{font-size:14px;overflow-wrap:anywhere}.quote-terms{white-space:pre-wrap;line-height:1.65;background:#f8faf7;padding:18px;border-radius:10px;border:1px solid #e7ece5}.quote-status{margin:16px 0;min-height:24px;color:#405148}.quote-status.error{color:#a52d25}.quote-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.quote-actions button{min-width:190px}.quote-foot{font-size:12px;color:#68776e;line-height:1.6;margin-top:22px}.quote-loading{padding:40px;text-align:center}
+</style>
+<script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
+</head>
+<body>
+<div class="announcement"><span class="status-dot"></span> ECU SOLUTION · ADVERTISING QUOTE <span class="announcement-right">SECURE REVIEW</span></div>
+<header class="site-header"><a class="brand" href="/" aria-label="ECU SOLUTION home"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 10h26v20H7z"/><path d="M12 15h5v10h-5zm11 0h5m-5 5h5m-5 5h5M3 15h4m-4 5h4m-4 5h4m26-10h4m-4 5h4m-4 5h4"/></svg></span><span class="brand-name">ECU SOLUTION <b>QUOTE</b></span></a><nav class="desktop-nav"><a href="/">File services</a><a href="/announcements.html">Offers & updates</a><a href="/advertise.html">Advertising</a></nav></header>
+<main class="quote-wrap"><div class="quote-card">
+<span class="quote-kicker">ADVERTISING PARTNERSHIPS</span>
+<h1 id="heading">Your advertising quote</h1>
+<p id="intro">Loading the secure quote…</p>
+<div id="quote-content" hidden>
+<div class="quote-price" id="price"></div>
+<div class="quote-grid">
+<div><small>Business</small><b id="business"></b></div>
+<div><small>Placement</small><b id="placement"></b></div>
+<div><small>Start date</small><b id="starts"></b></div>
+<div><small>End date</small><b id="ends"></b></div>
+<div><small>Quote expires</small><b id="expires"></b></div>
+<div><small>Quote version</small><b id="version"></b></div>
+</div>
+<div id="creative-wrap" hidden><h3>Creative requirements</h3><p id="creative"></p></div>
+<h3>Quote terms</h3><div class="quote-terms" id="terms"></div>
+<div class="quote-status" id="status" role="status" aria-live="polite"></div>
+<div class="quote-actions"><button class="button button-dark" id="accept" type="button" hidden>Accept quote →</button><button class="button button-dark" id="pay" type="button" hidden>Pay securely with Razorpay →</button><button class="button button-ghost" id="check" type="button" hidden>Check payment status</button></div>
+<p class="quote-foot">Payment is processed by Razorpay. An accepted quote does not guarantee publication by itself; creative review and approval are separate. This page never asks for your ECU files, account password, or card details.</p>
+</div>
+</div></main>
+<script>
+(()=> {
+ const $=id=>document.getElementById(id);
+ const token=location.hash.slice(1);
+ try{history.replaceState(null,'',location.pathname);}catch{}
+ let quote=null,lastPayment=null;
+ const status=(message,error=false)=>{$('status').textContent=message;$('status').classList.toggle('error',error);};
+ const money=paise=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(Number(paise)/100);
+ const date=value=>new Date(value).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});
+ async function api(path,body){
+   const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(body),cache:'no-store',credentials:'omit'});
+   const d=await r.json().catch(()=>({error:'Unexpected server response.'}));
+   if(!r.ok)throw new Error(d.error||'Request failed.');return d;
+ }
+ function showQuote(q){
+   quote=q;$('quote-content').hidden=false;$('intro').textContent='Review the quotation carefully before accepting.';
+   $('price').textContent=money(q.amountPaise);$('business').textContent=q.businessName;$('placement').textContent=q.placement;
+   $('starts').textContent=date(q.startsAt);$('ends').textContent=date(q.endsAt);$('expires').textContent=date(q.expiresAt);$('version').textContent=String(q.version);
+   $('terms').textContent=q.terms;
+   if(q.creativeRequirements){$('creative-wrap').hidden=false;$('creative').textContent=q.creativeRequirements;}
+   $('accept').hidden=q.status!=='issued';$('pay').hidden=!['accepted','payment_pending'].includes(q.status);$('check').hidden=q.status!=='payment_pending';
+   if(q.status==='paid'){status('Payment confirmed. Your advertisement will remain unpublished until creative approval and scheduling are completed.');}
+   else if(q.status==='accepted'||q.status==='payment_pending'){status('Quote accepted. You can continue to secure payment.');}
+   else if(q.status==='issued'){status('This quote is awaiting your decision.');}
+   else {status('Quote status: '+q.status);}
+ }
+ async function load(){
+   if(!token){$('heading').textContent='Quote link unavailable';$('intro').textContent='Open the full quote link from the email you received. If it has expired, contact ECU SOLUTION for a new quote.';return;}
+   try{const d=await api('/api/advertising/quote',{action:'view',token});showQuote(d.quote);}
+   catch(e){$('heading').textContent='Quote unavailable';$('intro').textContent=e.message;status(e.message,true);}
+ }
+ $('accept').addEventListener('click',async()=>{
+   $('accept').disabled=true;status('Recording your acceptance…');
+   try{await api('/api/advertising/quote',{action:'accept',token});quote.status='accepted';showQuote(quote);status('Quote accepted. You can now proceed to payment.');}
+   catch(e){status(e.message,true);}finally{$('accept').disabled=false;}
+ });
+ async function verify(payment){
+   status('Verifying payment directly with Razorpay…');
+   try{const d=await api('/api/advertising/payment/verify',{token,razorpay_order_id:payment.razorpay_order_id,razorpay_payment_id:payment.razorpay_payment_id,razorpay_signature:payment.razorpay_signature});quote.status='paid';showQuote(quote);lastPayment=null;status('Payment confirmed. Your advertisement still requires creative approval before publication.');}
+   catch(e){lastPayment=payment;$('check').hidden=false;status(e.message+' Do not pay again. Use “Check payment status” or retry verification.',true);}
+ }
+ $('pay').addEventListener('click',async()=>{
+   $('pay').disabled=true;status('Preparing secure Razorpay checkout…');
+   try{
+     const d=await api('/api/advertising/payment/create-order',{token});
+     if(d.status==='paid'){quote.status='paid';showQuote(quote);return;}
+     if(!window.Razorpay)throw new Error('Secure payment checkout is still loading. Please retry.');
+     const checkout=new Razorpay({key:d.keyId,amount:d.amount,currency:d.currency,name:'ECU SOLUTION',description:'Advertising quote payment',order_id:d.providerOrderId,modal:{ondismiss:()=>status('Checkout closed. If you completed payment, check payment status before trying again.')},handler:async result=>verify(result),prefill:{},notes:{quoteId:d.quoteId},theme:{color:'#101a19'}});
+     checkout.on('payment.failed',event=>status(event.error?.description||'Payment did not complete. Check the payment status before retrying.',true));
+     checkout.open();status('Complete payment in the secure Razorpay window.');
+   }catch(e){status(e.message,true);}finally{$('pay').disabled=false;}
+ });
+ $('check').addEventListener('click',async()=>{
+   $('check').disabled=true;
+   try{if(lastPayment){await verify(lastPayment);}else{status('Checking the saved Razorpay order…');const d=await api('/api/advertising/payment/reconcile',{token});if(d.status==='paid'){quote.status='paid';showQuote(quote);status('Payment confirmed. Your advertisement still requires creative approval before publication.');}else{status('Payment has not been confirmed yet. Do not pay again; retry this check later.',true);}}}
+   finally{$('check').disabled=false;}
+ });
+ load();
+})();
+</script>
+</body></html>

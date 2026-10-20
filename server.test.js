@@ -54,6 +54,10 @@ const state = {
   orderMessages: new Map(),
   objects: new Map(),
   outbox: new Map(),
+  advertisingInquiries: new Map(),
+  advertisingQuotes: new Map(),
+  advertisingPayments: new Map(),
+  advertisingAudit: new Map(),
   razorOrderCalls: 0,
   paypalOrderCalls: 0,
   paypalCaptureCalls: 0,
@@ -74,7 +78,7 @@ const state = {
 };
 
 function resetState() {
-  for (const map of [state.intents, state.orders, state.orderFiles, state.orderAttachments, state.orderMessages, state.objects, state.outbox]) map.clear();
+  for (const map of [state.intents, state.orders, state.orderFiles, state.orderAttachments, state.orderMessages, state.objects, state.outbox, state.advertisingInquiries, state.advertisingQuotes, state.advertisingPayments, state.advertisingAudit]) map.clear();
   state.razorOrderCalls = 0;
   state.paypalOrderCalls = 0;
   state.paypalCaptureCalls = 0;
@@ -138,6 +142,28 @@ function filteredRows(rows, searchParams) {
   return rows;
 }
 
+function filteredAdvertisingRows(rows, searchParams) {
+  for (const [key, value] of searchParams.entries()) {
+    if (key === 'select' || key === 'order' || key === 'limit') continue;
+    if (value.startsWith('eq.')) rows = rows.filter(row => String(row[key] ?? '') === value.slice(3));
+    else if (value.startsWith('in.(')) rows = rows.filter(row => value.slice(4, -1).split(',').includes(String(row[key] ?? '')));
+    else if (value === 'not.is.null') rows = rows.filter(row => row[key] !== null && row[key] !== undefined);
+    else if (value.startsWith('gt.')) rows = rows.filter(row => String(row[key] ?? '') !== '' && new Date(row[key]).getTime() > new Date(value.slice(3)).getTime());
+  }
+  const order = searchParams.get('order');
+  if (order) {
+    const [key, direction] = order.split('.');
+    rows.sort((a,b) => {
+      const av=a[key],bv=b[key];
+      const compare=typeof av==='number'&&typeof bv==='number'?av-bv:String(av??'').localeCompare(String(bv??''));
+      return direction==='desc'?-compare:compare;
+    });
+  }
+  const limit=Number(searchParams.get('limit'));
+  if(searchParams.has('limit')&&Number.isInteger(limit)&&limit>=0)rows=rows.slice(0,limit);
+  return rows;
+}
+
 const upstream = async (urlValue, options = {}) => {
   const url = new URL(urlValue);
   const method = options.method || 'GET';
@@ -161,6 +187,7 @@ const upstream = async (urlValue, options = {}) => {
       state.razorOrderCalls += 1;
       const body = JSON.parse(options.body);
       state.razorOrderNotes = body.notes;
+      state.razorOrderAmount = body.amount; state.razorOrderCurrency = body.currency; state.razorPaymentAmount = body.amount; state.razorPaymentCurrency = body.currency; state.razorPaymentOrderId = 'order_TestLocal01';
       return response(200, { id: 'order_TestLocal01', amount: body.amount, currency: body.currency, notes: body.notes });
     }
     if (url.pathname === '/v1/orders/order_TestLocal01') {
@@ -212,6 +239,69 @@ const upstream = async (urlValue, options = {}) => {
     state.resendRequests.push(state.lastResendRequest);
     if (state.resendShouldFail) return response(500, { message: 'synthetic Resend outage' });
     return response(200, { id: 'email-local-1' });
+  }
+
+  if (url.pathname === '/rest/v1/advertising_inquiries') {
+    if (method === 'GET') return response(200, filteredAdvertisingRows([...state.advertisingInquiries.values()].map(row=>({...row})),url.searchParams));
+    if (method === 'POST') {
+      const body=JSON.parse(options.body),id=crypto.randomUUID(),now=new Date().toISOString();
+      const row={id,status:'new',created_at:now,updated_at:now,...body};state.advertisingInquiries.set(id,row);
+      return response(201,[{...row}]);
+    }
+    if (method === 'PATCH') {
+      const rows=filteredAdvertisingRows([...state.advertisingInquiries.values()],url.searchParams),body=JSON.parse(options.body);
+      for(const row of rows)Object.assign(row,body,{updated_at:new Date().toISOString()});
+      return response(200,rows.map(row=>({...row})));
+    }
+  }
+  if (url.pathname === '/rest/v1/advertising_quotes') {
+    if (method === 'GET') {
+      let rows=filteredAdvertisingRows([...state.advertisingQuotes.values()].map(row=>({...row})),url.searchParams);
+      if(String(url.searchParams.get('select')||'').includes('advertising_inquiries(')) rows=rows.map(row=>({...row,advertising_inquiries:state.advertisingInquiries.has(row.inquiry_id)?{...state.advertisingInquiries.get(row.inquiry_id)}:null,advertising_payments:[...state.advertisingPayments.values()].filter(p=>p.quote_id===row.id).map(p=>({...p}))}));
+      return response(200,rows);
+    }
+    if (method === 'POST') {
+      const body=JSON.parse(options.body);
+      if([...state.advertisingQuotes.values()].some(row=>row.inquiry_id===body.inquiry_id&&row.quote_version===body.quote_version))return response(409,{message:'duplicate quote version'});
+      const id=crypto.randomUUID(),now=new Date().toISOString();
+      const row={id,status:'draft',currency:'INR',created_at:now,updated_at:now,...body};state.advertisingQuotes.set(id,row);
+      return response(201,[{...row}]);
+    }
+    if (method === 'PATCH') {
+      const rows=filteredAdvertisingRows([...state.advertisingQuotes.values()],url.searchParams),body=JSON.parse(options.body),updated=[];
+      for(const row of rows){Object.assign(row,body,{updated_at:new Date().toISOString()});updated.push({...row});}
+      return response(200,updated);
+    }
+  }
+  if (url.pathname === '/rest/v1/advertising_payments') {
+    if (method === 'GET') return response(200,filteredAdvertisingRows([...state.advertisingPayments.values()].map(row=>({...row})),url.searchParams));
+    if (method === 'POST') {
+      const body=JSON.parse(options.body);
+      if([...state.advertisingPayments.values()].some(row=>row.quote_id===body.quote_id&&['creating','created','authorized','captured'].includes(row.status)))return response(409,{message:'active payment exists'});
+      const id=crypto.randomUUID(),now=new Date().toISOString();
+      const row={id,status:'created',currency:'INR',created_at:now,updated_at:now,...body};state.advertisingPayments.set(id,row);
+      return response(201,[{...row}]);
+    }
+    if (method === 'PATCH') {
+      const rows=filteredAdvertisingRows([...state.advertisingPayments.values()],url.searchParams),body=JSON.parse(options.body),updated=[];
+      for(const row of rows){Object.assign(row,body,{updated_at:new Date().toISOString()});updated.push({...row});}
+      return response(200,updated);
+    }
+  }
+  if (url.pathname === '/rest/v1/advertising_payment_audit' && method === 'POST') {
+    const body=JSON.parse(options.body),id=String(state.advertisingAudit.size+1);
+    state.advertisingAudit.set(id,{id,...body,created_at:new Date().toISOString()});
+    return response(201,[{id,...body}]);
+  }
+  if (url.pathname === '/rest/v1/rpc/efsi_finalize_advertising_payment' && method === 'POST') {
+    const body=JSON.parse(options.body),quote=state.advertisingQuotes.get(body.p_quote_id),payment=state.advertisingPayments.get(body.p_payment_id);
+    if(!quote||!payment||payment.quote_id!==quote.id)return response(400,{message:'Quote/payment not found'});
+    if(quote.status==='paid'&&payment.status==='verified'&&payment.provider_payment_id===body.p_provider_payment_id)return response(200,true);
+    if(!['accepted','payment_pending'].includes(quote.status)||Number(quote.amount_paise)!==Number(body.p_amount_paise)||Number(payment.amount_paise)!==Number(body.p_amount_paise)||quote.currency!==body.p_currency||payment.currency!==body.p_currency||payment.provider_order_id!==body.p_provider_order_id||!['created','authorized','captured'].includes(payment.status))return response(400,{message:'Quote/payment mismatch'});
+    Object.assign(payment,{status:'verified',provider_payment_id:body.p_provider_payment_id,provider_evidence_verified:true,verified_at:new Date().toISOString()});
+    Object.assign(quote,{status:'paid',paid_at:new Date().toISOString(),updated_at:new Date().toISOString()});
+    const id=String(state.advertisingAudit.size+1);state.advertisingAudit.set(id,{id,quote_id:quote.id,payment_id:payment.id,event_type:'payment_verification_succeeded',details:{},created_at:new Date().toISOString()});
+    return response(200,true);
   }
 
   if (url.pathname === '/rest/v1/checkout_intents') {
@@ -1578,4 +1668,161 @@ test('announcement and advertiser tables grant access only to the trusted servic
   assert.match(schema, /alter table public\.site_announcements enable row level security/i);
   assert.match(schema, /alter table public\.advertising_inquiries enable row level security/i);
   assert.doesNotMatch(schema, /create policy/i);
+});
+
+
+test('advertising quote/payment schema is isolated, constrained, and server-role only', () => {
+  const schema = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180000_advertising_quotes_payments.sql'), 'utf8');
+  const grants = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180200_grant_advertising_quotes_payments.sql'), 'utf8');
+  assert.match(schema, /create table if not exists public\.advertising_quotes/i);
+  assert.match(schema, /create table if not exists public\.advertising_payments/i);
+  assert.match(schema, /create table if not exists public\.advertising_payment_audit/i);
+  assert.match(schema, /references public\.advertising_inquiries\(id\) on delete restrict/i);
+  assert.match(schema, /amount_paise bigint not null check \(amount_paise between 1 and 100000000000\)/i);
+  assert.match(schema, /acceptance_token_hash text unique check/i);
+  assert.match(schema, /provider_evidence_verified boolean not null default false/i);
+  assert.match(schema, /status <> 'verified' or \(provider_evidence_verified/i);
+  assert.match(schema, /alter table public\.advertising_quotes enable row level security/i);
+  assert.match(schema, /alter table public\.advertising_payments enable row level security/i);
+  assert.match(schema, /alter table public\.advertising_payment_audit enable row level security/i);
+  assert.match(grants, /revoke all on table public\.advertising_quotes from public, anon, authenticated/i);
+  assert.match(grants, /revoke all on table public\.advertising_payments from public, anon, authenticated/i);
+  assert.match(grants, /grant select, insert, update on table public\.advertising_quotes to service_role/i);
+  assert.match(grants, /grant select, insert, update on table public\.advertising_payments to service_role/i);
+  assert.match(grants, /grant select, insert on table public\.advertising_payment_audit to service_role/i);
+  assert.doesNotMatch(schema, /create policy/i);
+});
+
+
+test('advertising quote flow keeps tokens out of URLs and verifies Razorpay payments server-side', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const quotePage = fs.readFileSync(path.join(__dirname, 'advertising-quote.html'), 'utf8');
+  const adminPage = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
+  const adminSource = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const finalizer = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180100_finalize_advertising_payment.sql'), 'utf8');
+  const publicationGuard = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180300_paid_ad_publication_guard.sql'), 'utf8');
+  const lifecycleGuard = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180400_advertising_lifecycle_guard.sql'), 'utf8');
+  assert.match(serverSource, /url\.pathname === '\/api\/admin\/advertising\/quotes'/);
+  assert.match(serverSource, /url\.pathname === '\/api\/advertising\/quote'/);
+  assert.match(serverSource, /url\.pathname === '\/api\/advertising\/payment\/create-order'/);
+  assert.match(serverSource, /url\.pathname === '\/api\/advertising\/payment\/verify'/);
+  assert.match(serverSource, /url\.pathname === '\/api\/advertising\/payment\/reconcile'/);
+  assert.ok(serverSource.includes("createHmac('sha256', razorpayKeySecret).update(providerOrderId+'|'+providerPaymentId)"));
+  assert.match(serverSource, /rpc\/efsi_finalize_advertising_payment/);
+  assert.match(serverSource, /status:'creating'/);
+  assert.match(serverSource, /STALE_ORDER_CREATION/);
+  assert.match(serverSource, /A paid advertising quote is required before publishing an advertisement/);
+  assert.match(quotePage, /history\.replaceState/);
+  assert.ok(quotePage.includes("api('/api/advertising/quote'"));
+  assert.ok(quotePage.includes("api('/api/advertising/payment/reconcile'"));
+  assert.match(adminPage, /advertising-quote-form/);
+  assert.match(adminSource, /data-issue-quote/);
+  assert.match(finalizer, /for update/i);
+  assert.match(finalizer, /status = 'verified'/i);
+  assert.match(finalizer, /status = 'paid'/i);
+  assert.match(publicationGuard, /A verified paid advertising quote is required before publishing/i);
+  assert.match(publicationGuard, /create trigger site_announcements_paid_ad_guard/i);
+  assert.match(lifecycleGuard, /Issued advertising quote snapshots are immutable/i);
+  assert.match(lifecycleGuard, /Invalid advertising quote status transition/i);
+  assert.match(lifecycleGuard, /Invalid advertising payment status transition/i);
+  assert.match(lifecycleGuard, /A verified matching advertising payment is required/i);
+});
+
+test('advertising quote/payment schema prevents multiple active attempts and keeps database writes server-only', () => {
+  const schema = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180000_advertising_quotes_payments.sql'), 'utf8');
+  const grants = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180200_grant_advertising_quotes_payments.sql'), 'utf8');
+  const finalizer = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180100_finalize_advertising_payment.sql'), 'utf8');
+  assert.match(schema, /advertising_payments_one_active_attempt_uidx/i);
+  assert.match(schema, /status in \('creating','created','authorized','captured','verified'/i);
+  assert.match(grants, /revoke all on table public\.advertising_payment_audit from public, anon, authenticated/i);
+  assert.match(finalizer, /revoke all on function public\.efsi_finalize_advertising_payment/i);
+  assert.match(finalizer, /grant execute on function public\.efsi_finalize_advertising_payment.*to service_role/i);
+});
+
+
+test('advertising quote administration is denied without a trusted admin session', async () => {
+  const result = await call('/api/admin/advertising/quotes');
+  assert.equal(result.response.status, 403);
+  assert.match(result.payload.error, /Administrator role is required/);
+});
+
+test('advertising quote and payment endpoints reject malformed private tokens before provider access', async () => {
+  const beforeOrderCalls = state.razorOrderCalls;
+  const quote = await call('/api/advertising/quote', { method:'POST', body:{ action:'view', token:'not-a-valid-private-token' } });
+  const create = await call('/api/advertising/payment/create-order', { method:'POST', body:{ token:'not-a-valid-private-token' } });
+  const verify = await call('/api/advertising/payment/verify', { method:'POST', body:{ token:'not-a-valid-private-token', razorpay_order_id:'order_TestLocal01', razorpay_payment_id:'pay_TestLocal01', razorpay_signature:'0'.repeat(64) } });
+  const reconcile = await call('/api/advertising/payment/reconcile', { method:'POST', body:{ token:'not-a-valid-private-token' } });
+  assert.equal(quote.response.status, 404);
+  assert.equal(create.response.status, 404);
+  assert.equal(verify.response.status, 404);
+  assert.equal(reconcile.response.status, 404);
+  assert.equal(state.razorOrderCalls, beforeOrderCalls);
+});
+
+test('advertising payment endpoints reject unsupported HTTP methods', async () => {
+  for (const pathname of ['/api/advertising/payment/create-order','/api/advertising/payment/verify','/api/advertising/payment/reconcile']) {
+    const result = await call(pathname, { method:'GET' });
+    assert.equal(result.response.status, 405, pathname);
+  }
+  const quote = await call('/api/advertising/quote', { method:'GET' });
+  assert.equal(quote.response.status, 405);
+});
+
+
+test('advertising quote acceptance, Razorpay verification, mismatch rejection, and idempotent finalization work end to end', async () => {
+  const inquiryId='41000000-0000-4000-8000-000000000001';
+  state.advertisingInquiries.set(inquiryId,{id:inquiryId,business_name:'Test ECU Workshop',contact_name:'Workshop Owner',email:'advertiser@example.invalid',phone:'+919999999999',ad_type:'banner',message:'A test advertising enquiry with sufficient detail.',status:'contacted',created_at:new Date().toISOString(),updated_at:new Date().toISOString()});
+  const startsAt=new Date(Date.now()+24*60*60*1000).toISOString();
+  const endsAt=new Date(Date.now()+8*24*60*60*1000).toISOString();
+  const expiresAt=new Date(Date.now()+12*60*60*1000).toISOString();
+  const created=await call('/api/admin/advertising/quotes',{method:'POST',token:tokens.admin,body:{inquiryId,amountPaise:12500,placement:'banner',startsAt,endsAt,expiresAt,terms:'Test quote terms agreed with the advertiser.',creativeRequirements:'Use an approved HTTPS image and destination.'}});
+  assert.equal(created.response.status,201,JSON.stringify(created.payload));
+  assert.equal(created.payload.item.amount_paise,12500);
+  assert.equal(created.payload.item.quote_version,1);
+  const quoteId=created.payload.item.id;
+
+  const issued=await call('/api/admin/advertising/quotes',{method:'PATCH',token:tokens.admin,body:{id:quoteId,action:'issue'}});
+  assert.equal(issued.response.status,200,JSON.stringify(issued.payload));
+  assert.equal(state.resendCalls,1);
+  const token=state.lastResendRequest.body.html.match(/advertising-quote\.html#([A-Za-z0-9_-]{43})/)?.[1];
+  assert.ok(token,'quote email must contain the one-time token in the URL fragment');
+  assert.equal([...state.advertisingQuotes.values()][0].acceptance_token_hash,hash(token));
+  assert.equal([...state.advertisingQuotes.values()][0].status,'issued');
+
+  const viewed=await call('/api/advertising/quote',{method:'POST',body:{action:'view',token}});
+  assert.equal(viewed.response.status,200);
+  assert.equal(viewed.payload.quote.amountPaise,12500);
+  const accepted=await call('/api/advertising/quote',{method:'POST',body:{action:'accept',token}});
+  assert.equal(accepted.response.status,200);
+  assert.equal(accepted.payload.status,'accepted');
+
+  const order=await call('/api/advertising/payment/create-order',{method:'POST',body:{token}});
+  assert.equal(order.response.status,200,JSON.stringify(order.payload));
+  assert.equal(order.payload.amount,12500);
+  assert.equal(state.razorOrderCalls,1);
+  assert.equal([...state.advertisingQuotes.values()][0].status,'payment_pending');
+  const signature=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update('order_TestLocal01|pay_TestLocal01').digest('hex');
+
+  const badSignature=await call('/api/advertising/payment/verify',{method:'POST',body:{token,razorpay_order_id:'order_TestLocal01',razorpay_payment_id:'pay_TestLocal01',razorpay_signature:'invalid'}});
+  assert.equal(badSignature.response.status,402);
+  assert.equal([...state.advertisingQuotes.values()][0].status,'payment_pending');
+
+  state.razorPaymentAmount=12400;
+  const wrongAmount=await call('/api/advertising/payment/verify',{method:'POST',body:{token,razorpay_order_id:'order_TestLocal01',razorpay_payment_id:'pay_TestLocal01',razorpay_signature:signature}});
+  assert.equal(wrongAmount.response.status,402);
+  assert.equal([...state.advertisingQuotes.values()][0].status,'payment_pending');
+
+  state.razorPaymentAmount=12500;
+  const verified=await call('/api/advertising/payment/verify',{method:'POST',body:{token,razorpay_order_id:'order_TestLocal01',razorpay_payment_id:'pay_TestLocal01',razorpay_signature:signature}});
+  assert.equal(verified.response.status,200,JSON.stringify(verified.payload));
+  assert.equal(verified.payload.status,'paid');
+  assert.equal([...state.advertisingQuotes.values()][0].status,'paid');
+  const payment=[...state.advertisingPayments.values()][0];
+  assert.equal(payment.status,'verified');
+  assert.equal(payment.provider_evidence_verified,true);
+
+  const duplicate=await call('/api/advertising/payment/verify',{method:'POST',body:{token,razorpay_order_id:'order_TestLocal01',razorpay_payment_id:'pay_TestLocal01',razorpay_signature:signature}});
+  assert.equal(duplicate.response.status,200);
+  assert.equal(duplicate.payload.status,'paid');
+  assert.equal([...state.advertisingPayments.values()].length,1);
 });
