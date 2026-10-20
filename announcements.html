@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101a19">
+<meta name="description" content="Official ECU SOLUTION announcements, workshop offers and approved advertising.">
+<link rel="canonical" href="https://ecufileservice.in/announcements.html"><title>Announcements & Offers | ECU SOLUTION</title><link rel="stylesheet" href="/styles.css">
+<style>
+.content-wrap{max-width:1080px;margin:auto;padding:clamp(40px,7vw,82px) 6%}.kicker{font:10px var(--mono);letter-spacing:.16em;color:#758b2c}.content-wrap h1{font:700 clamp(38px,6vw,68px)/1.06 var(--display);letter-spacing:-.05em;margin:18px 0}.content-wrap h1 span{color:#829b2e}.intro{max-width:660px;color:#626d66;font-size:15px;line-height:1.8}.content-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:32px}.content-card{background:#fff;border:1px solid var(--line);padding:24px;min-width:0}.content-card img{display:block;width:100%;max-height:250px;object-fit:cover;margin-bottom:18px}.tag{font:10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:#758b2c}.content-card h2{font:700 22px var(--display);margin:12px 0}.content-card p{font-size:13px;line-height:1.8;color:#66716a;white-space:pre-wrap;overflow-wrap:anywhere}.content-card a{display:inline-flex;margin-top:10px;color:#1a2924;font-size:12px;font-weight:700}.empty{grid-column:1/-1;padding:32px;border:1px dashed var(--line);color:#66716a;font-size:13px;line-height:1.8}.bottom-cta{margin-top:36px;padding:26px;background:#eaf0e5;display:flex;justify-content:space-between;align-items:center;gap:20px}.bottom-cta p{font-size:13px;color:#626d66;margin:6px 0 0}@media(max-width:650px){.content-grid{grid-template-columns:1fr}.bottom-cta{align-items:flex-start;flex-direction:column}}
+</style></head>
+<body>
+<div class="announcement"><span class="status-dot"></span> ECU SOLUTION · WORKSHOP UPDATES <span class="announcement-right">OFFICIAL NOTICES</span></div>
+<header class="site-header"><a class="brand" href="/" aria-label="ECU SOLUTION home"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 10h26v20H7z"/><path d="M12 15h5v10h-5zm11 0h5m-5 5h5m-5 5h5M3 15h4m-4 5h4m-4 5h4m26-10h4m-4 5h4m-4 5h4"/></svg></span><span class="brand-name">ECU SOLUTION <b>ANNOUNCEMENTS</b></span></a><nav class="desktop-nav" aria-label="Main navigation"><a href="/">File services</a><a href="/forum.html">Forum</a><a href="/store.html">Store</a><a href="/membership.html">Membership</a><a href="/advertise.html">Advertise</a></nav><a class="button button-lime" href="/#order">File services <span>↗</span></a></header>
+<main class="content-wrap"><p class="kicker">UPDATES · OFFERS · PARTNER ADS</p><h1>What’s new at<br><span>ECU SOLUTION.</span></h1><p class="intro">Find important service notices, workshop offers and approved partner promotions in one place. Time-limited items appear only during their scheduled dates.</p><div id="content-grid" class="content-grid" aria-live="polite"><div class="empty">Loading current announcements and offers…</div></div><section class="bottom-cta"><div><strong>Want to promote a workshop product or service?</strong><p>Send an advertising enquiry for review. Publication is subject to approval.</p></div><a class="button button-dark" href="/advertise.html">Advertise with us <span>↗</span></a></section></main>
+<script>
+(function(){
+ const grid=document.getElementById('content-grid');
+ function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
+ function safeHttps(value){try{const u=new URL(value);return u.protocol==='https:'?u.href:null;}catch{return null;}}
+ function render(items){
+  grid.replaceChildren();
+  const sorted=(Array.isArray(items)?items:[]).filter(x=>x&&['announcement','offer','ad'].includes(x.kind));
+  if(!sorted.length){grid.append(el('div','empty','There are no current announcements or offers. Please check back later.'));return;}
+  for(const item of sorted){
+   const card=el('article','content-card');card.append(el('span','tag',item.kind==='ad'?'Partner advertisement':item.kind==='offer'?'Workshop offer':'Important announcement'));
+   const image=safeHttps(item.image_url);if(image){const img=el('img');img.src=image;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';card.append(img);}
+   card.append(el('h2','',item.title||''));card.append(el('p','',item.body||''));
+   const url=safeHttps(item.cta_url);if(url&&item.cta_label){const a=el('a','',item.cta_label);a.href=url;a.target='_blank';a.rel='noopener noreferrer sponsored';card.append(a);}
+   grid.append(card);
+  }
+ }
+ fetch('/api/site-content',{headers:{Accept:'application/json'}}).then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load updates');render(d.items);}).catch(()=>{grid.replaceChildren(el('div','empty','Updates could not be loaded right now. Please try again later.'));});
+})();
+</script></body></html>
