@@ -40,3 +40,4 @@ jobs:
           node --check auth.js
           node --check admin.js
           node --check dev-checkout.js
+          node --check forum.js
