@@ -560,6 +560,12 @@ test('serves customer and admin pages', async () => {
   assert.match(customer.response.headers.get('permissions-policy') || '', /camera=\(self\)/);
   assert.match(customer.response.headers.get('permissions-policy') || '', /microphone=\(\)/);
   assert.match(customer.response.headers.get('permissions-policy') || '', /geolocation=\(\)/);
+  assert.equal(admin.response.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(admin.response.headers.get('x-frame-options'), 'DENY');
+  assert.equal(admin.response.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
+  assert.match(admin.response.headers.get('permissions-policy') || '', /camera=\(self\)/);
+  assert.match(admin.response.headers.get('permissions-policy') || '', /microphone=\(\)/);
+  assert.match(admin.response.headers.get('permissions-policy') || '', /geolocation=\(\)/);
   assert.match(adminJs.response.headers.get('content-type') || '', /text\/javascript/);
 });
 
