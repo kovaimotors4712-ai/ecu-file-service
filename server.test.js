@@ -1568,3 +1568,14 @@ test('homepage announcement and promotion slots are populated from the validated
   assert.match(adminHtml, /site-content-cancel-edit/);
   assert.match(serverSource, /forwardedFor\.length \? forwardedFor\[forwardedFor\.length - 1\]/);
 });
+
+
+test('announcement and advertiser tables grant access only to the trusted service role', () => {
+  const grants = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_grant_site_content_service_role.sql'), 'utf8');
+  const schema = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_site_announcements_advertising.sql'), 'utf8');
+  assert.match(grants, /grant select, insert, update on table public\.site_announcements to service_role/i);
+  assert.match(grants, /grant select, insert, update on table public\.advertising_inquiries to service_role/i);
+  assert.match(schema, /alter table public\.site_announcements enable row level security/i);
+  assert.match(schema, /alter table public\.advertising_inquiries enable row level security/i);
+  assert.doesNotMatch(schema, /create policy/i);
+});
