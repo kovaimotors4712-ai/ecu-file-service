@@ -91,7 +91,7 @@
  });
  $('check').addEventListener('click',async()=>{
    $('check').disabled=true;
-   try{if(lastPayment){await verify(lastPayment);}else{status('No verified payment receipt is available in this page. If payment was deducted, contact support with your Razorpay payment reference; do not pay again.',true);}}
+   try{if(lastPayment){await verify(lastPayment);}else{status('Checking the saved Razorpay order…');const d=await api('/api/advertising/payment/reconcile',{token});if(d.status==='paid'){quote.status='paid';showQuote(quote);status('Payment confirmed. Your advertisement still requires creative approval before publication.');}else{status('Payment has not been confirmed yet. Do not pay again; retry this check later.',true);}}}
    finally{$('check').disabled=false;}
  });
  load();
