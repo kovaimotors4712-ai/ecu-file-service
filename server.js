@@ -1643,6 +1643,33 @@ async function handleVerifyAdvertisingPayment(request, response) {
   return true;
 }
 
+async function handleReconcileAdvertisingPayment(request, response) {
+  if (request.method !== 'POST') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
+  if (!supabaseServiceRoleKey || !hasRazorpayConfig()) { jsonResponse(response, 503, { error:'Advertising payment recovery is unavailable.' }); return true; }
+  try {
+    const body = await readJson(request, 4096);
+    const quote = await findAdvertisingQuoteByToken(String(body?.token || ''));
+    if (!quote) { jsonResponse(response, 404, { error:'Advertising quote not found.' }); return true; }
+    if (quote.status === 'paid') { jsonResponse(response, 200, { status:'paid', quoteId:quote.id }); return true; }
+    if (!['accepted','payment_pending'].includes(quote.status)) { jsonResponse(response, 409, { error:'This quote is not awaiting payment.' }); return true; }
+    const token = serviceToken();
+    const rowsResponse = await supabaseRequest(token, 'rest/v1/advertising_payments?select=id,status,amount_paise,currency,provider_order_id&quote_id=eq.'+encodeURIComponent(quote.id)+'&status=in.(created,authorized,captured)&provider_order_id=not.is.null&order=created_at.desc&limit=1', { timeoutMs:12000 });
+    if (!rowsResponse.ok) { jsonResponse(response, 502, { error:'Saved advertising payment could not be loaded.' }); return true; }
+    const row = (await rowsResponse.json())?.[0];
+    if (!row) { jsonResponse(response, 409, { error:'No saved payment order exists for this quote yet.' }); return true; }
+    const order = await razorpayApi('orders/'+encodeURIComponent(row.provider_order_id));
+    if (order?.id!==row.provider_order_id || Number(order.amount)!==Number(quote.amount_paise) || order.currency!=='INR' || order?.notes?.advertising_quote_id!==quote.id || order?.notes?.advertising_payment_id!==row.id) { jsonResponse(response, 402, { error:'The saved Razorpay order does not match this quote.' }); return true; }
+    const result = await razorpayApi('orders/'+encodeURIComponent(row.provider_order_id)+'/payments');
+    const items = Array.isArray(result?.items) ? result.items : [];
+    const payment = items.find(item => item?.order_id===row.provider_order_id && item?.status==='captured' && Number(item.amount)===Number(quote.amount_paise) && item.currency==='INR');
+    if (!payment || !/^pay_[A-Za-z0-9]+$/.test(String(payment.id||''))) { jsonResponse(response, 409, { error:'Razorpay has not reported a captured payment for this quote yet. Do not pay again; retry this check later.' }); return true; }
+    const finalized = await supabaseRequest(token, 'rest/v1/rpc/efsi_finalize_advertising_payment', { method:'POST', body:{ p_quote_id:quote.id, p_payment_id:row.id, p_provider_order_id:row.provider_order_id, p_provider_payment_id:payment.id, p_amount_paise:quote.amount_paise, p_currency:'INR' }, timeoutMs:15000 });
+    if (!finalized.ok || (await finalized.json().catch(()=>false))!==true) { jsonResponse(response, 409, { error:'Razorpay reports payment captured, but the saved record could not be finalized safely. Contact support; do not pay again.' }); return true; }
+    jsonResponse(response, 200, { status:'paid', quoteId:quote.id });
+  } catch (error) { jsonResponse(response, error.statusCode || (error.code === 'RAZORPAY_UPSTREAM' ? 502 : 400), { error:error.message || 'Advertising payment recovery failed.' }); }
+  return true;
+}
+
 async function handleApi(request, response, url) {
   if (url.pathname === '/api/health') { jsonResponse(response, 200, { configured: hasSafeSupabaseConfig, paymentConfigured: paymentsConfigured(), paymentReadiness: paymentReadinessChecks() }); return true; }
   if (url.pathname === '/api/site-content') return handlePublicSiteContent(request, response);
@@ -1650,6 +1677,7 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/advertising/quote') return handlePublicAdvertisingQuote(request, response);
   if (url.pathname === '/api/advertising/payment/create-order') return handleCreateAdvertisingPayment(request, response);
   if (url.pathname === '/api/advertising/payment/verify') return handleVerifyAdvertisingPayment(request, response);
+  if (url.pathname === '/api/advertising/payment/reconcile') return handleReconcileAdvertisingPayment(request, response);
   if (url.pathname === '/api/advertising/inquiries') return handleAdvertisingInquiry(request, response);
   if (url.pathname === '/api/admin/site-content') return handleAdminSiteContent(request, response);
   if (url.pathname === '/api/admin/advertising/inquiries') return handleAdminAdvertisingInquiries(request, response);
