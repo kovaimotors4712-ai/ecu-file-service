@@ -21,7 +21,7 @@ const maxOriginalFileBytes = 50 * 1024 * 1024;
 const maxAirbagPhotoBytes = 10 * 1024 * 1024;
 const allowedAirbagPhotoMimes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const allowedCorsOrigins = new Set(['https://ecufileservice.in', 'https://www.ecufileservice.in']);
-const publicFiles = new Set(['index.html', 'admin.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'googlea2bbe9d2fd8bede2.html']);
+const publicFiles = new Set(['index.html', 'admin.html', 'advertising-quote.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'googlea2bbe9d2fd8bede2.html']);
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
@@ -1475,7 +1475,7 @@ async function handleAdminAdvertisingQuotes(request, response) {
       const body = await readJson(request, 12000);
       const inquiryId = String(body?.inquiryId || '');
       if (!/^[0-9a-f-]{36}$/i.test(inquiryId)) { jsonResponse(response, 400, { error:'Select a valid advertiser enquiry.' }); return true; }
-      const inquiryResult = await supabaseRequest(token, 'rest/v1/advertising_inquiries?select=id,business_name,contact_name,email& id=eq.' + encodeURIComponent(inquiryId) + '&limit=1'.replace(' ', ''), { timeoutMs:12000 });
+      const inquiryResult = await supabaseRequest(token, 'rest/v1/advertising_inquiries?select=id,business_name,contact_name,email&id=eq.' + encodeURIComponent(inquiryId) + '&limit=1'.replace(' ', ''), { timeoutMs:12000 });
       if (!inquiryResult.ok) { jsonResponse(response, 502, { error:'Advertiser enquiry could not be loaded.' }); return true; }
       const inquiry = (await inquiryResult.json())?.[0];
       if (!inquiry) { jsonResponse(response, 404, { error:'Advertiser enquiry not found.' }); return true; }
@@ -1495,7 +1495,7 @@ async function handleAdminAdvertisingQuotes(request, response) {
       const body = await readJson(request, 12000);
       const id = String(body?.id || '');
       if (!/^[0-9a-f-]{36}$/i.test(id)) { jsonResponse(response, 400, { error:'Invalid quote reference.' }); return true; }
-      const currentResult = await supabaseRequest(token, 'rest/v1/advertising_quotes?select=id,status& id=eq.' + encodeURIComponent(id) + '&limit=1'.replace(' ', ''), { timeoutMs:12000 });
+      const currentResult = await supabaseRequest(token, 'rest/v1/advertising_quotes?select=id,status&id=eq.' + encodeURIComponent(id) + '&limit=1'.replace(' ', ''), { timeoutMs:12000 });
       if (!currentResult.ok) { jsonResponse(response, 502, { error:'Quote could not be loaded.' }); return true; }
       const current = (await currentResult.json())?.[0];
       if (!current) { jsonResponse(response, 404, { error:'Quote not found.' }); return true; }
@@ -1552,7 +1552,12 @@ async function handlePublicAdvertisingQuote(request, response) {
       const body = await readJson(request, 4096);
       const token = String(body?.token || '');
       const quote = await findAdvertisingQuoteByToken(token);
-      if (!quote || new Date(quote.expires_at).getTime() <= Date.now()) { jsonResponse(response, 404, { error:'This quote is unavailable or has expired.' }); return true; }
+      if (!quote || new Date(quote.expires_at).getTime() <= Date.now() || ['declined','expired','cancelled','payment_failed'].includes(quote.status)) { jsonResponse(response, 404, { error:'This quote is unavailable or has expired.' }); return true; }
+      const inquiryResult = await supabaseRequest(serviceToken(), 'rest/v1/advertising_inquiries?select=business_name&id=eq.'+encodeURIComponent(quote.inquiry_id)+'&limit=1', { timeoutMs:12000 });
+      const inquiry = inquiryResult.ok ? (await inquiryResult.json())?.[0] : null;
+      const publicQuote = { id:quote.id, version:quote.quote_version, status:quote.status, amountPaise:quote.amount_paise, currency:quote.currency, placement:quote.placement, startsAt:quote.starts_at, endsAt:quote.ends_at, expiresAt:quote.expires_at, terms:quote.terms_snapshot, creativeRequirements:quote.creative_requirements, businessName:inquiry?.business_name || 'Advertiser' };
+      if (body.action === 'view') { jsonResponse(response, 200, { quote:publicQuote }); return true; }
+      if (body.action !== 'accept') { jsonResponse(response, 400, { error:'Unsupported quote action.' }); return true; }
       if (quote.status === 'accepted' || quote.status === 'payment_pending' || quote.status === 'paid') { jsonResponse(response, 200, { status:quote.status }); return true; }
       if (quote.status !== 'issued') { jsonResponse(response, 409, { error:'This quote cannot be accepted in its current state.' }); return true; }
       const result = await supabaseRequest(serviceToken(), 'rest/v1/advertising_quotes?id=eq.'+encodeURIComponent(quote.id)+'&status=eq.issued&expires_at=gt.'+encodeURIComponent(new Date().toISOString())+'&select=id,status', { method:'PATCH', prefer:'return=representation', body:{ status:'accepted', accepted_at:new Date().toISOString(), updated_at:new Date().toISOString() }, timeoutMs:12000 });
