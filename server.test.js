@@ -1710,6 +1710,7 @@ test('advertising quote flow keeps tokens out of URLs and verifies Razorpay paym
   assert.ok(serverSource.includes("createHmac('sha256', razorpayKeySecret).update(providerOrderId+'|'+providerPaymentId)"));
   assert.match(serverSource, /rpc\/efsi_finalize_advertising_payment/);
   assert.match(serverSource, /status:'creating'/);
+  assert.match(serverSource, /STALE_ORDER_CREATION/);
   assert.match(serverSource, /A paid advertising quote is required before publishing an advertisement/);
   assert.match(quotePage, /history\.replaceState/);
   assert.ok(quotePage.includes("api('/api/advertising/quote'"));
