@@ -416,6 +416,58 @@
     }
   };
 
+
+  const siteContentForm = document.querySelector('#site-content-form');
+  const siteContentMessage = document.querySelector('#site-content-message');
+  async function adminApi(path, options = {}) {
+    const token = await backend.getAccessToken();
+    const response = await fetch(path, { ...options, headers: { ...(options.body ? {'Content-Type':'application/json'} : {}), Authorization:'Bearer '+token, ...(options.headers||{}) } });
+    const result = await parseJson(response);
+    if (!response.ok) throw new Error(result.error || 'The request could not be completed.');
+    return result;
+  }
+  function localDateTime(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const local = new Date(date.getTime() - date.getTimezoneOffset()*60000);
+    return local.toISOString().slice(0,16);
+  }
+  async function loadSiteContent() {
+    const list = document.querySelector('#site-content-list');
+    try {
+      const result = await adminApi('/api/admin/site-content');
+      list.innerHTML = (result.items||[]).map(item => '<article class="admin-order-card" style="padding:14px;margin-bottom:10px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><div><span class="form-kicker">'+escape(item.kind)+' · '+escape(item.placement)+'</span><h3>'+escape(item.title)+'</h3><p>'+escape(item.body||'')+'</p><small>'+escape(item.is_published?'Published':'Draft / hidden')+' · Starts '+escape(item.starts_at?new Date(item.starts_at).toLocaleString():'now')+(item.ends_at?' · Ends '+escape(new Date(item.ends_at).toLocaleString()):'')+'</small></div><button type="button" class="button button-ghost" data-content-id="'+escape(item.id)+'" data-published="'+String(Boolean(item.is_published))+'">'+(item.is_published?'Hide':'Publish')+'</button></div></article>').join('') || '<p>No announcements, offers or ads have been created.</p>';
+      list.querySelectorAll('button[data-content-id]').forEach(button => button.addEventListener('click', async () => {
+        button.disabled = true;
+        try { await adminApi('/api/admin/site-content',{method:'PATCH',body:JSON.stringify({id:button.dataset.contentId,is_published:button.dataset.published!=='true'})}); await loadSiteContent(); }
+        catch(error){siteContentMessage.textContent=error.message;siteContentMessage.classList.add('admin-error');}
+        finally{button.disabled=false;}
+      }));
+    } catch(error) { list.textContent=error.message; }
+  }
+  async function loadAdvertisingInquiries() {
+    const list = document.querySelector('#advertising-inquiry-list');
+    try {
+      const result = await adminApi('/api/admin/advertising/inquiries');
+      list.innerHTML = (result.items||[]).map(item => '<article class="admin-order-card" style="padding:14px;margin-bottom:10px"><span class="form-kicker">'+escape(item.ad_type)+' · '+escape(new Date(item.created_at).toLocaleString())+'</span><h3>'+escape(item.business_name)+'</h3><p>'+escape(item.contact_name)+' · '+escape(item.email)+' · '+escape(item.phone)+'</p>'+(item.website?'<p><a href="'+escape(item.website)+'" target="_blank" rel="noopener noreferrer">'+escape(item.website)+'</a></p>':'')+'<p>'+escape(item.message)+'</p><label>Status <select data-inquiry-id="'+escape(item.id)+'"><option value="new">New</option><option value="contacted">Contacted</option><option value="approved">Approved</option><option value="declined">Declined</option><option value="closed">Closed</option></select></label></article>').join('') || '<p>No advertiser enquiries received yet.</p>';
+      list.querySelectorAll('select[data-inquiry-id]').forEach(select => {
+        const item=(result.items||[]).find(x=>x.id===select.dataset.inquiryId); select.value=item?.status||'new';
+        select.addEventListener('change',async()=>{select.disabled=true;try{await adminApi('/api/admin/advertising/inquiries',{method:'PATCH',body:JSON.stringify({id:select.dataset.inquiryId,status:select.value})});document.querySelector('#advertising-inquiry-message').textContent='Enquiry status updated.';}catch(error){document.querySelector('#advertising-inquiry-message').textContent=error.message;select.value=item?.status||'new';}finally{select.disabled=false;}});
+      });
+    } catch(error) { list.textContent=error.message; }
+  }
+  siteContentForm?.addEventListener('submit', async event => {
+    event.preventDefault(); const button=siteContentForm.querySelector('button[type="submit"]');button.disabled=true;siteContentMessage.classList.remove('admin-error');siteContentMessage.textContent='Saving…';
+    try {
+      const data=new FormData(siteContentForm);
+      const value={kind:data.get('kind'),placement:data.get('placement'),title:data.get('title'),body:data.get('body'),image_url:data.get('image_url'),cta_label:data.get('cta_label'),cta_url:data.get('cta_url'),starts_at:data.get('starts_at')?new Date(data.get('starts_at')).toISOString():null,ends_at:data.get('ends_at')?new Date(data.get('ends_at')).toISOString():null,is_published:data.get('is_published')==='on'};
+      await adminApi('/api/admin/site-content',{method:'POST',body:JSON.stringify(value)});
+      siteContentForm.reset();siteContentMessage.textContent='Saved. The public page will show it when published and within its date window.';await loadSiteContent();
+    } catch(error) { siteContentMessage.textContent=error.message;siteContentMessage.classList.add('admin-error'); }
+    finally { button.disabled=false; }
+  });
+
   async function enterAdmin(){
     const session = backend.getSession();
     if (!session?.user) { setSignedOut(); return; }
@@ -429,6 +481,8 @@
     document.querySelector('#admin-signout').hidden = false;
     await loadPricing();
     await loadOrders();
+    await loadSiteContent();
+    await loadAdvertisingInquiries();
     subscribeRealtime();
   }
 
