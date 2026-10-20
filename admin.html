@@ -70,6 +70,22 @@
           <input type="hidden" name="id" value=""><div style="grid-column:1/-1"><button class="button button-dark" type="submit">Save website content →</button><button id="site-content-cancel-edit" class="button button-ghost" type="button" hidden>Cancel edit</button><p id="site-content-message" class="admin-message" role="status"></p></div>
         </form>
         <div style="margin-top:20px"><h3>Published and draft content</h3><div id="site-content-list" class="admin-order-list">Loading website content…</div></div>
+        <div style="margin-top:24px;border-top:1px solid #e3e8df;padding-top:22px">
+          <h3>Advertising quotes & payments</h3>
+          <p>Create a written INR quote for an enquiry. Issuing sends a private, expiring quote link by email; payment is separate from creative approval and publication.</p>
+          <form id="advertising-quote-form" class="pricing-form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:16px 0">
+            <label>Advertiser enquiry<select name="inquiryId" id="advertising-quote-inquiry" required><option value="">Loading enquiries…</option></select></label>
+            <label>Quote amount (INR)<input name="amount" type="number" min="0.01" max="1000000000" step="0.01" required inputmode="decimal" placeholder="Enter agreed amount"></label>
+            <label>Placement<select name="placement" required><option value="banner">Announcement strip / banner</option><option value="homepage">Homepage card</option><option value="sidebar">Sidebar slot</option></select></label>
+            <label>Start date/time<input name="startsAt" type="datetime-local" required></label>
+            <label>End date/time<input name="endsAt" type="datetime-local" required></label>
+            <label>Quote expiry date/time<input name="expiresAt" type="datetime-local" required></label>
+            <label style="grid-column:1/-1">Written terms (required)<textarea name="terms" maxlength="8000" rows="4" required placeholder="Enter the terms actually agreed with the advertiser. Do not assume tax/refund terms."></textarea></label>
+            <label style="grid-column:1/-1">Creative requirements (optional)<textarea name="creativeRequirements" maxlength="4000" rows="2" placeholder="Image dimensions, file format, destination link requirements, etc."></textarea></label>
+            <div style="grid-column:1/-1"><button class="button button-dark" type="submit">Save draft quote →</button><p id="advertising-quote-message" class="admin-message" role="status"></p></div>
+          </form>
+          <div id="advertising-quote-list" class="admin-order-list">Loading quotes…</div>
+        </div>
         <div style="margin-top:24px"><h3>Advertiser enquiries</h3><p>Review incoming advertising requests and update their status. Publishing an ad remains a separate approval step.</p><div id="advertising-inquiry-list" class="admin-order-list">Loading advertiser enquiries…</div><p id="advertising-inquiry-message" class="admin-message" role="status"></p></div>
       </section>
 
