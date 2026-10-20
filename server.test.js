@@ -160,7 +160,7 @@ function filteredAdvertisingRows(rows, searchParams) {
     });
   }
   const limit=Number(searchParams.get('limit'));
-  if(Number.isInteger(limit)&&limit>=0)rows=rows.slice(0,limit);
+  if(searchParams.has('limit')&&Number.isInteger(limit)&&limit>=0)rows=rows.slice(0,limit);
   return rows;
 }
 
