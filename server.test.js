@@ -625,7 +625,7 @@ test('keeps forum assets unavailable until its database migration is verified', 
 
 test('forum verification SQL is read-only and checks the required security controls', () => {
   const verifier = fs.readFileSync(path.join(__dirname, 'supabase/verify_forum_core.sql'), 'utf8');
-  assert.doesNotMatch(verifier, /^\\s*(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|GRANT|REVOKE|BEGIN|COMMIT|TRUNCATE|CALL|NOTIFY)\\b/im);
+  assert.doesNotMatch(verifier, /^\s*(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|GRANT|REVOKE|BEGIN|COMMIT|TRUNCATE|CALL|NOTIFY)\b/im);
   for (const required of [
     'forum_categories_read_active',
     'forum_profiles_insert_owner',
