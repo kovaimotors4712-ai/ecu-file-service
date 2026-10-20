@@ -21,7 +21,7 @@ const maxOriginalFileBytes = 50 * 1024 * 1024;
 const maxAirbagPhotoBytes = 10 * 1024 * 1024;
 const allowedAirbagPhotoMimes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const allowedCorsOrigins = new Set(['https://ecufileservice.in', 'https://www.ecufileservice.in']);
-const publicFiles = new Set(['index.html', 'admin.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'googlea2bbe9d2fd8bede2.html']);
+const publicFiles = new Set(['index.html', 'admin.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'googlea2bbe9d2fd8bede2.html']);
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
@@ -1294,8 +1294,138 @@ async function cleanupExpiredCheckoutIntents() {
   }
 }
 
+
+const advertisingSubmitAttempts = new Map();
+function cleanSiteText(value, max = 4000) { return String(value ?? '').trim().slice(0, max); }
+function validHttpsUrl(value) {
+  if (!value) return true;
+  try { const parsed = new URL(value); return parsed.protocol === 'https:' && !parsed.username && !parsed.password; } catch { return false; }
+}
+function announcementPayload(body, adminId, partial = false) {
+  const kinds = ['announcement','offer','ad'];
+  const placements = ['banner','homepage','sidebar'];
+  const out = {};
+  if (!partial || body.kind !== undefined) { if (!kinds.includes(body.kind)) throw Object.assign(new Error('Choose announcement, offer or ad.'), { statusCode: 400 }); out.kind = body.kind; }
+  if (!partial || body.title !== undefined) { out.title = cleanSiteText(body.title, 180); if (!out.title) throw Object.assign(new Error('A title is required.'), { statusCode: 400 }); }
+  if (!partial || body.body !== undefined) { out.body = cleanSiteText(body.body, 4000); }
+  for (const field of ['image_url','cta_url']) {
+    if (!partial || body[field] !== undefined) {
+      const value = cleanSiteText(body[field], 1000);
+      if (!validHttpsUrl(value)) throw Object.assign(new Error(field === 'image_url' ? 'Image URL must use HTTPS.' : 'Link URL must use HTTPS.'), { statusCode: 400 });
+      out[field] = value || null;
+    }
+  }
+  if (!partial || body.cta_label !== undefined) out.cta_label = cleanSiteText(body.cta_label, 80) || null;
+  if (!partial || body.placement !== undefined) { const value = body.placement || 'banner'; if (!placements.includes(value)) throw Object.assign(new Error('Choose a valid placement.'), { statusCode: 400 }); out.placement = value; }
+  for (const field of ['starts_at','ends_at']) {
+    if (!partial || body[field] !== undefined) {
+      const value = body[field] ? new Date(body[field]) : null;
+      if (body[field] && Number.isNaN(value.getTime())) throw Object.assign(new Error('Enter valid start and end dates.'), { statusCode: 400 });
+      out[field] = value ? value.toISOString() : (field === 'starts_at' ? new Date().toISOString() : null);
+    }
+  }
+  if (out.starts_at && out.ends_at && new Date(out.ends_at) <= new Date(out.starts_at)) throw Object.assign(new Error('End date must be after start date.'), { statusCode: 400 });
+  if (!partial || body.is_published !== undefined) out.is_published = body.is_published === true;
+  if (adminId && !partial) out.created_by = adminId;
+  out.updated_at = new Date().toISOString();
+  return out;
+}
+async function handlePublicSiteContent(request, response) {
+  if (request.method !== 'GET') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
+  if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error: 'Site content is temporarily unavailable.' }); return true; }
+  const now = encodeURIComponent(new Date().toISOString());
+  const result = await supabaseRequest(serviceToken(), 'rest/v1/site_announcements?select=id,kind,title,body,image_url,cta_label,cta_url,placement,starts_at,ends_at&is_published=eq.true&starts_at=lte.' + now + '&or=(ends_at.is.null,ends_at.gt.' + now + ')&order=created_at.desc&limit=30', { timeoutMs: 12000 });
+  if (!result.ok) { jsonResponse(response, 502, { error: 'Site content could not be loaded.' }); return true; }
+  jsonResponse(response, 200, { items: await result.json() });
+  return true;
+}
+async function handleAdminSiteContent(request, response) {
+  const admin = await requireAdmin(request);
+  if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
+  if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error: 'Site content management is unavailable.' }); return true; }
+  const token = serviceToken();
+  if (request.method === 'GET') {
+    const result = await supabaseRequest(token, 'rest/v1/site_announcements?select=*&order=created_at.desc&limit=100', { timeoutMs: 12000 });
+    if (!result.ok) { jsonResponse(response, 502, { error: 'Site content could not be loaded.' }); return true; }
+    jsonResponse(response, 200, { items: await result.json() }); return true;
+  }
+  if (request.method === 'POST') {
+    try {
+      const body = await readJson(request, 8192);
+      const payload = announcementPayload(body, admin.id);
+      const result = await supabaseRequest(token, 'rest/v1/site_announcements?select=*', { method:'POST', prefer:'return=representation', body:payload, timeoutMs:12000 });
+      if (!result.ok) { jsonResponse(response, 502, { error:'Announcement could not be saved.' }); return true; }
+      jsonResponse(response, 201, { item:(await result.json())?.[0] || null }); return true;
+    } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Invalid content.' }); return true; }
+  }
+  if (request.method === 'PATCH') {
+    try {
+      const body = await readJson(request, 8192);
+      const id = String(body.id || '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) { jsonResponse(response, 400, { error:'Invalid content reference.' }); return true; }
+      const payload = announcementPayload(body, admin.id, true);
+      const result = await supabaseRequest(token, 'rest/v1/site_announcements?id=eq.'+encodeURIComponent(id)+'&select=*', { method:'PATCH', prefer:'return=representation', body:payload, timeoutMs:12000 });
+      if (!result.ok) { jsonResponse(response, 502, { error:'Announcement could not be updated.' }); return true; }
+      const rows = await result.json();
+      if (!rows?.length) { jsonResponse(response, 404, { error:'Announcement not found.' }); return true; }
+      jsonResponse(response, 200, { item:rows[0] }); return true;
+    } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Invalid content.' }); return true; }
+  }
+  jsonResponse(response, 405, { error:'Method Not Allowed' }); return true;
+}
+async function handleAdvertisingInquiry(request, response) {
+  if (request.method !== 'POST') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
+  if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'Advertising enquiries are temporarily unavailable.' }); return true; }
+  const ip = String(request.socket?.remoteAddress || 'unknown').slice(0, 80);
+  const now = Date.now();
+  const recent = advertisingSubmitAttempts.get(ip) || [];
+  const allowed = recent.filter(t => now - t < 60 * 60 * 1000);
+  if (allowed.length >= 5) { jsonResponse(response, 429, { error:'Too many enquiries from this connection. Please try again later.' }); return true; }
+  try {
+    const body = await readJson(request, 8192);
+    if (cleanSiteText(body.website_trap, 100)) { jsonResponse(response, 202, { ok:true }); return true; }
+    const item = {
+      business_name:cleanSiteText(body.businessName,160), contact_name:cleanSiteText(body.contactName,120),
+      email:cleanSiteText(body.email,254).toLowerCase(), phone:cleanSiteText(body.phone,40),
+      website:cleanSiteText(body.website,500) || null, ad_type:body.adType, message:cleanSiteText(body.message,2000)
+    };
+    if (item.business_name.length < 1 || item.contact_name.length < 1 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item.email) || item.phone.length < 5 || item.message.length < 10 || !['banner','offer','sponsorship','other'].includes(item.ad_type) || !validHttpsUrl(item.website)) {
+      jsonResponse(response, 400, { error:'Please complete the required fields and use HTTPS for a website link.' }); return true;
+    }
+    const result = await supabaseRequest(serviceToken(), 'rest/v1/advertising_inquiries', { method:'POST', prefer:'return=minimal', body:item, timeoutMs:12000 });
+    if (!result.ok) { jsonResponse(response, 502, { error:'Your enquiry could not be saved. Please try again later.' }); return true; }
+    allowed.push(now); advertisingSubmitAttempts.set(ip, allowed);
+    jsonResponse(response, 201, { ok:true, message:'Thank you. Your advertising enquiry has been received.' }); return true;
+  } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Enquiry could not be submitted.' }); return true; }
+}
+async function handleAdminAdvertisingInquiries(request, response) {
+  const admin = await requireAdmin(request);
+  if (!admin) { jsonResponse(response, 403, { error:'Administrator role is required.' }); return true; }
+  if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'Advertising inbox is unavailable.' }); return true; }
+  const token = serviceToken();
+  if (request.method === 'GET') {
+    const result = await supabaseRequest(token, 'rest/v1/advertising_inquiries?select=*&order=created_at.desc&limit=100', { timeoutMs:12000 });
+    if (!result.ok) { jsonResponse(response, 502, { error:'Advertising enquiries could not be loaded.' }); return true; }
+    jsonResponse(response, 200, { items:await result.json() }); return true;
+  }
+  if (request.method === 'PATCH') {
+    const body = await readJson(request, 4096);
+    if (!/^[0-9a-f-]{36}$/i.test(String(body.id || '')) || !['new','contacted','approved','declined','closed'].includes(body.status)) { jsonResponse(response, 400, { error:'Invalid enquiry reference or status.' }); return true; }
+    const result = await supabaseRequest(token, 'rest/v1/advertising_inquiries?id=eq.'+encodeURIComponent(body.id)+'&select=id,status', { method:'PATCH', prefer:'return=representation', body:{ status:body.status, updated_at:new Date().toISOString() }, timeoutMs:12000 });
+    if (!result.ok) { jsonResponse(response, 502, { error:'Enquiry status could not be updated.' }); return true; }
+    const rows = await result.json();
+    if (!rows?.length) { jsonResponse(response, 404, { error:'Enquiry not found.' }); return true; }
+    jsonResponse(response, 200, { item:rows[0] }); return true;
+  }
+  jsonResponse(response, 405, { error:'Method Not Allowed' }); return true;
+}
+
 async function handleApi(request, response, url) {
   if (url.pathname === '/api/health') { jsonResponse(response, 200, { configured: hasSafeSupabaseConfig, paymentConfigured: paymentsConfigured(), paymentReadiness: paymentReadinessChecks() }); return true; }
+  if (url.pathname === '/api/site-content') return handlePublicSiteContent(request, response);
+  if (url.pathname === '/api/advertising/inquiries') return handleAdvertisingInquiry(request, response);
+  if (url.pathname === '/api/admin/site-content') return handleAdminSiteContent(request, response);
+  if (url.pathname === '/api/admin/advertising/inquiries') return handleAdminAdvertisingInquiries(request, response);
   if (url.pathname === '/api/pricing') return handlePricing(request, response);
   if (url.pathname === '/api/checkout/intents') return handleCreateCheckoutIntent(request, response);
   const stageMatch = url.pathname.match(/^\/api\/checkout\/intents\/([0-9a-f-]{36})\/stage$/i);

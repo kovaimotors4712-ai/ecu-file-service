@@ -1529,3 +1529,26 @@ test('second-stage trigger permits normal first-stage paid-order inserts with de
   assert.match(migration, /NEW\.second_stage_status IS NULL OR NEW\.second_stage_status = 'pending'/i);
   assert.match(migration, /BEFORE INSERT OR UPDATE ON public\.orders/i);
 });
+
+
+test('announcement and advertising features keep public writes behind validated server routes', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_site_announcements_advertising.sql'), 'utf8');
+  const announcementsPage = fs.readFileSync(path.join(__dirname, 'announcements.html'), 'utf8');
+  const advertisePage = fs.readFileSync(path.join(__dirname, 'advertise.html'), 'utf8');
+  const adminPage = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
+  assert.match(serverSource, /'announcements\.html', 'advertise\.html'/);
+  assert.match(serverSource, /url\.pathname === '\/api\/site-content'/);
+  assert.match(serverSource, /url\.pathname === '\/api\/advertising\/inquiries'/);
+  assert.match(serverSource, /async function handleAdminSiteContent[\s\S]*requireAdmin\(request\)/);
+  assert.match(serverSource, /async function handleAdminAdvertisingInquiries[\s\S]*requireAdmin\(request\)/);
+  assert.match(serverSource, /advertisingSubmitAttempts/);
+  assert.match(serverSource, /validHttpsUrl/);
+  assert.match(migration, /alter table public\.site_announcements enable row level security/i);
+  assert.match(migration, /alter table public\.advertising_inquiries enable row level security/i);
+  assert.doesNotMatch(migration, /create policy/i);
+  assert.match(announcementsPage, /\/api\/site-content/);
+  assert.match(advertisePage, /\/api\/advertising\/inquiries/);
+  assert.match(adminPage, /site-content-form/);
+  assert.match(adminPage, /advertising-inquiry-list/);
+});
