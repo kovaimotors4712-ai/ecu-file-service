@@ -606,6 +606,23 @@ test('does not expose project secrets, fixtures, or migration files', async () =
   }
 });
 
+test('keeps forum assets unavailable until its database migration is verified', async () => {
+  for (const name of ['forum.html', 'forum.css', 'forum.js', 'supabase/migrations/20261020_forum_core.sql', 'supabase/verify_forum_core.sql']) {
+    const res = await fetch(baseUrl + '/' + name);
+    assert.equal(res.status, 404, name);
+  }
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const forumSource = fs.readFileSync(path.join(__dirname, 'forum.js'), 'utf8');
+  const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_forum_core.sql'), 'utf8');
+  assert.doesNotMatch(serverSource, /forum\\.html|forum\\.css|forum\\.js/);
+  assert.match(forumSource, /escapeHtml/);
+  assert.match(forumSource, /forum_reports/);
+  assert.doesNotMatch(forumSource, /storage\\/v1\\/object|forum_files/);
+  assert.match(migration, /ENABLE ROW LEVEL SECURITY/i);
+  assert.match(migration, /forum_enforce_rate_limit/i);
+  assert.match(migration, /forum_is_moderator/i);
+});
+
 test('serves exact Google verification file googlea2bbe9d2fd8bede2.html and blocks arbitrary html files', async () => {
   const good = await fetch(`${baseUrl}/googlea2bbe9d2fd8bede2.html`);
   assert.equal(good.status, 200);
