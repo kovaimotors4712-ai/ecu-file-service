@@ -441,7 +441,7 @@
       list.querySelectorAll('button[data-edit-content-id]').forEach(button => button.addEventListener('click', () => {
         const item=(result.items||[]).find(x=>x.id===button.dataset.editContentId); if(!item)return;
         const set=(name,value)=>{const field=siteContentForm.elements.namedItem(name);if(field)field.value=value??'';};
-        set('id',item.id);set('kind',item.kind);set('placement',item.placement);set('title',item.title);set('body',item.body);set('image_url',item.image_url);set('cta_label',item.cta_label);set('cta_url',item.cta_url);set('starts_at',localDateTime(item.starts_at));set('ends_at',localDateTime(item.ends_at));
+        set('id',item.id);set('kind',item.kind);set('placement',item.placement);set('advertising_quote_id',item.advertising_quote_id);set('title',item.title);set('body',item.body);set('image_url',item.image_url);set('cta_label',item.cta_label);set('cta_url',item.cta_url);set('starts_at',localDateTime(item.starts_at));set('ends_at',localDateTime(item.ends_at));
         siteContentForm.elements.namedItem('is_published').checked=Boolean(item.is_published);
         siteContentForm.querySelector('button[type="submit"]').textContent='Update website content →';
         document.querySelector('#site-content-cancel-edit').hidden=false;
@@ -462,6 +462,19 @@
     document.querySelector('#site-content-cancel-edit').hidden=true;
   }
   document.querySelector('#site-content-cancel-edit')?.addEventListener('click',resetSiteContentForm);
+  const contentKindField=siteContentForm?.elements.namedItem('kind');
+  const contentPublishedField=siteContentForm?.elements.namedItem('is_published');
+  const contentQuoteField=siteContentForm?.elements.namedItem('advertising_quote_id');
+  function updateAdQuoteRequirement(){
+    if(!contentQuoteField)return;
+    const required=contentKindField?.value==='ad'&&contentPublishedField?.checked;
+    contentQuoteField.required=Boolean(required);
+    contentQuoteField.setCustomValidity(required&&!contentQuoteField.value?'Select a paid quote before publishing an advertisement.':'');
+  }
+  contentKindField?.addEventListener('change',updateAdQuoteRequirement);
+  contentPublishedField?.addEventListener('change',updateAdQuoteRequirement);
+  contentQuoteField?.addEventListener('change',updateAdQuoteRequirement);
+
   async function loadAdvertisingInquiries() {
     const list = document.querySelector('#advertising-inquiry-list');
     try {
@@ -485,6 +498,12 @@
     const list=document.querySelector('#advertising-quote-list');if(!list)return;
     try{
       const result=await adminApi('/api/admin/advertising/quotes');
+      const adQuoteSelect=document.querySelector('#site-content-advertising-quote');
+      if(adQuoteSelect){
+        const previous=adQuoteSelect.value;
+        adQuoteSelect.innerHTML='<option value="">Not linked (announcements/offers only)</option>'+(result.items||[]).filter(item=>item.status==='paid').map(item=>'<option value="'+escape(item.id)+'">Paid quote v'+escape(item.quote_version)+' · '+escape((Number(item.amount_paise)/100).toLocaleString('en-IN',{style:'currency',currency:'INR'}))+' · '+escape(item.placement)+'</option>').join('');
+        if(previous)adQuoteSelect.value=previous;
+      }
       list.innerHTML=(result.items||[]).map(item=>{
         const inquiry=Array.isArray(item.advertising_inquiries)?item.advertising_inquiries[0]:item.advertising_inquiries;
         const amount=(Number(item.amount_paise)/100).toLocaleString('en-IN',{style:'currency',currency:'INR'});
@@ -522,7 +541,7 @@
     event.preventDefault(); const button=siteContentForm.querySelector('button[type="submit"]');button.disabled=true;siteContentMessage.classList.remove('admin-error');siteContentMessage.textContent='Saving…';
     try {
       const data=new FormData(siteContentForm), id=String(data.get('id')||'').trim();
-      const value={kind:data.get('kind'),placement:data.get('placement'),title:data.get('title'),body:data.get('body'),image_url:data.get('image_url'),cta_label:data.get('cta_label'),cta_url:data.get('cta_url'),starts_at:data.get('starts_at')?new Date(data.get('starts_at')).toISOString():null,ends_at:data.get('ends_at')?new Date(data.get('ends_at')).toISOString():null,is_published:data.get('is_published')==='on'};
+      const value={kind:data.get('kind'),placement:data.get('placement'),advertising_quote_id:data.get('advertising_quote_id')||null,title:data.get('title'),body:data.get('body'),image_url:data.get('image_url'),cta_label:data.get('cta_label'),cta_url:data.get('cta_url'),starts_at:data.get('starts_at')?new Date(data.get('starts_at')).toISOString():null,ends_at:data.get('ends_at')?new Date(data.get('ends_at')).toISOString():null,is_published:data.get('is_published')==='on'};
       if(id)value.id=id;
       await adminApi('/api/admin/site-content',{method:id?'PATCH':'POST',body:JSON.stringify(value)});
       resetSiteContentForm();siteContentMessage.textContent='Saved. The public page will show it when published and within its date window.';await loadSiteContent();
@@ -543,9 +562,9 @@
     document.querySelector('#admin-signout').hidden = false;
     await loadPricing();
     await loadOrders();
-    await loadSiteContent();
     await loadAdvertisingInquiries();
     await loadAdvertisingQuotes();
+    await loadSiteContent();
     subscribeRealtime();
   }
 
