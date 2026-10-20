@@ -507,6 +507,31 @@ async function paidPayPalIntent() {
   return { created, paymentOrder, capture };
 }
 
+test('checkout insert failures do not expose raw database errors to customers', async () => {
+  setTestUpstreamRequest((urlValue, options = {}) => {
+    const url = new URL(urlValue);
+    if (url.pathname === '/rest/v1/checkout_intents' && String(options.method || 'GET').toUpperCase() === 'POST') {
+      return response(500, {
+        code: '42501',
+        message: 'SENSITIVE_DATABASE_MESSAGE',
+        details: 'SENSITIVE_SCHEMA_DETAILS',
+        hint: 'SENSITIVE_INTERNAL_HINT'
+      });
+    }
+    return upstream(urlValue, options);
+  });
+  try {
+    const { request } = customerRequest();
+    const result = await call('/api/checkout/intents', { method: 'POST', token: tokens.customer, body: { request } });
+    const body = JSON.stringify(result.payload);
+    assert.equal(result.response.status, 400);
+    assert.match(body, /The secure checkout could not be saved\. Please retry\./);
+    assert.doesNotMatch(body, /SENSITIVE_DATABASE_MESSAGE|SENSITIVE_SCHEMA_DETAILS|SENSITIVE_INTERNAL_HINT|42501/);
+  } finally {
+    setTestUpstreamRequest(upstream);
+  }
+});
+
 test('serves customer and admin pages', async () => {
   const customer = await call('/');
   const admin = await call('/admin.html');
@@ -529,6 +554,12 @@ test('serves customer and admin pages', async () => {
   assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
   assert.match(airbagSeo.payload,/canonical.*airbag-crash-clear\.html/);
   assert.match(customer.response.headers.get('content-type') || '', /text\/html/);
+  assert.equal(customer.response.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(customer.response.headers.get('x-frame-options'), 'DENY');
+  assert.equal(customer.response.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
+  assert.match(customer.response.headers.get('permissions-policy') || '', /camera=\(self\)/);
+  assert.match(customer.response.headers.get('permissions-policy') || '', /microphone=\(\)/);
+  assert.match(customer.response.headers.get('permissions-policy') || '', /geolocation=\(\)/);
   assert.match(adminJs.response.headers.get('content-type') || '', /text\/javascript/);
 });
 
