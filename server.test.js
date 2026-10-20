@@ -54,6 +54,10 @@ const state = {
   orderMessages: new Map(),
   objects: new Map(),
   outbox: new Map(),
+  advertisingInquiries: new Map(),
+  advertisingQuotes: new Map(),
+  advertisingPayments: new Map(),
+  advertisingAudit: new Map(),
   razorOrderCalls: 0,
   paypalOrderCalls: 0,
   paypalCaptureCalls: 0,
@@ -74,7 +78,7 @@ const state = {
 };
 
 function resetState() {
-  for (const map of [state.intents, state.orders, state.orderFiles, state.orderAttachments, state.orderMessages, state.objects, state.outbox]) map.clear();
+  for (const map of [state.intents, state.orders, state.orderFiles, state.orderAttachments, state.orderMessages, state.objects, state.outbox, state.advertisingInquiries, state.advertisingQuotes, state.advertisingPayments, state.advertisingAudit]) map.clear();
   state.razorOrderCalls = 0;
   state.paypalOrderCalls = 0;
   state.paypalCaptureCalls = 0;
@@ -138,6 +142,28 @@ function filteredRows(rows, searchParams) {
   return rows;
 }
 
+function filteredAdvertisingRows(rows, searchParams) {
+  for (const [key, value] of searchParams.entries()) {
+    if (key === 'select' || key === 'order' || key === 'limit') continue;
+    if (value.startsWith('eq.')) rows = rows.filter(row => String(row[key] ?? '') === value.slice(3));
+    else if (value.startsWith('in.(')) rows = rows.filter(row => value.slice(4, -1).split(',').includes(String(row[key] ?? '')));
+    else if (value === 'not.is.null') rows = rows.filter(row => row[key] !== null && row[key] !== undefined);
+    else if (value.startsWith('gt.')) rows = rows.filter(row => String(row[key] ?? '') !== '' && new Date(row[key]).getTime() > new Date(value.slice(3)).getTime());
+  }
+  const order = searchParams.get('order');
+  if (order) {
+    const [key, direction] = order.split('.');
+    rows.sort((a,b) => {
+      const av=a[key],bv=b[key];
+      const compare=typeof av==='number'&&typeof bv==='number'?av-bv:String(av??'').localeCompare(String(bv??''));
+      return direction==='desc'?-compare:compare;
+    });
+  }
+  const limit=Number(searchParams.get('limit'));
+  if(Number.isInteger(limit)&&limit>=0)rows=rows.slice(0,limit);
+  return rows;
+}
+
 const upstream = async (urlValue, options = {}) => {
   const url = new URL(urlValue);
   const method = options.method || 'GET';
@@ -161,6 +187,7 @@ const upstream = async (urlValue, options = {}) => {
       state.razorOrderCalls += 1;
       const body = JSON.parse(options.body);
       state.razorOrderNotes = body.notes;
+      state.razorOrderAmount = body.amount; state.razorOrderCurrency = body.currency; state.razorPaymentAmount = body.amount; state.razorPaymentCurrency = body.currency; state.razorPaymentOrderId = 'order_TestLocal01';
       return response(200, { id: 'order_TestLocal01', amount: body.amount, currency: body.currency, notes: body.notes });
     }
     if (url.pathname === '/v1/orders/order_TestLocal01') {
@@ -212,6 +239,69 @@ const upstream = async (urlValue, options = {}) => {
     state.resendRequests.push(state.lastResendRequest);
     if (state.resendShouldFail) return response(500, { message: 'synthetic Resend outage' });
     return response(200, { id: 'email-local-1' });
+  }
+
+  if (url.pathname === '/rest/v1/advertising_inquiries') {
+    if (method === 'GET') return response(200, filteredAdvertisingRows([...state.advertisingInquiries.values()].map(row=>({...row})),url.searchParams));
+    if (method === 'POST') {
+      const body=JSON.parse(options.body),id=crypto.randomUUID(),now=new Date().toISOString();
+      const row={id,status:'new',created_at:now,updated_at:now,...body};state.advertisingInquiries.set(id,row);
+      return response(201,[{...row}]);
+    }
+    if (method === 'PATCH') {
+      const rows=filteredAdvertisingRows([...state.advertisingInquiries.values()],url.searchParams),body=JSON.parse(options.body);
+      for(const row of rows)Object.assign(row,body,{updated_at:new Date().toISOString()});
+      return response(200,rows.map(row=>({...row})));
+    }
+  }
+  if (url.pathname === '/rest/v1/advertising_quotes') {
+    if (method === 'GET') {
+      let rows=filteredAdvertisingRows([...state.advertisingQuotes.values()].map(row=>({...row})),url.searchParams);
+      if(String(url.searchParams.get('select')||'').includes('advertising_inquiries(')) rows=rows.map(row=>({...row,advertising_inquiries:state.advertisingInquiries.has(row.inquiry_id)?{...state.advertisingInquiries.get(row.inquiry_id)}:null,advertising_payments:[...state.advertisingPayments.values()].filter(p=>p.quote_id===row.id).map(p=>({...p}))}));
+      return response(200,rows);
+    }
+    if (method === 'POST') {
+      const body=JSON.parse(options.body);
+      if([...state.advertisingQuotes.values()].some(row=>row.inquiry_id===body.inquiry_id&&row.quote_version===body.quote_version))return response(409,{message:'duplicate quote version'});
+      const id=crypto.randomUUID(),now=new Date().toISOString();
+      const row={id,status:'draft',currency:'INR',created_at:now,updated_at:now,...body};state.advertisingQuotes.set(id,row);
+      return response(201,[{...row}]);
+    }
+    if (method === 'PATCH') {
+      const rows=filteredAdvertisingRows([...state.advertisingQuotes.values()],url.searchParams),body=JSON.parse(options.body),updated=[];
+      for(const row of rows){Object.assign(row,body,{updated_at:new Date().toISOString()});updated.push({...row});}
+      return response(200,updated);
+    }
+  }
+  if (url.pathname === '/rest/v1/advertising_payments') {
+    if (method === 'GET') return response(200,filteredAdvertisingRows([...state.advertisingPayments.values()].map(row=>({...row})),url.searchParams));
+    if (method === 'POST') {
+      const body=JSON.parse(options.body);
+      if([...state.advertisingPayments.values()].some(row=>row.quote_id===body.quote_id&&['creating','created','authorized','captured'].includes(row.status)))return response(409,{message:'active payment exists'});
+      const id=crypto.randomUUID(),now=new Date().toISOString();
+      const row={id,status:'created',currency:'INR',created_at:now,updated_at:now,...body};state.advertisingPayments.set(id,row);
+      return response(201,[{...row}]);
+    }
+    if (method === 'PATCH') {
+      const rows=filteredAdvertisingRows([...state.advertisingPayments.values()],url.searchParams),body=JSON.parse(options.body),updated=[];
+      for(const row of rows){Object.assign(row,body,{updated_at:new Date().toISOString()});updated.push({...row});}
+      return response(200,updated);
+    }
+  }
+  if (url.pathname === '/rest/v1/advertising_payment_audit' && method === 'POST') {
+    const body=JSON.parse(options.body),id=String(state.advertisingAudit.size+1);
+    state.advertisingAudit.set(id,{id,...body,created_at:new Date().toISOString()});
+    return response(201,[{id,...body}]);
+  }
+  if (url.pathname === '/rest/v1/rpc/efsi_finalize_advertising_payment' && method === 'POST') {
+    const body=JSON.parse(options.body),quote=state.advertisingQuotes.get(body.p_quote_id),payment=state.advertisingPayments.get(body.p_payment_id);
+    if(!quote||!payment||payment.quote_id!==quote.id)return response(400,{message:'Quote/payment not found'});
+    if(quote.status==='paid'&&payment.status==='verified'&&payment.provider_payment_id===body.p_provider_payment_id)return response(200,true);
+    if(!['accepted','payment_pending'].includes(quote.status)||Number(quote.amount_paise)!==Number(body.p_amount_paise)||Number(payment.amount_paise)!==Number(body.p_amount_paise)||quote.currency!==body.p_currency||payment.currency!==body.p_currency||payment.provider_order_id!==body.p_provider_order_id||!['created','authorized','captured'].includes(payment.status))return response(400,{message:'Quote/payment mismatch'});
+    Object.assign(payment,{status:'verified',provider_payment_id:body.p_provider_payment_id,provider_evidence_verified:true,verified_at:new Date().toISOString()});
+    Object.assign(quote,{status:'paid',paid_at:new Date().toISOString(),updated_at:new Date().toISOString()});
+    const id=String(state.advertisingAudit.size+1);state.advertisingAudit.set(id,{id,quote_id:quote.id,payment_id:payment.id,event_type:'payment_verification_succeeded',details:{},created_at:new Date().toISOString()});
+    return response(200,true);
   }
 
   if (url.pathname === '/rest/v1/checkout_intents') {
