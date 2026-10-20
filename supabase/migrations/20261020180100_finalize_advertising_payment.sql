@@ -8,7 +8,7 @@ create or replace function public.efsi_finalize_advertising_payment(
   p_currency text
 ) returns boolean
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
