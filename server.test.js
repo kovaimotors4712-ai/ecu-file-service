@@ -1552,3 +1552,19 @@ test('announcement and advertising features keep public writes behind validated 
   assert.match(adminPage, /site-content-form/);
   assert.match(adminPage, /advertising-inquiry-list/);
 });
+
+
+test('homepage announcement and promotion slots are populated from the validated public content API', () => {
+  const homepage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const adminHtml = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  assert.match(homepage, /id="live-announcement-slot"/);
+  assert.match(homepage, /id="homepage-promotion-slot"/);
+  assert.match(homepage, /fetch\('\/api\/site-content'/);
+  assert.match(homepage, /noopener noreferrer sponsored/);
+  assert.match(admin, /data-edit-content-id/);
+  assert.match(admin, /method:id\?'PATCH':'POST'/);
+  assert.match(adminHtml, /site-content-cancel-edit/);
+  assert.match(serverSource, /forwardedFor\.length \? forwardedFor\[forwardedFor\.length - 1\]/);
+});

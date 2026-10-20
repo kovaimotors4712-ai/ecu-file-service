@@ -1333,10 +1333,20 @@ function announcementPayload(body, adminId, partial = false) {
 async function handlePublicSiteContent(request, response) {
   if (request.method !== 'GET') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
   if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error: 'Site content is temporarily unavailable.' }); return true; }
-  const now = encodeURIComponent(new Date().toISOString());
-  const result = await supabaseRequest(serviceToken(), 'rest/v1/site_announcements?select=id,kind,title,body,image_url,cta_label,cta_url,placement,starts_at,ends_at&is_published=eq.true&starts_at=lte.' + now + '&or=(ends_at.is.null,ends_at.gt.' + now + ')&order=created_at.desc&limit=30', { timeoutMs: 12000 });
-  if (!result.ok) { jsonResponse(response, 502, { error: 'Site content could not be loaded.' }); return true; }
-  jsonResponse(response, 200, { items: await result.json() });
+  const result = await supabaseRequest(serviceToken(), 'rest/v1/site_announcements?select=id,kind,title,body,image_url,cta_label,cta_url,placement,starts_at,ends_at&is_published=eq.true&order=created_at.desc&limit=100', { timeoutMs: 12000 });
+  if (!result.ok) {
+    const detail = await result.text().catch(() => '');
+    console.warn('[site-content] Public query failed', { status: result.status, detail: String(detail || '').slice(0, 300) });
+    jsonResponse(response, 502, { error: 'Site content could not be loaded.' }); return true;
+  }
+  const now = Date.now();
+  const rows = await result.json();
+  const items = (Array.isArray(rows) ? rows : []).filter(item => {
+    const starts = item.starts_at ? new Date(item.starts_at).getTime() : 0;
+    const ends = item.ends_at ? new Date(item.ends_at).getTime() : null;
+    return starts <= now && (ends === null || ends > now);
+  }).slice(0, 30);
+  jsonResponse(response, 200, { items });
   return true;
 }
 async function handleAdminSiteContent(request, response) {
@@ -1376,7 +1386,8 @@ async function handleAdminSiteContent(request, response) {
 async function handleAdvertisingInquiry(request, response) {
   if (request.method !== 'POST') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
   if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'Advertising enquiries are temporarily unavailable.' }); return true; }
-  const ip = String(request.socket?.remoteAddress || 'unknown').slice(0, 80);
+  const forwardedFor = String(request.headers['x-forwarded-for'] || '').split(',').map(value => value.trim()).filter(Boolean);
+  const ip = String(forwardedFor.length ? forwardedFor[forwardedFor.length - 1] : (request.socket?.remoteAddress || 'unknown')).slice(0, 80);
   const now = Date.now();
   const recent = advertisingSubmitAttempts.get(ip) || [];
   const allowed = recent.filter(t => now - t < 60 * 60 * 1000);
