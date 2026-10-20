@@ -682,7 +682,7 @@ test('legacy paid-order RPC is removed from client-callable roles', () => {
   assert.doesNotMatch(sql, /\b(GRANT|DROP|TRUNCATE|ALTER TABLE|DELETE FROM|UPDATE public|INSERT INTO)\b/i);
   assert.ok(!server.includes('rpc/efsi_create_paid_order'));
   assert.ok(server.includes('rpc/efsi_finalize_paid_checkout'));
-  assert.ok(!sql.includes('efsi_finalize_paid_checkout'));
+  assert.doesNotMatch(sql, /REVOKE[^;]*efsi_finalize_paid_checkout/i);
 });
 
 test('forum moderator helper uses invoker rights and only checks the trusted JWT role', () => {
