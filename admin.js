@@ -443,6 +443,7 @@
         const set=(name,value)=>{const field=siteContentForm.elements.namedItem(name);if(field)field.value=value??'';};
         set('id',item.id);set('kind',item.kind);set('placement',item.placement);set('advertising_quote_id',item.advertising_quote_id);set('title',item.title);set('body',item.body);set('image_url',item.image_url);set('cta_label',item.cta_label);set('cta_url',item.cta_url);set('starts_at',localDateTime(item.starts_at));set('ends_at',localDateTime(item.ends_at));
         siteContentForm.elements.namedItem('is_published').checked=Boolean(item.is_published);
+        updateAdQuoteRequirement();
         siteContentForm.querySelector('button[type="submit"]').textContent='Update website content →';
         document.querySelector('#site-content-cancel-edit').hidden=false;
         siteContentMessage.textContent='Editing: '+item.title;
@@ -458,6 +459,7 @@
   }
   function resetSiteContentForm() {
     siteContentForm.reset(); siteContentForm.elements.namedItem('id').value='';
+    updateAdQuoteRequirement();
     siteContentForm.querySelector('button[type="submit"]').textContent='Save website content →';
     document.querySelector('#site-content-cancel-edit').hidden=true;
   }
