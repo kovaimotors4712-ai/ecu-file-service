@@ -36,7 +36,7 @@ begin
       where id = NEW.advertising_quote_id for share;
     if not found or q.status <> 'paid' or q.placement <> NEW.placement
        or q.starts_at <> NEW.starts_at or q.ends_at <> NEW.ends_at
-       or q.starts_at > now() + interval '365 days' then
+       or q.ends_at <= now() then
       raise exception 'The advertising quote is not paid or does not match this publication schedule';
     end if;
     insert into public.advertising_payment_audit (quote_id, actor_user_id, event_type, details)
