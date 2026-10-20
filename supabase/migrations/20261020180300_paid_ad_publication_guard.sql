@@ -8,7 +8,7 @@ create unique index if not exists site_announcements_advertising_quote_uidx
 create or replace function public.enforce_paid_advertising_publication()
 returns trigger
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
