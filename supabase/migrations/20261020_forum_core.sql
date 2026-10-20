@@ -112,6 +112,7 @@ DECLARE
 BEGIN
   IF TG_TABLE_NAME = 'forum_topics' THEN
     actor := NEW.author_id;
+    PERFORM pg_advisory_xact_lock(hashtextextended(actor::text, 0));
     SELECT count(*) INTO recent_count
       FROM public.forum_topics t
       WHERE t.author_id = actor AND t.created_at > now() - interval '10 minutes';
@@ -120,6 +121,7 @@ BEGIN
     END IF;
   ELSIF TG_TABLE_NAME = 'forum_replies' THEN
     actor := NEW.author_id;
+    PERFORM pg_advisory_xact_lock(hashtextextended(actor::text, 0));
     SELECT count(*) INTO recent_count
       FROM public.forum_replies r
       WHERE r.author_id = actor AND r.created_at > now() - interval '10 minutes';
@@ -128,6 +130,7 @@ BEGIN
     END IF;
   ELSIF TG_TABLE_NAME = 'forum_reports' THEN
     actor := NEW.reporter_id;
+    PERFORM pg_advisory_xact_lock(hashtextextended(actor::text, 0));
     SELECT count(*) INTO recent_count
       FROM public.forum_reports r
       WHERE r.reporter_id = actor AND r.created_at > now() - interval '1 hour';
