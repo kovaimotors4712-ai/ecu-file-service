@@ -1579,14 +1579,29 @@ async function handleCreateAdvertisingPayment(request, response) {
     if (quoteExpired && quote.status !== 'payment_pending') { jsonResponse(response, 410, { error:'This quote has expired. Contact ECU SOLUTION for a renewed quote.' }); return true; }
     if (!['accepted','payment_pending'].includes(quote.status)) { jsonResponse(response, 409, { error:'Accept the valid quote before starting payment.' }); return true; }
     const token = serviceToken();
-    const existingResult = await supabaseRequest(token, 'rest/v1/advertising_payments?select=id,status,amount_paise,currency,provider_order_id,provider_payment_id&id=not.is.null&quote_id=eq.'+encodeURIComponent(quote.id)+'&status=in.(creating,created,authorized,captured,verified)&order=created_at.desc&limit=1', { timeoutMs:12000 });
+    const existingResult = await supabaseRequest(token, 'rest/v1/advertising_payments?select=id,status,amount_paise,currency,provider_order_id,provider_payment_id,created_at&id=not.is.null&quote_id=eq.'+encodeURIComponent(quote.id)+'&status=in.(creating,created,authorized,captured,verified)&order=created_at.desc&limit=1', { timeoutMs:12000 });
     if (!existingResult.ok) { jsonResponse(response, 502, { error:'Payment session could not be checked.' }); return true; }
     let paymentRow = (await existingResult.json())?.[0];
     if (paymentRow?.status === 'verified') { jsonResponse(response, quote.status === 'paid' ? 200 : 409, quote.status === 'paid' ? { status:'paid' } : { error:'Payment records require reconciliation. Do not pay again; contact support.' }); return true; }
     if (paymentRow?.provider_order_id) {
       jsonResponse(response, 200, { provider:'razorpay', keyId:razorpayKeyId, providerOrderId:paymentRow.provider_order_id, amount:paymentRow.amount_paise, currency:paymentRow.currency, quoteId:quote.id }); return true;
     }
-    if (paymentRow?.status === 'creating') { jsonResponse(response, 409, { error:'A payment session is being prepared. Retry in a few seconds.' }); return true; }
+    if (paymentRow?.status === 'creating') {
+      // Recover a crashed order-creation attempt. No checkout was returned to the browser,
+      // so an expired reservation can be failed safely after the provider request timeout window.
+      const creatingAgeMs = Date.now() - Date.parse(paymentRow.created_at || '');
+      if (!Number.isFinite(creatingAgeMs) || creatingAgeMs < 2 * 60 * 1000) {
+        jsonResponse(response, 409, { error:'A payment session is being prepared. Retry in a few seconds.' }); return true;
+      }
+      const staleAttempt = await supabaseRequest(token, 'rest/v1/advertising_payments?id=eq.'+encodeURIComponent(paymentRow.id)+'&status=eq.creating&select=id,status', {
+        method:'PATCH', prefer:'return=representation',
+        body:{ status:'failed', failure_code:'STALE_ORDER_CREATION', failure_message:'Order creation did not finish before the recovery window elapsed.', updated_at:new Date().toISOString() },
+        timeoutMs:12000
+      });
+      const staleRows = staleAttempt.ok ? await staleAttempt.json().catch(()=>[]) : [];
+      if (!staleRows?.length) { jsonResponse(response, 409, { error:'The payment session changed while recovery was attempted. Refresh and retry.' }); return true; }
+      paymentRow = null;
+    }
     if (!paymentRow && quoteExpired) { jsonResponse(response, 410, { error:'The quote expired before a payment order was ready. Contact ECU SOLUTION; do not pay again.' }); return true; }
     if (!paymentRow) {
       const idempotencyKey = 'adquote:'+quote.id+':'+crypto.randomUUID();
