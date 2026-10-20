@@ -1376,7 +1376,8 @@ async function handleAdminSiteContent(request, response) {
 async function handleAdvertisingInquiry(request, response) {
   if (request.method !== 'POST') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
   if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'Advertising enquiries are temporarily unavailable.' }); return true; }
-  const ip = String(request.socket?.remoteAddress || 'unknown').slice(0, 80);
+  const forwardedFor = String(request.headers['x-forwarded-for'] || '').split(',').map(value => value.trim()).filter(Boolean);
+  const ip = String(forwardedFor.length ? forwardedFor[forwardedFor.length - 1] : (request.socket?.remoteAddress || 'unknown')).slice(0, 80);
   const now = Date.now();
   const recent = advertisingSubmitAttempts.get(ip) || [];
   const allowed = recent.filter(t => now - t < 60 * 60 * 1000);
