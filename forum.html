@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101a19">
+  <meta name="description" content="A moderated automotive workshop community for evidence-led diagnostics, ECU identification, wiring checks and safety-first repair discussions.">
+  <link rel="canonical" href="https://ecufileservice.in/forum.html">
+  <meta property="og:title" content="Automotive Workshop Community | ECU SOLUTION">
+  <meta property="og:description" content="Discuss diagnostic workflows, ECU identification, wiring and workshop safety with automotive professionals.">
+  <meta property="og:url" content="https://ecufileservice.in/forum.html">
+  <meta property="og:type" content="website">
+  <title>Automotive Workshop Community | ECU SOLUTION</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/forum.css">
+</head>
+<body class="forum-page">
+  <div class="announcement"><span class="status-dot"></span> COMMUNITY BETA · MODERATED WORKSHOP DISCUSSIONS <span class="announcement-right">SAFETY FIRST</span></div>
+  <header class="site-header forum-header">
+    <a class="brand" href="/" aria-label="ECU SOLUTION home"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 10h26v20H7z"/><path d="M12 15h5v10h-5zm11 0h5m-5 5h5m-5 5h5M3 15h4m-4 5h4m-4 5h4m26-10h4m-4 5h4m-4 5h4"/></svg></span><span class="brand-name">ECU SOLUTION <b>WORKSHOP COMMUNITY</b></span></a>
+    <nav class="desktop-nav" aria-label="Main navigation"><a href="/">File services</a><a href="/ecu-file-services.html">ECU services</a><a href="/guides.html">Guides</a></nav>
+    <a class="forum-home-link" href="/">Back to service</a>
+  </header>
+
+  <main class="forum-main">
+    <section class="forum-hero">
+      <p class="forum-kicker"><span></span> AUTOMOTIVE TECHNICIAN COMMUNITY</p>
+      <h1>Better diagnosis.<br><span>Better evidence.</span></h1>
+      <p>Share safe, evidence-led workshop knowledge about DTCs, ECU identification, wiring and repair workflows. Protect customer data and follow vehicle-manufacturer procedures.</p>
+      <div class="forum-hero-meta"><span>Public reading</span><span>Sign-in required to post</span><span>Moderated discussions</span></div>
+    </section>
+
+    <section class="forum-account panel" aria-labelledby="account-heading">
+      <div class="section-heading">
+        <div><p class="forum-kicker"><span></span> YOUR ACCOUNT</p><h2 id="account-heading">Sign in to participate</h2></div>
+        <span id="account-state" class="state-pill">Not signed in</span>
+      </div>
+      <p class="muted">The forum uses your existing ECU SOLUTION account. Your email and customer files are not displayed publicly.</p>
+      <form id="forum-auth-form" class="forum-auth-form">
+        <label>Email address<input id="forum-auth-email" type="email" autocomplete="email" required maxlength="254"></label>
+        <label>Password<input id="forum-auth-password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></label>
+        <div class="auth-actions">
+          <button type="submit" class="button button-lime" id="forum-sign-in">Sign in</button>
+          <button type="button" class="button button-outline" id="forum-sign-up">Create account</button>
+          <button type="button" class="button button-outline" id="forum-sign-out" hidden>Sign out</button>
+        </div>
+      </form>
+      <p id="forum-auth-message" class="status-message" aria-live="polite"></p>
+    </section>
+
+    <section class="forum-profile panel" id="forum-profile-panel" hidden aria-labelledby="profile-heading">
+      <div class="section-heading"><div><p class="forum-kicker"><span></span> PUBLIC PROFILE</p><h2 id="profile-heading">Choose your display name</h2></div></div>
+      <p class="muted">Only your display name and short bio are public. Do not include phone numbers, email addresses, VINs or customer identifiers.</p>
+      <form id="forum-profile-form" class="profile-form">
+        <label>Display name<input id="forum-display-name" minlength="2" maxlength="32" autocomplete="nickname" required></label>
+        <label>Short bio <span class="muted">(optional)</span><textarea id="forum-bio" maxlength="240" rows="2"></textarea></label>
+        <button type="submit" class="button button-lime">Save public profile</button>
+      </form>
+      <p id="forum-profile-message" class="status-message" aria-live="polite"></p>
+    </section>
+
+    <section class="forum-workspace">
+      <aside class="forum-sidebar">
+        <div class="panel">
+          <p class="forum-kicker"><span></span> COMMUNITY RULES</p>
+          <ul class="forum-rules">
+            <li>Share test results and exact vehicle/ECU context.</li>
+            <li>Remove customer names, phone numbers, VINs and registration details.</li>
+            <li>Never post passwords, API keys, private download links or paid files.</li>
+            <li>Use manufacturer procedures for SRS, high-voltage and anti-theft work.</li>
+            <li>No piracy, unsafe bypass instructions, harassment or spam.</li>
+          </ul>
+          <a class="guide-reference" href="/guides.html">Read workshop safety guidance ↗</a>
+        </div>
+        <div class="panel trust-panel">
+          <p class="forum-kicker"><span></span> MODERATION</p>
+          <p class="muted">Report suspected abuse or unsafe advice. Reports are private to the reporter and authorized moderators.</p>
+        </div>
+      </aside>
+
+      <section class="forum-content" aria-labelledby="topics-heading">
+        <div class="panel topics-panel">
+          <div class="section-heading topics-title-row">
+            <div><p class="forum-kicker"><span></span> DISCUSSION BOARD</p><h2 id="topics-heading">Workshop topics</h2></div>
+            <button type="button" id="forum-new-topic-toggle" class="button button-lime" disabled>New topic</button>
+          </div>
+          <div class="forum-filters">
+            <label class="search-label">Search discussions<input id="forum-search" type="search" placeholder="DTC, ECU family, symptoms…" maxlength="120"></label>
+            <label>Category<select id="forum-category-filter"><option value="">All categories</option></select></label>
+          </div>
+          <p id="forum-topics-message" class="status-message" aria-live="polite">Loading community topics…</p>
+          <div id="forum-topic-list" class="forum-topic-list" aria-live="polite"></div>
+          <button type="button" id="forum-load-topics" class="button button-outline" hidden>Refresh topics</button>
+        </div>
+
+        <section class="panel new-topic-panel" id="forum-new-topic-panel" hidden aria-labelledby="new-topic-heading">
+          <div class="section-heading"><div><p class="forum-kicker"><span></span> START A DISCUSSION</p><h2 id="new-topic-heading">Create a topic</h2></div><button type="button" id="forum-cancel-topic" class="plain-close" aria-label="Cancel new topic">Cancel</button></div>
+          <form id="forum-new-topic-form">
+            <label>Category<select id="forum-new-topic-category" required></select></label>
+            <label>Title<input id="forum-new-topic-title" minlength="8" maxlength="160" required placeholder="Vehicle + ECU + observed symptom"></label>
+            <label>Details<textarea id="forum-new-topic-body" minlength="20" maxlength="12000" rows="7" required placeholder="Describe tests performed, relevant readings and what you need help understanding. Exclude customer-identifying information."></textarea></label>
+            <p class="muted">Do not upload binaries, private files or credentials. Only text discussions are supported in this beta.</p>
+            <button type="submit" class="button button-lime">Publish topic</button>
+          </form>
+          <p id="forum-create-message" class="status-message" aria-live="polite"></p>
+        </section>
+
+        <section class="panel forum-thread-panel" id="forum-thread-panel" hidden aria-labelledby="forum-thread-title">
+          <div class="section-heading thread-heading"><button type="button" id="forum-back-topics" class="button button-outline">← All topics</button><button type="button" id="forum-report-topic" class="plain-report">Report topic</button></div>
+          <p id="forum-thread-category" class="forum-kicker"><span></span> TOPIC</p>
+          <h2 id="forum-thread-title"></h2>
+          <p id="forum-thread-meta" class="muted"></p>
+          <div id="forum-thread-body" class="thread-body"></div>
+          <div class="thread-divider"></div>
+          <div class="section-heading"><div><p class="forum-kicker"><span></span> REPLIES</p><h3>Workshop responses</h3></div><span id="forum-reply-count" class="state-pill">0 replies</span></div>
+          <p id="forum-replies-message" class="status-message" aria-live="polite"></p>
+          <div id="forum-reply-list" class="forum-reply-list"></div>
+          <form id="forum-reply-form" class="forum-reply-form" hidden>
+            <label>Your reply<textarea id="forum-reply-body" minlength="2" maxlength="8000" rows="4" required placeholder="Keep it respectful, specific and safety-first."></textarea></label>
+            <button type="submit" class="button button-lime">Post reply</button>
+          </form>
+          <p id="forum-reply-form-message" class="status-message" aria-live="polite"></p>
+        </section>
+      </section>
+    </section>
+    <p class="forum-disclaimer">Community posts are user-generated and are not manufacturer-approved repair instructions. Verify specifications and safe procedures with authoritative service information. Emissions and safety-system work must comply with applicable law.</p>
+  </main>
+
+  <footer class="site-footer forum-footer">
+    <a class="brand footer-brand" href="/"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 10h26v20H7z"/><path d="M12 15h5v10h-5zm11 0h5m-5 5h5m-5 5h5M3 15h4m-4 5h4m-4 5h4m26-10h4m-4 5h4m-4 5h4"/></svg></span><span class="brand-name">ECU SOLUTION <b>WORKSHOP COMMUNITY</b></span></a>
+    <span class="footer-copy">Respectful discussion. Verified evidence. Safer repairs.</span>
+    <nav class="footer-links" aria-label="Reference links"><a href="/">File services</a><a href="/guides.html">Diagnostic guides</a></nav>
+    <span class="footer-right">© <span id="forum-year">2026</span> ECU SOLUTION</span>
+  </footer>
+  <script src="/supabase.js"></script>
+  <script src="/auth.js"></script>
+  <script src="/forum.js"></script>
+</body>
+</html>
