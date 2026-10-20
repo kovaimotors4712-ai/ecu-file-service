@@ -1431,9 +1431,220 @@ async function handleAdminAdvertisingInquiries(request, response) {
   jsonResponse(response, 405, { error:'Method Not Allowed' }); return true;
 }
 
+
+function advertisingTokenHash(token) {
+  return crypto.createHash('sha256').update(String(token || '')).digest('hex');
+}
+async function findAdvertisingQuoteByToken(token) {
+  if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
+  const digest = advertisingTokenHash(token);
+  const result = await supabaseRequest(serviceToken(), 'rest/v1/advertising_quotes?select=id,inquiry_id,quote_version,status,amount_paise,currency,placement,starts_at,ends_at,expires_at,terms_snapshot,creative_requirements,acceptance_token_hash,issued_at,accepted_at,paid_at,created_at,updated_at&id=not.is.null&acceptance_token_hash=eq.' + encodeURIComponent(digest) + '&limit=1', { timeoutMs: 12000 });
+  if (!result.ok) throw Object.assign(new Error('Advertising quote could not be loaded.'), { statusCode: 502 });
+  return (await result.json())?.[0] || null;
+}
+function validAdvertisingQuoteInput(body) {
+  const amountPaise = body?.amountPaise;
+  const placement = body?.placement;
+  const startsAt = new Date(body?.startsAt);
+  const endsAt = new Date(body?.endsAt);
+  const expiresAt = new Date(body?.expiresAt);
+  const terms = cleanSiteText(body?.terms, 8000);
+  const creativeRequirements = cleanSiteText(body?.creativeRequirements, 4000);
+  if (!Number.isSafeInteger(amountPaise) || amountPaise < 1 || amountPaise > 100000000000) throw Object.assign(new Error('Enter a valid advertising quote amount in paise.'), { statusCode: 400 });
+  if (!['banner','homepage','sidebar'].includes(placement)) throw Object.assign(new Error('Choose a valid advertising placement.'), { statusCode: 400 });
+  if ([startsAt, endsAt, expiresAt].some(date => Number.isNaN(date.getTime())) || endsAt <= startsAt || expiresAt <= new Date()) throw Object.assign(new Error('Enter valid advertising start, end, and quote-expiry dates.'), { statusCode: 400 });
+  if (!terms) throw Object.assign(new Error('Written quote terms are required.'), { statusCode: 400 });
+  return { amount_paise: amountPaise, currency:'INR', placement, starts_at:startsAt.toISOString(), ends_at:endsAt.toISOString(), expires_at:expiresAt.toISOString(), terms_snapshot:terms, creative_requirements:creativeRequirements };
+}
+async function writeAdvertisingAudit(eventType, quoteId, paymentId, actorId, details = {}) {
+  const result = await supabaseRequest(serviceToken(), 'rest/v1/advertising_payment_audit', { method:'POST', prefer:'return=minimal', body:{ event_type:eventType, quote_id:quoteId || null, payment_id:paymentId || null, actor_user_id:actorId || null, details }, timeoutMs:12000 });
+  if (!result.ok) console.warn('[advertising] Audit insert failed', { eventType, status:result.status });
+}
+async function handleAdminAdvertisingQuotes(request, response) {
+  const admin = await requireAdmin(request);
+  if (!admin) { jsonResponse(response, 403, { error:'Administrator role is required.' }); return true; }
+  if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'Advertising quote management is unavailable.' }); return true; }
+  const token = serviceToken();
+  if (request.method === 'GET') {
+    const result = await supabaseRequest(token, 'rest/v1/advertising_quotes?select=*,advertising_inquiries(business_name,contact_name,email,phone,ad_type)&order=created_at.desc&limit=100', { timeoutMs:12000 });
+    if (!result.ok) { jsonResponse(response, 502, { error:'Advertising quotes could not be loaded.' }); return true; }
+    jsonResponse(response, 200, { items:await result.json() }); return true;
+  }
+  if (request.method === 'POST') {
+    try {
+      const body = await readJson(request, 12000);
+      const inquiryId = String(body?.inquiryId || '');
+      if (!/^[0-9a-f-]{36}$/i.test(inquiryId)) { jsonResponse(response, 400, { error:'Select a valid advertiser enquiry.' }); return true; }
+      const inquiryResult = await supabaseRequest(token, 'rest/v1/advertising_inquiries?select=id,business_name,contact_name,email& id=eq.' + encodeURIComponent(inquiryId) + '&limit=1'.replace(' ', ''), { timeoutMs:12000 });
+      if (!inquiryResult.ok) { jsonResponse(response, 502, { error:'Advertiser enquiry could not be loaded.' }); return true; }
+      const inquiry = (await inquiryResult.json())?.[0];
+      if (!inquiry) { jsonResponse(response, 404, { error:'Advertiser enquiry not found.' }); return true; }
+      const latestResult = await supabaseRequest(token, 'rest/v1/advertising_quotes?select=quote_version&inquiry_id=eq.' + encodeURIComponent(inquiryId) + '&order=quote_version.desc&limit=1', { timeoutMs:12000 });
+      if (!latestResult.ok) { jsonResponse(response, 502, { error:'Quote version could not be determined safely.' }); return true; }
+      const version = Number((await latestResult.json())?.[0]?.quote_version || 0) + 1;
+      const payload = { inquiry_id:inquiryId, quote_version:version, ...validAdvertisingQuoteInput(body), status:'draft', created_by:admin.id };
+      const result = await supabaseRequest(token, 'rest/v1/advertising_quotes?select=id,inquiry_id,quote_version,status,amount_paise,currency,placement,starts_at,ends_at,expires_at,terms_snapshot,creative_requirements,created_at', { method:'POST', prefer:'return=representation', body:payload, timeoutMs:12000 });
+      if (!result.ok) { jsonResponse(response, result.status === 409 ? 409 : 502, { error:'Quote could not be saved. Refresh and retry; the enquiry may have changed.' }); return true; }
+      const quote = (await result.json())?.[0];
+      await writeAdvertisingAudit('quote_created', quote?.id, null, admin.id, { inquiry_id:inquiryId, quote_version:version });
+      jsonResponse(response, 201, { item:quote, advertiser:{ businessName:inquiry.business_name, email:inquiry.email } }); return true;
+    } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Invalid advertising quote.' }); return true; }
+  }
+  if (request.method === 'PATCH') {
+    try {
+      const body = await readJson(request, 12000);
+      const id = String(body?.id || '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) { jsonResponse(response, 400, { error:'Invalid quote reference.' }); return true; }
+      const currentResult = await supabaseRequest(token, 'rest/v1/advertising_quotes?select=id,status& id=eq.' + encodeURIComponent(id) + '&limit=1'.replace(' ', ''), { timeoutMs:12000 });
+      if (!currentResult.ok) { jsonResponse(response, 502, { error:'Quote could not be loaded.' }); return true; }
+      const current = (await currentResult.json())?.[0];
+      if (!current) { jsonResponse(response, 404, { error:'Quote not found.' }); return true; }
+      if (body.action === 'issue') {
+        if (current.status !== 'draft') { jsonResponse(response, 409, { error:'Only a draft quote can be issued.' }); return true; }
+        if (!hasResendConfig()) { jsonResponse(response, 503, { error:'Quote email delivery is not configured. The quote remains a draft.' }); return true; }
+        const quoteResult = await supabaseRequest(token, 'rest/v1/advertising_quotes?select=*&id=eq.' + encodeURIComponent(id) + '&limit=1', { timeoutMs:12000 });
+        const quote = (await quoteResult.json())?.[0];
+        const inquiryResult = await supabaseRequest(token, 'rest/v1/advertising_inquiries?select=business_name,email&id=eq.' + encodeURIComponent(quote.inquiry_id) + '&limit=1', { timeoutMs:12000 });
+        const inquiry = (await inquiryResult.json())?.[0];
+        if (!quote || !inquiry?.email) { jsonResponse(response, 409, { error:'A valid advertiser email is required before issuing the quote.' }); return true; }
+        const rawToken = crypto.randomBytes(32).toString('base64url');
+        const digest = advertisingTokenHash(rawToken);
+        const issuedAt = new Date().toISOString();
+        const update = await supabaseRequest(token, 'rest/v1/advertising_quotes?id=eq.' + encodeURIComponent(id) + '&status=eq.draft&select=id,status', { method:'PATCH', prefer:'return=representation', body:{ status:'issued', acceptance_token_hash:digest, issued_at:issuedAt, updated_at:issuedAt }, timeoutMs:12000 });
+        if (!update.ok || !(await update.json())?.length) { jsonResponse(response, 409, { error:'Quote changed while issuing. Refresh and retry.' }); return true; }
+        const quoteUrl = 'https://ecufileservice.in/advertising-quote.html#' + rawToken;
+        const htmlEscape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const emailBody = { from:emailFrom, to:[inquiry.email], subject:'Advertising quote from ECU SOLUTION', html:'<p>Hello '+htmlEscape(inquiry.business_name)+',</p><p>Your advertising quote is ready for review.</p><p><strong>Amount:</strong> ₹'+(Number(quote.amount_paise)/100).toFixed(2)+' INR<br><strong>Placement:</strong> '+htmlEscape(quote.placement)+'<br><strong>Schedule:</strong> '+htmlEscape(quote.starts_at)+' to '+htmlEscape(quote.ends_at)+'<br><strong>Quote expiry:</strong> '+htmlEscape(quote.expires_at)+'</p><p><a href="'+quoteUrl+'">Review quote and accept</a></p><p>'+htmlEscape(quote.terms_snapshot)+'</p><p>Payment does not automatically publish the advertisement; creative approval is separate.</p>' };
+        let mail;
+        try { mail = await requestHttps('https://api.resend.com/emails', { method:'POST', headers:{ Authorization:'Bearer '+resendApiKey, 'Content-Type':'application/json' }, body:JSON.stringify(emailBody), timeoutMs:15000 }); }
+        catch { mail = null; }
+        if (!mail?.ok) {
+          await supabaseRequest(token, 'rest/v1/advertising_quotes?id=eq.'+encodeURIComponent(id)+'&status=eq.issued', { method:'PATCH', prefer:'return=minimal', body:{ status:'draft', acceptance_token_hash:null, issued_at:null, updated_at:new Date().toISOString() }, timeoutMs:12000 }).catch(()=>{});
+          jsonResponse(response, 502, { error:'Quote email could not be delivered. The quote was returned to draft.' }); return true;
+        }
+        await writeAdvertisingAudit('quote_issued', id, null, admin.id, { quote_version:quote.quote_version });
+        jsonResponse(response, 200, { ok:true, status:'issued' }); return true;
+      }
+      if (body.action === 'decline' && ['draft','issued'].includes(current.status)) {
+        const result = await supabaseRequest(token, 'rest/v1/advertising_quotes?id=eq.'+encodeURIComponent(id)+'&status=in.(draft,issued)&select=id,status', { method:'PATCH', prefer:'return=representation', body:{ status:'declined', updated_at:new Date().toISOString() }, timeoutMs:12000 });
+        const rows = await result.json().catch(()=>[]);
+        if (!result.ok || !rows?.length) { jsonResponse(response, 409, { error:'Quote could not be declined.' }); return true; }
+        await writeAdvertisingAudit('quote_declined', id, null, admin.id);
+        jsonResponse(response, 200, { item:rows[0] }); return true;
+      }
+      jsonResponse(response, 400, { error:'Unsupported quote action.' }); return true;
+    } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Quote action failed.' }); return true; }
+  }
+  jsonResponse(response, 405, { error:'Method Not Allowed' }); return true;
+}
+async function handlePublicAdvertisingQuote(request, response) {
+  if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'Advertising quotes are temporarily unavailable.' }); return true; }
+  try {
+    if (request.method === 'GET') {
+      const token = String(new URL(request.url, 'http://localhost').searchParams.get('token') || '');
+      const quote = await findAdvertisingQuoteByToken(token);
+      if (!quote || new Date(quote.expires_at).getTime() <= Date.now() || ['declined','expired','cancelled','payment_failed'].includes(quote.status)) { jsonResponse(response, 404, { error:'This quote is unavailable or has expired.' }); return true; }
+      const inquiryResult = await supabaseRequest(serviceToken(), 'rest/v1/advertising_inquiries?select=business_name&id=eq.'+encodeURIComponent(quote.inquiry_id)+'&limit=1', { timeoutMs:12000 });
+      const inquiry = inquiryResult.ok ? (await inquiryResult.json())?.[0] : null;
+      jsonResponse(response, 200, { quote:{ id:quote.id, version:quote.quote_version, status:quote.status, amountPaise:quote.amount_paise, currency:quote.currency, placement:quote.placement, startsAt:quote.starts_at, endsAt:quote.ends_at, expiresAt:quote.expires_at, terms:quote.terms_snapshot, creativeRequirements:quote.creative_requirements, businessName:inquiry?.business_name || 'Advertiser' } }); return true;
+    }
+    if (request.method === 'POST') {
+      const body = await readJson(request, 4096);
+      const token = String(body?.token || '');
+      const quote = await findAdvertisingQuoteByToken(token);
+      if (!quote || new Date(quote.expires_at).getTime() <= Date.now()) { jsonResponse(response, 404, { error:'This quote is unavailable or has expired.' }); return true; }
+      if (quote.status === 'accepted' || quote.status === 'payment_pending' || quote.status === 'paid') { jsonResponse(response, 200, { status:quote.status }); return true; }
+      if (quote.status !== 'issued') { jsonResponse(response, 409, { error:'This quote cannot be accepted in its current state.' }); return true; }
+      const result = await supabaseRequest(serviceToken(), 'rest/v1/advertising_quotes?id=eq.'+encodeURIComponent(quote.id)+'&status=eq.issued&expires_at=gt.'+encodeURIComponent(new Date().toISOString())+'&select=id,status', { method:'PATCH', prefer:'return=representation', body:{ status:'accepted', accepted_at:new Date().toISOString(), updated_at:new Date().toISOString() }, timeoutMs:12000 });
+      const rows = result.ok ? await result.json() : [];
+      if (!rows?.length) { jsonResponse(response, 409, { error:'Quote changed or expired before acceptance. Refresh the quote.' }); return true; }
+      await writeAdvertisingAudit('quote_accepted', quote.id, null, null, { quote_version:quote.quote_version });
+      jsonResponse(response, 200, { status:'accepted' }); return true;
+    }
+    jsonResponse(response, 405, { error:'Method Not Allowed' }); return true;
+  } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Advertising quote request failed.' }); return true; }
+}
+async function handleCreateAdvertisingPayment(request, response) {
+  if (request.method !== 'POST') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
+  if (!supabaseServiceRoleKey || !hasRazorpayConfig()) { jsonResponse(response, 503, { error:'Advertising payments are temporarily unavailable.' }); return true; }
+  try {
+    const body = await readJson(request, 4096);
+    const quote = await findAdvertisingQuoteByToken(String(body?.token || ''));
+    if (!quote || new Date(quote.expires_at).getTime() <= Date.now()) { jsonResponse(response, 404, { error:'This quote is unavailable or has expired.' }); return true; }
+    if (quote.status === 'paid') { jsonResponse(response, 200, { status:'paid' }); return true; }
+    if (!['accepted','payment_pending'].includes(quote.status)) { jsonResponse(response, 409, { error:'Accept the valid quote before starting payment.' }); return true; }
+    const token = serviceToken();
+    const existingResult = await supabaseRequest(token, 'rest/v1/advertising_payments?select=id,status,amount_paise,currency,provider_order_id,provider_payment_id&id=not.is.null&quote_id=eq.'+encodeURIComponent(quote.id)+'&status=in.(creating,created,authorized,captured,verified)&order=created_at.desc&limit=1', { timeoutMs:12000 });
+    if (!existingResult.ok) { jsonResponse(response, 502, { error:'Payment session could not be checked.' }); return true; }
+    let paymentRow = (await existingResult.json())?.[0];
+    if (paymentRow?.status === 'verified') { jsonResponse(response, 200, { status:'paid' }); return true; }
+    if (paymentRow?.provider_order_id) {
+      jsonResponse(response, 200, { provider:'razorpay', keyId:razorpayKeyId, providerOrderId:paymentRow.provider_order_id, amount:paymentRow.amount_paise, currency:paymentRow.currency, quoteId:quote.id }); return true;
+    }
+    if (paymentRow?.status === 'creating') { jsonResponse(response, 409, { error:'A payment session is being prepared. Retry in a few seconds.' }); return true; }
+    if (!paymentRow) {
+      const idempotencyKey = 'adquote:'+quote.id+':'+crypto.randomUUID();
+      const inserted = await supabaseRequest(token, 'rest/v1/advertising_payments?select=id,status,amount_paise,currency,provider_order_id', { method:'POST', prefer:'return=representation', body:{ quote_id:quote.id, status:'creating', amount_paise:quote.amount_paise, currency:quote.currency, idempotency_key:idempotencyKey }, timeoutMs:12000 });
+      if (!inserted.ok) {
+        const retry = await supabaseRequest(token, 'rest/v1/advertising_payments?select=id,status,amount_paise,currency,provider_order_id&quote_id=eq.'+encodeURIComponent(quote.id)+'&status=in.(creating,created,authorized,captured,verified)&order=created_at.desc&limit=1', { timeoutMs:12000 });
+        const row = retry.ok ? (await retry.json())?.[0] : null;
+        if (row?.provider_order_id) { jsonResponse(response, 200, { provider:'razorpay', keyId:razorpayKeyId, providerOrderId:row.provider_order_id, amount:row.amount_paise, currency:row.currency, quoteId:quote.id }); return true; }
+        jsonResponse(response, 409, { error:'Another payment attempt is being prepared. Retry shortly.' }); return true;
+      }
+      paymentRow = (await inserted.json())?.[0];
+    }
+    if (!paymentRow?.id) { jsonResponse(response, 502, { error:'Payment session could not be reserved safely.' }); return true; }
+    const order = await razorpayApi('orders', { method:'POST', body:{ amount:quote.amount_paise, currency:'INR', receipt:'adq_'+quote.id.replaceAll('-','').slice(0,24), notes:{ advertising_quote_id:quote.id, advertising_payment_id:paymentRow.id, quote_version:String(quote.quote_version) } } });
+    if (!/^order_[A-Za-z0-9]+$/.test(String(order?.id || '')) || Number(order.amount)!==Number(quote.amount_paise) || order.currency!=='INR' || order?.notes?.advertising_quote_id!==quote.id || order?.notes?.advertising_payment_id!==paymentRow.id) throw Object.assign(new Error('Razorpay returned an invalid advertising payment order.'), { statusCode:502 });
+    const update = await supabaseRequest(token, 'rest/v1/advertising_payments?id=eq.'+encodeURIComponent(paymentRow.id)+'&status=eq.creating&select=id', { method:'PATCH', prefer:'return=representation', body:{ status:'created', provider_order_id:order.id, updated_at:new Date().toISOString() }, timeoutMs:12000 });
+    if (!update.ok || !(await update.json())?.length) throw Object.assign(new Error('Payment order could not be saved. Please retry safely.'), { statusCode:502 });
+    await supabaseRequest(token, 'rest/v1/advertising_quotes?id=eq.'+encodeURIComponent(quote.id)+'&status=eq.accepted', { method:'PATCH', prefer:'return=minimal', body:{ status:'payment_pending', updated_at:new Date().toISOString() }, timeoutMs:12000 });
+    await writeAdvertisingAudit('payment_order_created', quote.id, paymentRow.id, null, { provider_order_id:order.id, amount_paise:quote.amount_paise });
+    jsonResponse(response, 200, { provider:'razorpay', keyId:razorpayKeyId, providerOrderId:order.id, amount:quote.amount_paise, currency:'INR', quoteId:quote.id });
+  } catch (error) {
+    jsonResponse(response, error.statusCode || (error.code === 'RAZORPAY_UPSTREAM' ? 502 : 400), { error:error.message || 'Advertising payment could not be created.' });
+  }
+  return true;
+}
+async function handleVerifyAdvertisingPayment(request, response) {
+  if (request.method !== 'POST') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
+  if (!supabaseServiceRoleKey || !hasRazorpayConfig()) { jsonResponse(response, 503, { error:'Advertising payment verification is unavailable.' }); return true; }
+  try {
+    const body = await readJson(request, 4096);
+    const token = String(body?.token || '');
+    const quote = await findAdvertisingQuoteByToken(token);
+    if (!quote) { jsonResponse(response, 404, { error:'Advertising quote not found.' }); return true; }
+    const providerOrderId = String(body?.razorpayOrderId || body?.razorpay_order_id || '');
+    const providerPaymentId = String(body?.razorpayPaymentId || body?.razorpay_payment_id || '');
+    const signature = String(body?.razorpaySignature || body?.razorpay_signature || '');
+    if (!/^order_[A-Za-z0-9]+$/.test(providerOrderId) || !/^pay_[A-Za-z0-9]+$/.test(providerPaymentId)) { jsonResponse(response, 400, { error:'Valid Razorpay payment references are required.' }); return true; }
+    const expected = crypto.createHmac('sha256', razorpayKeySecret).update(providerOrderId+'|'+providerPaymentId).digest('hex');
+    if (!safeEqualHex(signature, expected)) { jsonResponse(response, 402, { error:'Payment signature could not be verified.' }); return true; }
+    const tokenService = serviceToken();
+    const paymentResult = await supabaseRequest(tokenService, 'rest/v1/advertising_payments?select=id,status,amount_paise,currency,provider_order_id,provider_payment_id&quote_id=eq.'+encodeURIComponent(quote.id)+'&provider_order_id=eq.'+encodeURIComponent(providerOrderId)+'&limit=1', { timeoutMs:12000 });
+    if (!paymentResult.ok) { jsonResponse(response, 502, { error:'Payment record could not be loaded.' }); return true; }
+    const paymentRow = (await paymentResult.json())?.[0];
+    if (!paymentRow) { jsonResponse(response, 404, { error:'This payment order does not belong to the quote.' }); return true; }
+    if (paymentRow.status === 'verified' && paymentRow.provider_payment_id === providerPaymentId && quote.status === 'paid') { jsonResponse(response, 200, { status:'paid', quoteId:quote.id }); return true; }
+    if (Number(paymentRow.amount_paise)!==Number(quote.amount_paise) || paymentRow.currency!=='INR') { jsonResponse(response, 402, { error:'Saved payment amount does not match the quote.' }); return true; }
+    const razorOrder = await razorpayApi('orders/'+encodeURIComponent(providerOrderId));
+    if (razorOrder?.id!==providerOrderId || Number(razorOrder.amount)!==Number(quote.amount_paise) || razorOrder.currency!=='INR' || razorOrder?.notes?.advertising_quote_id!==quote.id || razorOrder?.notes?.advertising_payment_id!==paymentRow.id) { jsonResponse(response, 402, { error:'Razorpay order does not match this advertising quote.' }); return true; }
+    const payment = await razorpayApi('payments/'+encodeURIComponent(providerPaymentId));
+    if (payment?.order_id!==providerOrderId || payment?.status!=='captured' || Number(payment.amount)!==Number(quote.amount_paise) || payment.currency!=='INR') { jsonResponse(response, 402, { error:'Razorpay has not confirmed the full quote amount as captured.' }); return true; }
+    const finalized = await supabaseRequest(tokenService, 'rest/v1/rpc/efsi_finalize_advertising_payment', { method:'POST', body:{ p_quote_id:quote.id, p_payment_id:paymentRow.id, p_provider_order_id:providerOrderId, p_provider_payment_id:providerPaymentId, p_amount_paise:quote.amount_paise, p_currency:'INR' }, timeoutMs:15000 });
+    if (!finalized.ok || (await finalized.json().catch(()=>false))!==true) { jsonResponse(response, 409, { error:'Payment was verified by the gateway but could not be safely finalized. Contact support; do not pay again.' }); return true; }
+    jsonResponse(response, 200, { status:'paid', quoteId:quote.id });
+  } catch (error) { jsonResponse(response, error.statusCode || (error.code === 'RAZORPAY_UPSTREAM' ? 502 : 400), { error:error.message || 'Advertising payment could not be verified.' }); }
+  return true;
+}
+
 async function handleApi(request, response, url) {
   if (url.pathname === '/api/health') { jsonResponse(response, 200, { configured: hasSafeSupabaseConfig, paymentConfigured: paymentsConfigured(), paymentReadiness: paymentReadinessChecks() }); return true; }
   if (url.pathname === '/api/site-content') return handlePublicSiteContent(request, response);
+  if (url.pathname === '/api/admin/advertising/quotes') return handleAdminAdvertisingQuotes(request, response);
+  if (url.pathname === '/api/advertising/quote') return handlePublicAdvertisingQuote(request, response);
+  if (url.pathname === '/api/advertising/payment/create-order') return handleCreateAdvertisingPayment(request, response);
+  if (url.pathname === '/api/advertising/payment/verify') return handleVerifyAdvertisingPayment(request, response);
   if (url.pathname === '/api/advertising/inquiries') return handleAdvertisingInquiry(request, response);
   if (url.pathname === '/api/admin/site-content') return handleAdminSiteContent(request, response);
   if (url.pathname === '/api/admin/advertising/inquiries') return handleAdminAdvertisingInquiries(request, response);
