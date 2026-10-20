@@ -530,7 +530,7 @@
     event.preventDefault();const button=advertisingQuoteForm.querySelector('button[type="submit"]');button.disabled=true;advertisingQuoteMessage.classList.remove('admin-error');advertisingQuoteMessage.textContent='Saving quote draft…';
     try{
       const data=new FormData(advertisingQuoteForm), amountText=String(data.get('amount')||'').trim();
-      if(!/^\\d+(?:\\.\\d{1,2})?$/.test(amountText))throw new Error('Enter a valid amount with up to two decimal places.');
+      if(!/^\d+(?:\.\d{1,2})?$/.test(amountText))throw new Error('Enter a valid amount with up to two decimal places.');
       const parts=amountText.split('.'), amountPaise=Number(parts[0])*100+Number((parts[1]||'').padEnd(2,'0'));
       if(!Number.isSafeInteger(amountPaise)||amountPaise<1)throw new Error('Enter a valid positive amount.');
       const result=await adminApi('/api/admin/advertising/quotes',{method:'POST',body:JSON.stringify({inquiryId:data.get('inquiryId'),amountPaise,placement:data.get('placement'),startsAt:new Date(data.get('startsAt')).toISOString(),endsAt:new Date(data.get('endsAt')).toISOString(),expiresAt:new Date(data.get('expiresAt')).toISOString(),terms:data.get('terms'),creativeRequirements:data.get('creativeRequirements')})});
