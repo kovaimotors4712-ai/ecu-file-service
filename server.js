@@ -1481,7 +1481,7 @@ async function handleAdminAdvertisingQuotes(request, response) {
       const body = await readJson(request, 12000);
       const inquiryId = String(body?.inquiryId || '');
       if (!/^[0-9a-f-]{36}$/i.test(inquiryId)) { jsonResponse(response, 400, { error:'Select a valid advertiser enquiry.' }); return true; }
-      const inquiryResult = await supabaseRequest(token, 'rest/v1/advertising_inquiries?select=id,business_name,contact_name,email&id=eq.' + encodeURIComponent(inquiryId) + '&limit=1'.replace(' ', ''), { timeoutMs:12000 });
+      const inquiryResult = await supabaseRequest(token, 'rest/v1/advertising_inquiries?select=id,business_name,contact_name,email&id=eq.' + encodeURIComponent(inquiryId) + '&limit=1', { timeoutMs:12000 });
       if (!inquiryResult.ok) { jsonResponse(response, 502, { error:'Advertiser enquiry could not be loaded.' }); return true; }
       const inquiry = (await inquiryResult.json())?.[0];
       if (!inquiry) { jsonResponse(response, 404, { error:'Advertiser enquiry not found.' }); return true; }
@@ -1509,7 +1509,9 @@ async function handleAdminAdvertisingQuotes(request, response) {
         if (current.status !== 'draft') { jsonResponse(response, 409, { error:'Only a draft quote can be issued.' }); return true; }
         if (!hasResendConfig()) { jsonResponse(response, 503, { error:'Quote email delivery is not configured. The quote remains a draft.' }); return true; }
         const quoteResult = await supabaseRequest(token, 'rest/v1/advertising_quotes?select=*&id=eq.' + encodeURIComponent(id) + '&limit=1', { timeoutMs:12000 });
+        if (!quoteResult.ok) { jsonResponse(response, 502, { error:'Quote could not be loaded for issuing.' }); return true; }
         const quote = (await quoteResult.json())?.[0];
+        if (!quote) { jsonResponse(response, 404, { error:'Quote not found.' }); return true; }
         const inquiryResult = await supabaseRequest(token, 'rest/v1/advertising_inquiries?select=business_name,email&id=eq.' + encodeURIComponent(quote.inquiry_id) + '&limit=1', { timeoutMs:12000 });
         const inquiry = (await inquiryResult.json())?.[0];
         if (!quote || !inquiry?.email) { jsonResponse(response, 409, { error:'A valid advertiser email is required before issuing the quote.' }); return true; }
