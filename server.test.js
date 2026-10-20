@@ -268,9 +268,7 @@ const upstream = async (urlValue, options = {}) => {
       return response(201,[{...row}]);
     }
     if (method === 'PATCH') {
-      const idFilter=url.searchParams.get('id');
-      const rows=[...state.advertisingQuotes.values()].filter(row=>!idFilter||!idFilter.startsWith('eq.')||row.id===idFilter.slice(3));
-      const body=JSON.parse(options.body),updated=[];
+      const rows=filteredAdvertisingRows([...state.advertisingQuotes.values()],url.searchParams),body=JSON.parse(options.body),updated=[];
       for(const row of rows){Object.assign(row,body,{updated_at:new Date().toISOString()});updated.push({...row});}
       return response(200,updated);
     }
