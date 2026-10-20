@@ -643,6 +643,21 @@ test('forum verification SQL is read-only and checks the required security contr
   assert.equal(migration.split('pg_advisory_xact_lock(hashtextextended(actor::text, 0))').length - 1, 3, 'each forum rate-limit path must serialize concurrent checks');
 });
 
+test('trigger-function hardening migration revokes only direct RPC execute privileges', () => {
+  const sql = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020_harden_trigger_function_exec.sql'), 'utf8');
+  const targets = [...sql.matchAll(/REVOKE ALL ON FUNCTION public\.([a-z_]+)\(\) FROM PUBLIC, anon, authenticated;/g)].map((match) => match[1]).sort();
+  assert.deepEqual(targets, [
+    'create_profile_for_auth_user',
+    'enforce_order_contact_email',
+    'enforce_second_stage_payment_state',
+    'enqueue_admin_order_notifications'
+  ]);
+  assert.match(sql, /^BEGIN;/m);
+  assert.match(sql, /^COMMIT;/m);
+  assert.doesNotMatch(sql, /\b(GRANT|DROP|TRUNCATE|ALTER TABLE|DELETE FROM|UPDATE public|INSERT INTO)\b/i);
+  assert.doesNotMatch(sql, /efsi_create_paid_order|efsi_finalize_paid_checkout|orders|checkout_intents|order_files/i);
+});
+
 test('serves exact Google verification file googlea2bbe9d2fd8bede2.html and blocks arbitrary html files', async () => {
   const good = await fetch(`${baseUrl}/googlea2bbe9d2fd8bede2.html`);
   assert.equal(good.status, 200);
