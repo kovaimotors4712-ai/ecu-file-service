@@ -1702,6 +1702,7 @@ test('advertising quote flow keeps tokens out of URLs and verifies Razorpay paym
   const finalizer = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180100_finalize_advertising_payment.sql'), 'utf8');
   const publicationGuard = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180300_paid_ad_publication_guard.sql'), 'utf8');
   const lifecycleGuard = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180400_advertising_lifecycle_guard.sql'), 'utf8');
+  const foreignKeyIndexes = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180500_advertising_fk_indexes.sql'), 'utf8');
   assert.match(serverSource, /url\.pathname === '\/api\/admin\/advertising\/quotes'/);
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/quote'/);
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/payment\/create-order'/);
@@ -1726,6 +1727,9 @@ test('advertising quote flow keeps tokens out of URLs and verifies Razorpay paym
   assert.match(lifecycleGuard, /Invalid advertising quote status transition/i);
   assert.match(lifecycleGuard, /Invalid advertising payment status transition/i);
   assert.match(lifecycleGuard, /A verified matching advertising payment is required/i);
+  assert.match(foreignKeyIndexes, /advertising_payment_audit_actor_user_id_idx/i);
+  assert.match(foreignKeyIndexes, /advertising_quotes_created_by_idx/i);
+  assert.match(foreignKeyIndexes, /site_announcements_created_by_idx/i);
 });
 
 test('advertising quote/payment schema prevents multiple active attempts and keeps database writes server-only', () => {
