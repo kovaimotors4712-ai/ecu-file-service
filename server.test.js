@@ -1590,8 +1590,8 @@ test('advertising quote/payment schema is isolated, constrained, and server-role
   assert.match(schema, /references public\.advertising_inquiries\(id\) on delete restrict/i);
   assert.match(schema, /amount_paise bigint not null check \(amount_paise between 1 and 100000000000\)/i);
   assert.match(schema, /acceptance_token_hash text unique check/i);
-  assert.match(schema, /provider_signature_verified boolean not null default false/i);
-  assert.match(schema, /status <> 'verified' or \(provider_signature_verified/i);
+  assert.match(schema, /provider_evidence_verified boolean not null default false/i);
+  assert.match(schema, /status <> 'verified' or \(provider_evidence_verified/i);
   assert.match(schema, /alter table public\.advertising_quotes enable row level security/i);
   assert.match(schema, /alter table public\.advertising_payments enable row level security/i);
   assert.match(schema, /alter table public\.advertising_payment_audit enable row level security/i);
