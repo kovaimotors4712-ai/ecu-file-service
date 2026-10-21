@@ -75,6 +75,8 @@
     const visible = topics.filter(function (topic) {
       if (categoryId && topic.category_id !== categoryId) return false;
       if (statusFilter && statusFilter.value === 'unanswered' && Number(topic.reply_count || 0) > 0) return false;
+      if (statusFilter && statusFilter.value === 'solved' && !topic.accepted_reply_id) return false;
+      if (statusFilter && statusFilter.value === 'unsolved' && topic.accepted_reply_id) return false;
       if (!query) return true;
       return (topic.title + ' ' + topic.body + ' ' + (categories.find(function (item) { return item.id === topic.category_id; }) || {}).title)
         .toLocaleLowerCase().includes(query);
@@ -305,7 +307,7 @@
       $('#forum-reply-count').textContent = replies.length + (replies.length === 1 ? ' reply' : ' replies');
       setMessage(message, replies.length ? '' : 'No replies yet. Share a useful test result or a clarifying question.');
       list.innerHTML = replies.map(function (reply) {
-        return "<article class='reply-card'><div class='reply-card-head'><strong>" + escapeHtml(displayNameFor(reply.author_id, profiles)) + "</strong><span>" + escapeHtml(formatDate(reply.created_at)) + "</span></div>" +
+        return "<article class='reply-card" + (activeTopic.accepted_reply_id === reply.id ? " accepted-solution-card" : "") + "'><div class='reply-card-head'><strong>" + escapeHtml(displayNameFor(reply.author_id, profiles)) + "</strong><span>" + (activeTopic.accepted_reply_id === reply.id ? "<span class='topic-tag'>ACCEPTED SOLUTION</span> " : "") + escapeHtml(formatDate(reply.created_at)) + "</span></div>" +
           "<p class='reply-card-body'>" + escapeHtml(reply.body) + "</p>" +
           ((user && activeTopic && activeTopic.author_id === user.id) ? "<div class='reply-card-actions'><button type='button' class='button button-outline accept-solution' data-reply-id='" + escapeHtml(reply.id) + "'>" + (activeTopic.accepted_reply_id === reply.id ? 'Unmark solution' : 'Accept solution') + "</button> <button type='button' class='plain-report report-reply' data-reply-id='" + escapeHtml(reply.id) + "'>Report reply</button></div>" : (user ? "<div class='reply-card-actions'><button type='button' class='plain-report report-reply' data-reply-id='" + escapeHtml(reply.id) + "'>Report reply</button></div>" : '')) +
           "</article>";
