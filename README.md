@@ -1,6 +1,6 @@
 # ECU FILE SERVICE INDIA
 
-A responsive ECU SOLUTION storefront and admin console for ECU file services and Airbag Crash Clear. Historical Dashboard orders remain in the database and admin order history.
+A responsive ECU File Service India storefront and admin console for ECU file services and Airbag Crash Clear. Historical Dashboard orders remain in the database and admin order history.
 
 ## Current architecture
 
