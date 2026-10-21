@@ -599,6 +599,36 @@
   loadChatMessages();
   window.setInterval(loadChatMessages, 12000);
 
+
+  // Display only active, admin-published sidebar promotions from the existing site-content system.
+  (function loadForumSidebarPromotion() {
+    const slot = $('#forum-sidebar-ad-slot');
+    const target = $('#forum-sidebar-ad-content');
+    if (!slot || !target) return;
+    const safeHttps = function (value) {
+      try { const url = new URL(value, window.location.origin); return url.protocol === 'https:' ? url.href : null; }
+      catch (_) { return null; }
+    };
+    fetch('/api/site-content', { headers: { Accept: 'application/json' } }).then(async function (response) {
+      if (!response.ok) throw new Error('promotion unavailable');
+      const data = await response.json();
+      const item = (Array.isArray(data.items) ? data.items : []).find(function (entry) {
+        return entry.placement === 'sidebar' && entry.kind === 'ad';
+      });
+      if (!item) return;
+      target.replaceChildren();
+      const heading = document.createElement('h3'); heading.textContent = item.title || 'Sponsored workshop resource';
+      const body = document.createElement('p'); body.textContent = item.body || '';
+      target.append(heading);
+      const imageUrl = safeHttps(item.image_url);
+      if (imageUrl) { const image = document.createElement('img'); image.src = imageUrl; image.alt = ''; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer'; target.append(image); }
+      target.append(body);
+      const href = safeHttps(item.cta_url);
+      if (href && item.cta_label) { const link = document.createElement('a'); link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer sponsored'; link.textContent = item.cta_label + ' ↗'; target.append(link); }
+      slot.hidden = false;
+    }).catch(function () { /* Ads are optional; a failed ad request must not affect forum use. */ });
+  })();
+
   $('#forum-year').textContent = String(new Date().getFullYear());
   if (!api) {
     setMessage($('#forum-auth-message'), 'Account service is unavailable. The forum cannot be used until setup is complete.', 'error');
