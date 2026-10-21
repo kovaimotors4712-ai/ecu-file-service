@@ -42,3 +42,48 @@
 /* Keep the free-text reader field visually aligned with the original select control. */
 #reading-tool{padding-right:28px;background-image:linear-gradient(45deg,transparent 50%,#7b867e 50%),linear-gradient(135deg,#7b867e 50%,transparent 50%);background-position:calc(100% - 12px) 16px,calc(100% - 7px) 16px;background-size:5px 5px,5px 5px;background-repeat:no-repeat;}
 #reading-tool:focus{background-image:linear-gradient(45deg,transparent 50%,#829a32 50%),linear-gradient(135deg,#829a32 50%,transparent 50%);}
+
+
+/* Mobile polish: prevent horizontal overflow and keep hero content readable. */
+html, body { width:100%; max-width:100%; }
+body { overflow-x:clip; }
+img, svg, video, canvas { max-width:100%; }
+@media (max-width:740px) {
+  .site-header { width:100%; min-width:0; padding-left:16px; padding-right:16px; gap:10px; }
+  .brand { min-width:0; flex:1 1 auto; gap:8px; }
+  .brand-name { min-width:0; overflow-wrap:anywhere; line-height:1.35; }
+  .brand-mark { flex:0 0 34px; }
+  .header-actions { flex:0 0 auto; min-width:0; }
+  .hero { width:100%; min-width:0; min-height:0; padding:68px 24px 54px; align-items:flex-start; }
+  .hero-content { width:100%; max-width:100%; min-width:0; }
+  .hero h1 { max-width:100%; font-size:clamp(39px, 9vw, 58px); line-height:1.08; letter-spacing:-.045em; overflow-wrap:normal; }
+  .hero-copy { max-width:100%; font-size:14px; line-height:1.75; }
+  .hero-actions { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; width:100%; }
+  .hero-actions .button { width:100%; min-height:50px; justify-content:space-between; }
+  .hero-art { display:none; }
+  .hero-meta { display:grid; grid-template-columns:minmax(0,1fr); gap:9px; margin-top:26px; line-height:1.6; }
+  .hero-meta>i { display:none; }
+  .hero-index { right:18px; bottom:14px; }
+  .trust-strip { width:100%; min-width:0; padding:18px 24px; gap:14px; flex-wrap:wrap; justify-content:space-between; }
+  .strip-label, .strip-note { display:none; }
+  .section, .process-section, .tools-section { width:100%; min-width:0; padding-left:24px; padding-right:24px; }
+  .section-heading, .process-heading { align-items:flex-start; flex-direction:column; gap:14px; }
+  .section h2, .process-heading h2, .tools-content h2 { max-width:100%; font-size:clamp(30px,7vw,42px); line-height:1.15; overflow-wrap:break-word; }
+  .service-cards, .steps, .tools-section, .order-layout { grid-template-columns:minmax(0,1fr); }
+  .service-card { min-width:0; }
+  .order-form, .order-aside { min-width:0; width:100%; }
+  .order-aside { position:static; }
+}
+@media (max-width:400px) {
+  .site-header { padding-left:12px; padding-right:12px; gap:6px; }
+  .brand-mark { width:29px; height:29px; flex-basis:29px; }
+  .brand-mark svg { width:20px; }
+  .brand-name { font-size:7px; letter-spacing:.02em; }
+  .header-actions { gap:4px; }
+  .account-trigger { max-width:68px; padding:8px 5px; font-size:7px; }
+  .header-contact { padding:8px 6px; font-size:7px; }
+  .hero { padding:56px 18px 48px; }
+  .hero h1 { font-size:clamp(36px,10vw,44px); }
+  .section, .process-section, .tools-section { padding-left:18px; padding-right:18px; }
+  .trust-strip { padding-left:18px; padding-right:18px; }
+}
