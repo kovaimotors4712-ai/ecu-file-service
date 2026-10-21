@@ -45,7 +45,7 @@
   };
   function isUnsupportedElectricModel(brand, model) {
     const raw = String(model || '').trim();
-    if (/\\b(?:EV|BEV|electric)\\b/i.test(raw)) return true;
+    if (/\b(?:EV|BEV|electric)\b/i.test(raw)) return true;
     const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     const candidate = normalize(raw);
     return (electricOnlyModels[String(brand || '').trim()] || []).some(name => {
