@@ -1,52 +1,55 @@
 # ECU File Service India — Release Work Tracker
-Updated: 2026-10-20
+Updated: 2026-10-21
 
 Repository: https://github.com/kovaimotors4712-ai/ecu-file-service
 Production domain: https://ecufileservice.in
 Production branch: main
-Current production commit: 6f3558c26194d0666e11f573f0bc9a1242022241
+Latest verified production commit: 930a76c2ea8fc09586d6b029ccf06b138552907b
 
-## Completed and verified
+## Verified in the latest production review
 
-- GitHub Actions runs the existing Node.js suite plus syntax checks for the server, front-end scripts, and staged forum client.
-- CI passed on the current forum-stage merge: npm test and all JavaScript syntax checks.
-- Render deployed the forum-stage commit successfully. Live API health reports configured=true, paymentConfigured=true, Razorpay ready, schemaReady=true and serviceRoleAvailable=true.
-- Baseline browser security headers are present in the server response code. Regression tests cover customer and admin HTML responses.
-- Checkout insert failure responses use a customer-safe generic error rather than returning raw PostgREST/schema details.
-- Public diagnostic guides are live at https://ecufileservice.in/guides.html; the sitemap lists the homepage, two service pages, and the Guides page.
-- A narrow manual grant of SELECT and UPDATE on public.notification_outbox to service_role was run in the Supabase SQL Editor; the privilege query returned can_select=true and can_update=true.
-- A worker log after the grant showed Queue batch found { count: 10 }. Continue observing later worker runs; this is not proof of successful email delivery.
-- Forum preparation is merged in a gated state: UI/client, additive RLS/rate-limit migration, verification SQL and staging documentation are present in the repository. It is deliberately not enabled as a public route.
-- Forum security regression tests check that forum HTML, JS, CSS and migration files remain inaccessible over HTTP before database verification.
-- Existing ECU checkout, Razorpay finalization and private result-delivery code were not changed by the staged forum feature.
+- Render deployment for commit 930a76c2ea8fc09586d6b029ccf06b138552907b is live.
+- GitHub Actions run 39559265891 completed successfully.
+- Live /api/health reports configured=true, paymentConfigured=true, schemaReady=true and serviceRoleAvailable=true. Razorpay and Resend readiness are true; PayPal readiness is false.
+- Public homepage and ECU service page load over HTTPS with current neutral page titles/metadata. The exact private business-name search returns no matches in current default-branch code search results. Public search indexes and historical Git commit/PR diffs can retain older copies; do not claim historical erasure.
+- robots.txt and sitemap.xml load. The sitemap currently lists nine public URLs, including /forum.html and /advertise.html.
+- The live forum page loads; production database reports six active categories, zero topics and zero replies. Forum tables and policies exist in the verified Supabase project, and migration history includes forum_core_20261020. Forum is empty, not populated with sample/customer content.
+- Current public database grants/RLS inspection: six internal tables have RLS enabled and zero policies; anon/authenticated SELECT and INSERT grants are false for those tables. The checkout_intents, orders, order_files, notifications and forum tables have RLS enabled and policies. Keep the existing paid-checkout SECURITY DEFINER RPC unchanged unless its authorization design is reviewed end-to-end.
+- Read-only production counts: 12 notification_outbox records are SENT; one advertising payment record is cancelled; two orders currently have status Completed. These counts do not prove inbox delivery or a successful live advertising payment.
+- Existing private result delivery and Razorpay checkout are preserved. Never run a real payment as a smoke test.
 
-## Pending — do not bypass these gates
+## Outstanding — requires credentials, account action, or a deliberate launch decision
 
-### P0 — production database and notifications
-- Supabase connector methods still return the eligible linked-account error. The correct project is visible in the user's Supabase dashboard, but connector-side migration/schema inspection is unavailable.
-- Before applying schema changes, confirm production project identity and inspect migration history, existing tables, RLS, storage policies, security/performance advisors and a verified recovery point.
-- The manual notification_outbox grant succeeded, but migration history has not been reconciled with the manual change. Continue checking worker logs for recurring 403s and confirm actual notifications are delivered idempotently.
-- The additive forum migration has not been applied to any database. Review and apply only once in the verified project, then run supabase/verify_forum_core.sql and test with normal and moderator accounts.
+### P0 — delivery and payments
+- Email provider readiness is configured, but actual delivery to recipient inboxes and bounce/spam handling have not been independently confirmed. Check worker logs for recurring errors and verify delivery using an owner-controlled test address; do not contact customers as a test.
+- PayPal is not configured in production (health reports paypal=false). Enable only after valid production credentials and a deliberate decision to support it; never invent credentials or change payment secrets without authorization.
+- Advertising checkout has not been proven end-to-end with a successful authorized test payment. Do not create a real charge without explicit approval; use gateway test mode or a documented safe test procedure.
+- The public health endpoint being green is not a substitute for authenticated customer/admin regression tests or full payment/download verification.
 
-### P1 — Forum launch
-- forum.html, forum.css and forum.js are in the repository but are not in the public-file allowlist, homepage navigation or sitemap; the public forum route intentionally returns 404.
-- After the database migration is verified, test sign-in/sign-up, profile ownership, category/topic/reply operations, rate limits, self-report rejection, report confidentiality and moderator-only actions. Only then enable the route and navigation in a separate change.
-- No forum attachment uploads exist. Do not accept ECU binaries, private download links or customer-identifying data through the forum.
+### P1 — security and database hygiene
+- Supabase security advisor reports leaked-password protection disabled. Enable it in the Supabase Auth settings when the account owner can review the setting and its sign-in impact.
+- Supabase advisor reports six RLS-enabled internal tables with no policies: advertising_inquiries, advertising_payment_audit, advertising_payments, advertising_quotes, notification_outbox and site_announcements. Current anon/authenticated grants for these tables are false, so do not add permissive policies just to silence the advisor. Review service-role-only access and required server paths before any policy/grant changes.
+- Advisor flags public.efsi_finalize_paid_checkout as SECURITY DEFINER callable by authenticated users. This is an intentional checkout path in the current design; review function body, signature verification and ownership/amount checks before changing grants.
+- Do not drop indexes solely because advisors call them unused; current usage history may be limited.
+- Continue verifying private storage, order ownership, webhook idempotency and admin authorization after any code/schema change.
 
-### P1 — Licensed Store and Membership
-- Store/Membership UI and server integration have not been deployed. Integrate separately without changing the existing ECU checkout/payment finalizer.
-- Keep licensed-store-files private. Verify payment signatures/amounts, duplicate callbacks, ownership, download limits, membership expiry and RLS before launch.
-- Publish no item until lawful commercial redistribution rights are documented. No products or plans are seeded.
+### P1 — forum
+- Forum page is publicly readable and its database core is present, but it has no topics/replies yet. Before promoting it, test sign-in, profile ownership, topic/reply creation, rate limits, reporting privacy and moderator-only actions with ordinary and moderator accounts.
+- Do not seed fake posts or accept ECU binaries, private download links or customer-identifying data as forum attachments.
 
-### P2 — SEO, legal pages and launch
-- Privacy, Terms and Refund pages remain drafts. Review against real business practices and applicable law before making them public.
-- Add new URLs to sitemap only when those routes are actually live and tested.
-- After each release, run the repository suite, inspect the exact diff, verify Render deployment and health, check payment and private-file delivery, then verify rollback readiness.
+### P1 — store and membership
+- Store and membership pages are present in the sitemap, but full purchase, entitlement, download-limit and expiry workflows have not been verified end-to-end. Do not advertise paid plans/items as fully operational until the entire flow passes.
+- Keep licensed files private and publish no item until commercial redistribution rights are documented.
 
-## Security guardrails
+### P2 — SEO and legal launch readiness
+- robots.txt and sitemap.xml are reachable; Search Console indexing status for every URL is not confirmed. A prior indexing request is not confirmed as completed.
+- Privacy, Terms and Refund pages require review against actual business practices and applicable law before publication.
+- Recheck canonical URLs, sitemap membership and noindex behavior after route changes.
+
+## Security and release guardrails
 
 - Keep https://ecufileservice.in unchanged.
-- Never request, expose, or commit service-role keys, database passwords, Razorpay secrets or customer files.
-- Never apply migrations blindly or to a different/inactive Supabase project.
-- Preserve the private-ecu-files bucket, payment/order tables and existing checkout path.
-- Static/package tests and a healthy health endpoint do not prove full database authorization or end-to-end security.
+- Never expose or commit service-role keys, database passwords, payment secrets or customer files.
+- Never apply migrations blindly or against a different/inactive Supabase project.
+- Preserve the private-ecu-files bucket, existing order/payment tables and checkout path.
+- After each release, run tests and syntax checks, inspect the exact diff, verify the live Render deployment/health, and validate payment and private-file delivery without creating unauthorized real charges.
