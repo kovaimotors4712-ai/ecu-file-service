@@ -22,6 +22,41 @@ const maxAirbagPhotoBytes = 10 * 1024 * 1024;
 const allowedAirbagPhotoMimes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const allowedCorsOrigins = new Set(['https://ecufileservice.in', 'https://www.ecufileservice.in']);
 const premiumTwoWheelerBrands = new Set(['Aprilia','BMW Motorrad','Benelli','Ducati','Harley-Davidson','Kawasaki','KTM','Moto Guzzi','MV Agusta','Triumph']);
+const electricOnlyModels = {
+  'Tata Motors':['Nexon EV','Tiago EV','Tigor EV','Punch EV','Curvv EV','Harrier EV','Sierra EV'],
+  'Tata Motors Commercial Vehicles':['Ace EV'],
+  'Mahindra':['XUV400','BE 6','XEV 9e','eVerito','e2o'],
+  'Hyundai':['Kona','Ioniq','Ioniq 5','Ioniq 6'],
+  'MG Motor':['Comet','ZS','Windsor','Cyberster'],
+  'BMW':['i3','i4','i5','i7','iX','iX1','iX2','iX3'],
+  'Mercedes-Benz':['EQA','EQB','EQC','EQE','EQS'],
+  'Audi':['e-tron','Q4 e-tron','Q8 e-tron'],
+  'Porsche':['Taycan'],
+  'Volvo':['EX30','EX40','EC40','EX90'],
+  'Nissan':['Leaf','Ariya'],
+  'Renault':['Zoe','Megane E-Tech'],
+  'Citroën':['e-C3','ë-C3','eC3'],
+  'Maruti Suzuki':['e Vitara'],
+  'Kia':['EV6','EV9','Carens Clavis EV'],
+  'Jaguar':['I-Pace'],
+  'Mini':['Cooper SE','Electric'],
+  'Lexus':['RZ'],
+  'Volkswagen':['ID.3','ID.4','ID.5','ID.7','ID Buzz'],
+  'Ford':['Mustang Mach-E','F-150 Lightning'],
+  'Toyota':['bZ4X']
+};
+const twoWheelerOnlyBrands = new Set(['Aprilia','Bajaj','Benelli','BMW Motorrad','Ducati','Harley-Davidson','Kawasaki','KTM','Moto Guzzi','MV Agusta','Polaris','Triumph','TVS','Yamaha']);
+function isUnsupportedElectricModel(brand, model) {
+  const raw = String(model || '').trim();
+  if (/\\b(?:EV|BEV|electric)\\b/i.test(raw)) return true;
+  const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const candidate = normalize(raw);
+  return (electricOnlyModels[String(brand || '').trim()] || []).some(name => {
+    const blocked = normalize(name);
+    return candidate === blocked || candidate.startsWith(blocked + ' ');
+  });
+}
+
 const publicFiles = new Set(['index.html', 'admin.html', 'advertising-quote.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'googlea2bbe9d2fd8bede2.html']);
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -255,8 +290,9 @@ function normalizePaymentRequest(value) {
   if (!clean(value?.vehicleBrand) || !clean(value?.vehicleType) || !clean(value?.vehicleModel) || !clean(value?.contactName) || !clean(value?.contactPhone) || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error('Complete the required vehicle, contact and valid email details.');
   }
-  if (/\b(?:EV|BEV|electric)\b/i.test(clean(value?.vehicleModel))) throw new Error('Electric vehicles are not currently supported. Select a non-EV vehicle variant.');
+  if (isUnsupportedElectricModel(clean(value?.vehicleBrand), clean(value?.vehicleModel))) throw new Error('Electric vehicles are not currently supported. Select a non-EV vehicle variant.');
   if (clean(value?.vehicleType) === 'Two-wheeler' && !premiumTwoWheelerBrands.has(clean(value?.vehicleBrand))) throw new Error('Two-wheeler requests are limited to selected imported/premium motorcycle brands.');
+  if (clean(value?.vehicleType) !== 'Two-wheeler' && twoWheelerOnlyBrands.has(clean(value?.vehicleBrand))) throw new Error('Select the imported/premium two-wheeler vehicle type for this motorcycle brand.');
   if (year !== null && (!Number.isInteger(year) || year < 1950 || year > 2100)) throw new Error('Enter a valid vehicle year.');
   if (category === 'AIRBAG' && year === null) throw new Error('Year is required for Airbag Crash Clear requests.');
   if (category === 'AIRBAG' && (services.length !== 1 || services[0] !== 'Crash Clear')) throw new Error('Airbag requests support Crash Clear only.');

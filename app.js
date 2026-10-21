@@ -20,6 +20,39 @@
   ];
   const premiumTwoWheelerBrands = new Set(['Aprilia','BMW Motorrad','Benelli','Ducati','Harley-Davidson','Kawasaki','KTM','Moto Guzzi','MV Agusta','Triumph']);
   const twoWheelerOnlyBrands = new Set(['Aprilia','Bajaj','Benelli','BMW Motorrad','Ducati','Harley-Davidson','Kawasaki','KTM','Moto Guzzi','MV Agusta','Polaris','Triumph','TVS','Yamaha']);
+  const electricOnlyModels = {
+    'Tata Motors':['Nexon EV','Tiago EV','Tigor EV','Punch EV','Curvv EV','Harrier EV','Sierra EV'],
+    'Tata Motors Commercial Vehicles':['Ace EV'],
+    'Mahindra':['XUV400','BE 6','XEV 9e','eVerito','e2o'],
+    'Hyundai':['Kona','Ioniq','Ioniq 5','Ioniq 6'],
+    'MG Motor':['Comet','ZS','Windsor','Cyberster'],
+    'BMW':['i3','i4','i5','i7','iX','iX1','iX2','iX3'],
+    'Mercedes-Benz':['EQA','EQB','EQC','EQE','EQS'],
+    'Audi':['e-tron','Q4 e-tron','Q8 e-tron'],
+    'Porsche':['Taycan'],
+    'Volvo':['EX30','EX40','EC40','EX90'],
+    'Nissan':['Leaf','Ariya'],
+    'Renault':['Zoe','Megane E-Tech'],
+    'Citroën':['e-C3','ë-C3','eC3'],
+    'Maruti Suzuki':['e Vitara'],
+    'Kia':['EV6','EV9','Carens Clavis EV'],
+    'Jaguar':['I-Pace'],
+    'Mini':['Cooper SE','Electric'],
+    'Lexus':['RZ'],
+    'Volkswagen':['ID.3','ID.4','ID.5','ID.7','ID Buzz'],
+    'Ford':['Mustang Mach-E','F-150 Lightning'],
+    'Toyota':['bZ4X']
+  };
+  function isUnsupportedElectricModel(brand, model) {
+    const raw = String(model || '').trim();
+    if (/\\b(?:EV|BEV|electric)\\b/i.test(raw)) return true;
+    const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const candidate = normalize(raw);
+    return (electricOnlyModels[String(brand || '').trim()] || []).some(name => {
+      const blocked = normalize(name);
+      return candidate === blocked || candidate.startsWith(blocked + ' ');
+    });
+  }
   const modelCatalog = {
     'Maruti Suzuki':['Alto','Alto K10','S-Presso','Celerio','Wagon R','Swift','Dzire','Baleno','Fronx','Brezza','Ertiga','XL6','Grand Vitara','Ignis','Eeco','Jimny','Ciaz','S-Cross','Vitara Brezza'],
     'Tata Motors':['Nano','Tiago','Tigor','Altroz','Punch','Nexon','Harrier','Safari','Indica','Indigo','Bolt','Zest','Sumo','Hexa','Aria'],
@@ -135,7 +168,7 @@
       const year = values.vehicleYear;
       if (!values.vehicleBrand || !values.vehicleType || !values.vehicleModel) { setError(index, 'Brand, vehicle type and model are required.'); return false; }
       if (values.vehicleType === 'Two-wheeler' && !premiumTwoWheelerBrands.has(values.vehicleBrand)) { setError(index, 'Two-wheeler requests are limited to selected imported/premium motorcycle brands.'); return false; }
-      if (/\b(?:EV|BEV|electric)\b/i.test(values.vehicleModel)) { setError(index, 'Electric vehicles are not currently supported. Select a petrol, diesel, CNG or other non-EV variant.'); return false; }
+      if (isUnsupportedElectricModel(values.vehicleBrand, values.vehicleModel)) { setError(index, 'Electric vehicles are not supported. Select a supported petrol, diesel, CNG or other non-EV variant.'); return false; }
       if (values.category === 'AIRBAG' && !year) { setError(index, 'Year is required for Airbag Crash Clear requests.'); return false; }
       if (year && (!/^\d{4}$/.test(year) || Number(year)<1950 || Number(year)>2100)) { setError(index, 'Enter a valid vehicle year.'); return false; }
     }

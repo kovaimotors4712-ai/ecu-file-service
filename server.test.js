@@ -819,6 +819,23 @@ test('rejects electric vehicle variants before creating a checkout', async () =>
   assert.equal(result.response.status,400);
 });
 
+test('rejects EV-only model names even when the model name does not say EV', async () => {
+  const { request } = customerRequest();
+  request.vehicleBrand = 'Hyundai';
+  request.vehicleModel = 'Ioniq 5';
+  const result = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request } });
+  assert.equal(result.response.status,400);
+});
+
+test('rejects motorcycle-only brands when submitted as passenger cars', async () => {
+  const { request } = customerRequest();
+  request.vehicleType = 'Passenger car';
+  request.vehicleBrand = 'Yamaha';
+  request.vehicleModel = 'R1';
+  const result = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request } });
+  assert.equal(result.response.status,400);
+});
+
 test('rejects non-premium two-wheelers before creating a checkout', async () => {
   const { request } = customerRequest();
   request.vehicleType = 'Two-wheeler';
