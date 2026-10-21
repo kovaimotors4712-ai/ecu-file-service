@@ -75,6 +75,8 @@
     const visible = topics.filter(function (topic) {
       if (categoryId && topic.category_id !== categoryId) return false;
       if (statusFilter && statusFilter.value === 'unanswered' && Number(topic.reply_count || 0) > 0) return false;
+      if (statusFilter && statusFilter.value === 'solved' && !topic.accepted_reply_id) return false;
+      if (statusFilter && statusFilter.value === 'unsolved' && topic.accepted_reply_id) return false;
       if (!query) return true;
       return (topic.title + ' ' + topic.body + ' ' + (categories.find(function (item) { return item.id === topic.category_id; }) || {}).title)
         .toLocaleLowerCase().includes(query);
@@ -93,6 +95,7 @@
         "<div class='topic-card-top'><span class='topic-tag'>" + escapeHtml(category ? category.title : 'Discussion') + "</span>" +
         (topic.is_pinned ? "<span class='topic-pin'>PINNED</span>" : '') +
         (topic.is_locked ? "<span class='topic-locked'>LOCKED</span>" : '') +
+        (topic.accepted_reply_id ? "<span class='topic-tag'>SOLVED</span>" : '') +
         (Number(topic.reply_count || 0) === 0 ? "<span class='topic-tag'>UNANSWERED</span>" : "<span class='topic-tag'>" + Number(topic.reply_count || 0) + (Number(topic.reply_count || 0) === 1 ? ' REPLY' : ' REPLIES') + "</span>") + "</div>" +
         "<h3><button type='button' class='topic-open' data-topic-id='" + escapeHtml(topic.id) + "'>" + escapeHtml(topic.title) + "</button></h3>" +
         "<p class='topic-preview'>" + escapeHtml(preview) + "</p>" +
@@ -108,7 +111,7 @@
     }
     setMessage(topicsMessage, 'Loading topics…');
     try {
-      const rows = await api.rest('forum_topics?select=id,category_id,author_id,title,body,is_pinned,is_locked,created_at&order=is_pinned.desc,created_at.desc&limit=100');
+      const rows = await api.rest('forum_topics?select=id,category_id,author_id,title,body,is_pinned,is_locked,accepted_reply_id,created_at&order=is_pinned.desc,created_at.desc&limit=100');
       topics = Array.isArray(rows) ? rows : [];
       topics.forEach(function (topic) { topic.reply_count = 0; });
       const topicIds = topics.filter(function (topic) { return validUuid(topic.id); }).map(function (topic) { return topic.id; });
@@ -265,7 +268,7 @@
     if (!validUuid(topicId)) return;
     let topic = topics.find(function (item) { return item.id === topicId; });
     try {
-      const found = await api.rest('forum_topics?select=id,category_id,author_id,title,body,is_pinned,is_locked,created_at&id=eq.' + encodeURIComponent(topicId) + '&limit=1');
+      const found = await api.rest('forum_topics?select=id,category_id,author_id,title,body,is_pinned,is_locked,accepted_reply_id,created_at&id=eq.' + encodeURIComponent(topicId) + '&limit=1');
       if (Array.isArray(found) && found.length) topic = found[0];
     } catch (_) {}
     if (!topic) {
@@ -279,6 +282,7 @@
     $('#forum-thread-category').textContent = category ? category.title : 'Workshop discussion';
     $('#forum-thread-meta').textContent = 'By ' + displayNameFor(topic.author_id, topicList._profiles || {}) + ' · ' + formatDate(topic.created_at) + (topic.is_pinned ? ' · Pinned' : '');
     $('#forum-thread-body').textContent = topic.body;
+    $('#forum-thread-category').textContent = (category ? category.title : 'Workshop discussion') + (topic.accepted_reply_id ? ' · SOLVED' : '');
     $('#forum-report-topic').hidden = !user;
     $('#forum-topics-heading');
     $('.topics-panel').hidden = true;
@@ -297,15 +301,15 @@
     list.innerHTML = '';
     setMessage(message, 'Loading replies…');
     try {
-      const rows = await api.rest('forum_replies?select=id,topic_id,author_id,body,created_at&topic_id=eq.' + encodeURIComponent(topicId) + '&order=created_at.asc&limit=200');
+      const rows = await api.rest('forum_replies?select=id,topic_id,author_id,body,is_hidden,created_at&topic_id=eq.' + encodeURIComponent(topicId) + '&order=created_at.asc&limit=200');
       const replies = Array.isArray(rows) ? rows : [];
       const profiles = await profilesFor(replies.map(function (reply) { return reply.author_id; }));
       $('#forum-reply-count').textContent = replies.length + (replies.length === 1 ? ' reply' : ' replies');
       setMessage(message, replies.length ? '' : 'No replies yet. Share a useful test result or a clarifying question.');
       list.innerHTML = replies.map(function (reply) {
-        return "<article class='reply-card'><div class='reply-card-head'><strong>" + escapeHtml(displayNameFor(reply.author_id, profiles)) + "</strong><span>" + escapeHtml(formatDate(reply.created_at)) + "</span></div>" +
+        return "<article class='reply-card" + (activeTopic.accepted_reply_id === reply.id ? " accepted-solution-card" : "") + "'><div class='reply-card-head'><strong>" + escapeHtml(displayNameFor(reply.author_id, profiles)) + "</strong><span>" + (activeTopic.accepted_reply_id === reply.id ? "<span class='topic-tag'>ACCEPTED SOLUTION</span> " : "") + escapeHtml(formatDate(reply.created_at)) + "</span></div>" +
           "<p class='reply-card-body'>" + escapeHtml(reply.body) + "</p>" +
-          (user ? "<div class='reply-card-actions'><button type='button' class='plain-report report-reply' data-reply-id='" + escapeHtml(reply.id) + "'>Report reply</button></div>" : '') +
+          ((user && activeTopic && activeTopic.author_id === user.id) ? "<div class='reply-card-actions'><button type='button' class='button button-outline accept-solution' data-reply-id='" + escapeHtml(reply.id) + "'>" + (activeTopic.accepted_reply_id === reply.id ? 'Unmark solution' : 'Accept solution') + "</button> <button type='button' class='plain-report report-reply' data-reply-id='" + escapeHtml(reply.id) + "'>Report reply</button></div>" : (user ? "<div class='reply-card-actions'><button type='button' class='plain-report report-reply' data-reply-id='" + escapeHtml(reply.id) + "'>Report reply</button></div>" : '')) +
           "</article>";
       }).join('');
     } catch (_) {
@@ -476,7 +480,27 @@
   $('#forum-report-topic').addEventListener('click', function () {
     if (activeTopic) submitReport(activeTopic.id, null);
   });
-  $('#forum-reply-list').addEventListener('click', function (event) {
+  $('#forum-reply-list').addEventListener('click', async function (event) {
+    const acceptButton = event.target.closest('.accept-solution');
+    if (acceptButton && activeTopic && user && activeTopic.author_id === user.id) {
+      const replyId = acceptButton.getAttribute('data-reply-id');
+      acceptButton.disabled = true;
+      try {
+        await api.rest('rpc/forum_set_accepted_reply', { method: 'POST', body: { p_topic_id: activeTopic.id, p_reply_id: activeTopic.accepted_reply_id === replyId ? null : replyId }, prefer: 'return=representation' });
+        const result = await api.rest('forum_topics?select=id,category_id,author_id,title,body,is_pinned,is_locked,accepted_reply_id,created_at&id=eq.' + encodeURIComponent(activeTopic.id) + '&limit=1');
+        const updated = Array.isArray(result) ? result[0] : null;
+        if (!updated) throw new Error('Topic unavailable');
+        activeTopic = updated;
+        const topicIndex = topics.findIndex(function (item) { return item.id === updated.id; });
+        if (topicIndex >= 0) topics[topicIndex].accepted_reply_id = updated.accepted_reply_id;
+        setMessage($('#forum-replies-message'), updated.accepted_reply_id ? 'Accepted solution saved.' : 'Accepted solution removed.', 'success');
+        await loadReplies(activeTopic.id);
+        renderTopics();
+      } catch (_) {
+        setMessage($('#forum-replies-message'), 'Could not update the accepted solution. Only the topic author can change it.', 'error');
+      } finally { acceptButton.disabled = false; }
+      return;
+    }
     const button = event.target.closest('.report-reply');
     if (button && activeTopic) submitReport(null, button.getAttribute('data-reply-id'));
   });

@@ -94,7 +94,7 @@
           <div class="forum-filters">
             <label class="search-label">Search discussions<input id="forum-search" type="search" placeholder="DTC, ECU family, symptoms…" maxlength="120"></label>
             <label>Category<select id="forum-category-filter"><option value="">All categories</option></select></label>
-            <label>Topic status<select id="forum-status-filter"><option value="all">All topics</option><option value="unanswered">Unanswered only</option></select></label>
+            <label>Topic status<select id="forum-status-filter"><option value="all">All topics</option><option value="unanswered">Unanswered only</option><option value="unsolved">Unsolved topics</option><option value="solved">Solved topics</option></select></label>
           </div>
           <p id="forum-topics-message" class="status-message" aria-live="polite">Loading community topics…</p>
           <div id="forum-topic-list" class="forum-topic-list" aria-live="polite"></div>
@@ -142,6 +142,6 @@
   </footer>
   <script src="/supabase.js"></script>
   <script src="/auth.js"></script>
-  <script src="/forum.js?v=20261022-1"></script>
+  <script src="/forum.js?v=20261022-accepted-solution"></script>
 </body>
 </html>
