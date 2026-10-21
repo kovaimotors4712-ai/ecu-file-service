@@ -1,4 +1,4 @@
--- ECU SOLUTION Forum core: additive only. Review and apply only to the verified production project.
+-- Automotive forum core: additive only. Review and apply only to the verified production project.
 -- Public reads are limited to visible content. Publishing/moderation writes require auth + RLS.
 BEGIN;
 
