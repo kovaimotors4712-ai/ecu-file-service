@@ -145,7 +145,12 @@
   (function () {
     var hero = document.querySelector('main#home > .hero');
     var order = document.querySelector('#order.order-section');
-    if (hero && order) hero.insertAdjacentElement('afterend', order);
+    var quickServices = document.querySelector('.quick-service-strip');
+    var community = document.querySelector('#workshop-community');
+    if (hero && quickServices) hero.insertAdjacentElement('afterend', quickServices);
+    if (quickServices && order) quickServices.insertAdjacentElement('afterend', order);
+    else if (hero && order) hero.insertAdjacentElement('afterend', order);
+    if (order && community) order.insertAdjacentElement('afterend', community);
     var params = new URLSearchParams(window.location.search);
     var category = (params.get('category') || '').toUpperCase();
     if (category === 'ECU' || category === 'AIRBAG') {
