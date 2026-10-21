@@ -1419,8 +1419,8 @@ async function handleAdminSiteSettings(request, response) {
       const telegram=cleanSiteText(body.telegram_url,500);
       const email=cleanSiteText(body.contact_email,254).toLowerCase();
       if (telegram) { let parsed; try { parsed=new URL(telegram); } catch { throw Object.assign(new Error('Enter a valid Telegram URL.'),{statusCode:400}); } if (parsed.protocol!=='https:' || !['t.me','telegram.me','www.t.me','www.telegram.me'].includes(parsed.hostname.toLowerCase()) || parsed.username || parsed.password) throw Object.assign(new Error('Telegram link must use an HTTPS t.me or telegram.me address.'),{statusCode:400}); }
-      if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) throw Object.assign(new Error('Enter a valid contact email address.'),{statusCode:400});
-      if (phone && phone.replace(/[^\\d]/g,'').length<7) throw Object.assign(new Error('Enter a valid phone number, or leave it empty.'),{statusCode:400});
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw Object.assign(new Error('Enter a valid contact email address.'),{statusCode:400});
+      if (phone && phone.replace(/[^\d]/g,'').length<7) throw Object.assign(new Error('Enter a valid phone number, or leave it empty.'),{statusCode:400});
       if (!phone && !telegram && !email) throw Object.assign(new Error('Enter at least one public contact method.'),{statusCode:400});
       const payload={id:true,contact_phone:phone,telegram_url:telegram,contact_email:email,updated_at:new Date().toISOString(),updated_by:admin.id};
       const result=await supabaseRequest(token,'rest/v1/site_public_settings?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=representation',body:payload,timeoutMs:12000});
