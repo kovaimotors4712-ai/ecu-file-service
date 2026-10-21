@@ -38,3 +38,7 @@
 .hero-actions{flex-wrap:wrap;}
 @media(max-width:740px){.forum-header-cta{min-height:32px;padding:8px 9px;font-size:10px}.header-actions{gap:7px}}
 @media(max-width:400px){.forum-header-cta{padding:7px 6px;font-size:9px}.header-actions{gap:4px}}
+
+/* Keep the free-text reader field visually aligned with the original select control. */
+#reading-tool{padding-right:28px;background-image:linear-gradient(45deg,transparent 50%,#7b867e 50%),linear-gradient(135deg,#7b867e 50%,transparent 50%);background-position:calc(100% - 12px) 16px,calc(100% - 7px) 16px;background-size:5px 5px,5px 5px;background-repeat:no-repeat;}
+#reading-tool:focus{background-image:linear-gradient(45deg,transparent 50%,#829a32 50%),linear-gradient(135deg,#829a32 50%,transparent 50%);}
