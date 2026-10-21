@@ -530,6 +530,75 @@
     }
   });
 
+
+  // Public live workshop chat: real authenticated messages only; no fabricated members.
+  const chatList = $('#forum-chat-list');
+  const chatForm = $('#forum-chat-form');
+  const chatInput = $('#forum-chat-input');
+  const chatSend = $('#forum-chat-send');
+  const chatStatus = $('#forum-chat-status');
+  let chatRefreshBusy = false;
+  function renderChatMessage(row, displayName) {
+    const article = document.createElement('article');
+    article.className = 'forum-chat-message';
+    const head = document.createElement('div'); head.className = 'forum-chat-message-head';
+    const who = document.createElement('strong'); who.textContent = displayName || 'Community member';
+    const time = document.createElement('time'); time.dateTime = row.created_at || ''; time.textContent = formatDate(row.created_at);
+    const body = document.createElement('p'); body.textContent = row.body || '';
+    head.append(who, time); article.append(head, body); return article;
+  }
+  async function loadChatMessages() {
+    if (!api || !chatList || chatRefreshBusy) return;
+    chatRefreshBusy = true;
+    try {
+      const rows = await api.rest('forum_chat_messages?select=id,author_id,body,created_at&order=created_at.desc&limit=60');
+      const messages = Array.isArray(rows) ? rows.slice().reverse() : [];
+      const ids = messages.map(function (row) { return row.author_id; });
+      const profiles = await profilesFor(ids);
+      chatList.replaceChildren();
+      if (!messages.length) {
+        const empty = document.createElement('div'); empty.className = 'forum-chat-message empty';
+        empty.textContent = 'No live messages yet. Start the first real conversation by signing in and posting a question.'; chatList.append(empty);
+      } else {
+        messages.forEach(function (row) { chatList.append(renderChatMessage(row, displayNameFor(row.author_id, profiles))); });
+        chatList.scrollTop = chatList.scrollHeight;
+      }
+      if (chatStatus) chatStatus.textContent = user ? 'Signed in as a community member. Messages are public.' : 'Sign in to post. Public messages are visible to visitors.';
+      if (chatSend) chatSend.disabled = !user;
+    } catch (_) {
+      chatList.replaceChildren(); const empty = document.createElement('div'); empty.className = 'forum-chat-message empty';
+      empty.textContent = 'Live chat is temporarily unavailable. You can still search and read workshop topics below.'; chatList.append(empty);
+    } finally { chatRefreshBusy = false; }
+  }
+  function assistantReply(message) {
+    const q = message.toLowerCase();
+    if (/dtc|fault code|p0[0-9a-f]{3}/i.test(q)) return 'Community Assistant (automated): Please include the exact DTC, vehicle year/engine, ECU part number, freeze-frame data and tests already performed. Verify the next step against authoritative service information; this is not a confirmed diagnosis.';
+    if (/ecu|edc|md1|dcm|bosch|denso/i.test(q)) return 'Community Assistant (automated): Please share the ECU label/part number, HW/SW identifiers, vehicle details and read method. Keep the original file unchanged and do not post customer identifiers or paid files.';
+    if (/airbag|srs|crash/i.test(q)) return 'Community Assistant (automated): SRS is a safety-critical system. Follow the manufacturer procedure and applicable law; verify the module and fault data before any repair. Do not bypass safety restraints.';
+    return 'Community Assistant (automated): To help other technicians respond, add vehicle/year/engine, ECU or module number, exact fault/symptom, measurements and steps already tried. This automated note is not a human member or a verified repair answer.';
+  }
+  if (chatForm) chatForm.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    if (!api || !user) { if (chatStatus) chatStatus.textContent = 'Please sign in above to post to the public chat.'; return; }
+    const body = String(chatInput.value || '').trim();
+    if (!body || body.length > 1200) { if (chatStatus) chatStatus.textContent = 'Messages must be 1–1,200 characters.'; return; }
+    chatSend.disabled = true;
+    try {
+      await api.rest('forum_chat_messages', { method: 'POST', body: { author_id: user.id, body: body }, prefer: 'return=minimal' });
+      chatInput.value = ''; if (chatStatus) chatStatus.textContent = 'Message posted.';
+      await loadChatMessages();
+      // A transparent, clearly labelled automated prompt is shown locally only; it never impersonates a user or writes fake chat history.
+      const assistant = document.createElement('article'); assistant.className = 'forum-chat-message assistant';
+      const head = document.createElement('div'); head.className = 'forum-chat-message-head';
+      const label = document.createElement('strong'); label.className = 'assistant-label'; label.textContent = 'Community Assistant · automated';
+      const bodyNode = document.createElement('p'); bodyNode.textContent = assistantReply(body);
+      head.append(label); assistant.append(head, bodyNode); chatList.append(assistant); chatList.scrollTop = chatList.scrollHeight;
+    } catch (_) { if (chatStatus) chatStatus.textContent = 'Message could not be posted. Check your sign-in or try again shortly.'; }
+    finally { chatSend.disabled = !user; }
+  });
+  loadChatMessages();
+  window.setInterval(loadChatMessages, 12000);
+
   $('#forum-year').textContent = String(new Date().getFullYear());
   if (!api) {
     setMessage($('#forum-auth-message'), 'Account service is unavailable. The forum cannot be used until setup is complete.', 'error');
