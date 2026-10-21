@@ -30,7 +30,7 @@
     'Hyundai':['Santro','i10','Grand i10','i20','Accent','Verna','Aura','Xcent','Venue','Creta','Alcazar','Tucson','Santa Fe','Eon','Getz','Elantra','Kona'],
     'Honda':['Amaze','City','Civic','Accord','Jazz','Brio','WR-V','BR-V','CR-V','Mobilio','Elevate'],
     'Toyota':['Etios','Glanza','Urban Cruiser','Urban Cruiser Hyryder','Innova','Innova Crysta','Innova Hycross','Fortuner','Hilux','Camry','Corolla Altis','Yaris','Qualis','Land Cruiser','Vellfire'],
-    'Kia':['Seltos','Sonet','Carens','Carnival','EV6'],
+    'Kia':['Seltos','Sonet','Carens','Carnival'],
     'Volkswagen':['Polo','Vento','Virtus','Taigun','Tiguan','Passat','Jetta','Ameo','T-Roc'],
     'Skoda':['Fabia','Rapid','Octavia','Superb','Kushaq','Slavia','Kodiaq','Laura','Yeti'],
     'Nissan':['Micra','Sunny','Terrano','Kicks','Magnite','X-Trail'],
