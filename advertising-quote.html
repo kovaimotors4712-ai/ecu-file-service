@@ -6,8 +6,8 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex,nofollow,noarchive">
 <meta name="theme-color" content="#101a19">
-<meta name="description" content="Review your ECU SOLUTION advertising quote and pay securely if you accept.">
-<title>Advertising Quote | ECU SOLUTION</title>
+<meta name="description" content="Review your ECU File Service India advertising quote and pay securely if you accept.">
+<title>Advertising Quote | ECU File Service India</title>
 <link rel="stylesheet" href="/styles.css">
 <style>
 .quote-wrap{max-width:820px;margin:56px auto;padding:0 20px 64px}.quote-card{background:#fff;border:1px solid #dce3dc;border-radius:18px;padding:clamp(20px,5vw,42px);box-shadow:0 18px 60px #101a1910}.quote-kicker{font:700 11px monospace;letter-spacing:.14em;color:#64756c}.quote-price{font-size:clamp(32px,7vw,52px);font-weight:800;letter-spacing:-.04em;margin:10px 0}.quote-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin:26px 0}.quote-grid div{background:#f4f7f2;border-radius:10px;padding:14px}.quote-grid small{display:block;color:#64756c;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}.quote-grid b{font-size:14px;overflow-wrap:anywhere}.quote-terms{white-space:pre-wrap;line-height:1.65;background:#f8faf7;padding:18px;border-radius:10px;border:1px solid #e7ece5}.quote-status{margin:16px 0;min-height:24px;color:#405148}.quote-status.error{color:#a52d25}.quote-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.quote-actions button{min-width:190px}.quote-foot{font-size:12px;color:#68776e;line-height:1.6;margin-top:22px}.quote-loading{padding:40px;text-align:center}
@@ -15,8 +15,8 @@
 <script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
 </head>
 <body>
-<div class="announcement"><span class="status-dot"></span> ECU SOLUTION · ADVERTISING QUOTE <span class="announcement-right">SECURE REVIEW</span></div>
-<header class="site-header"><a class="brand" href="/" aria-label="ECU SOLUTION home"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 10h26v20H7z"/><path d="M12 15h5v10h-5zm11 0h5m-5 5h5m-5 5h5M3 15h4m-4 5h4m-4 5h4m26-10h4m-4 5h4m-4 5h4"/></svg></span><span class="brand-name">ECU SOLUTION <b>QUOTE</b></span></a><nav class="desktop-nav"><a href="/">File services</a><a href="/announcements.html">Offers & updates</a><a href="/advertise.html">Advertising</a></nav></header>
+<div class="announcement"><span class="status-dot"></span> ECU File Service India · ADVERTISING QUOTE <span class="announcement-right">SECURE REVIEW</span></div>
+<header class="site-header"><a class="brand" href="/" aria-label="ECU File Service India home"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 10h26v20H7z"/><path d="M12 15h5v10h-5zm11 0h5m-5 5h5m-5 5h5M3 15h4m-4 5h4m-4 5h4m26-10h4m-4 5h4m-4 5h4"/></svg></span><span class="brand-name">ECU File Service India <b>QUOTE</b></span></a><nav class="desktop-nav"><a href="/">File services</a><a href="/announcements.html">Offers & updates</a><a href="/advertise.html">Advertising</a></nav></header>
 <main class="quote-wrap"><div class="quote-card">
 <span class="quote-kicker">ADVERTISING PARTNERSHIPS</span>
 <h1 id="heading">Your advertising quote</h1>
@@ -65,7 +65,7 @@
    else {status('Quote status: '+q.status);}
  }
  async function load(){
-   if(!token){$('heading').textContent='Quote link unavailable';$('intro').textContent='Open the full quote link from the email you received. If it has expired, contact ECU SOLUTION for a new quote.';return;}
+   if(!token){$('heading').textContent='Quote link unavailable';$('intro').textContent='Open the full quote link from the email you received. If it has expired, contact ECU File Service India for a new quote.';return;}
    try{const d=await api('/api/advertising/quote',{action:'view',token});showQuote(d.quote);}
    catch(e){$('heading').textContent='Quote unavailable';$('intro').textContent=e.message;status(e.message,true);}
  }
@@ -85,7 +85,7 @@
      const d=await api('/api/advertising/payment/create-order',{token});
      if(d.status==='paid'){quote.status='paid';showQuote(quote);return;}
      if(!window.Razorpay)throw new Error('Secure payment checkout is still loading. Please retry.');
-     const checkout=new Razorpay({key:d.keyId,amount:d.amount,currency:d.currency,name:'ECU SOLUTION',description:'Advertising quote payment',order_id:d.providerOrderId,modal:{ondismiss:()=>status('Checkout closed. If you completed payment, check payment status before trying again.')},handler:async result=>verify(result),prefill:{},notes:{quoteId:d.quoteId},theme:{color:'#101a19'}});
+     const checkout=new Razorpay({key:d.keyId,amount:d.amount,currency:d.currency,name:'ECU File Service India',description:'Advertising quote payment',order_id:d.providerOrderId,modal:{ondismiss:()=>status('Checkout closed. If you completed payment, check payment status before trying again.')},handler:async result=>verify(result),prefill:{},notes:{quoteId:d.quoteId},theme:{color:'#101a19'}});
      checkout.on('payment.failed',event=>status(event.error?.description||'Payment did not complete. Check the payment status before retrying.',true));
      checkout.open();status('Complete payment in the secure Razorpay window.');
    }catch(e){status(e.message,true);}finally{$('pay').disabled=false;}

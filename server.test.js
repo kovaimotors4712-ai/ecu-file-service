@@ -1015,8 +1015,8 @@ test('Resend outbox sends event-specific email to Admin and customer idempotentl
     'admin@example.invalid','customer@example.invalid','admin@example.invalid','customer@example.invalid'
   ]);
   assert.deepEqual(state.resendRequests.map(item => item.body.subject), [
-    'New Order Received – ECU File Service India','We received your order – ECU SOLUTION',
-    'Payment Confirmed – ECU File Service India','Payment received – ECU SOLUTION'
+    'New Order Received – ECU File Service India','We received your order – ECU File Service India',
+    'Payment Confirmed – ECU File Service India','Payment received – ECU File Service India'
   ]);
   assert.ok(state.resendRequests.every(item => /^efsi\/.+\/(?:admin|customer)$/.test(item.headers['Idempotency-Key'])));
   const bodies = state.resendRequests.map(item => item.body.html).join('\n');
@@ -1071,7 +1071,7 @@ test('status-change notification sends separate idempotent updates to Admin and 
   assert.deepEqual(statusEmails.map(item => item.body.to[0]),['admin@example.invalid','customer@example.invalid']);
   assert.deepEqual(statusEmails.map(item => item.body.subject),[
     'Order Status Updated: Processing – ECU File Service India',
-    'Your order status is now Processing – ECU SOLUTION'
+    'Your order status is now Processing – ECU File Service India'
   ]);
   assert.ok(statusEmails.every(item => item.body.html.includes('New') && item.body.html.includes('Processing')));
   assert.ok(paid.verify.payload.orderId);

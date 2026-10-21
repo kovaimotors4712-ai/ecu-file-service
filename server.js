@@ -1194,7 +1194,7 @@ async function flushNotificationOutbox() {
       const currentStatus = rowPayload.status || order.status || 'New';
       const eventTitle = eventType === 'paid_order' ? 'Payment Confirmed' : eventType === 'status_change' ? `Order Status Updated: ${currentStatus}` : 'New Order Received';
       const adminSubject = eventType === 'paid_order' ? 'Payment Confirmed – ECU File Service India' : eventType === 'status_change' ? `Order Status Updated: ${currentStatus} – ECU File Service India` : 'New Order Received – ECU File Service India';
-      const customerSubject = eventType === 'paid_order' ? 'Payment received – ECU SOLUTION' : eventType === 'status_change' ? `Your order status is now ${currentStatus} – ECU SOLUTION` : 'We received your order – ECU SOLUTION';
+      const customerSubject = eventType === 'paid_order' ? 'Payment received – ECU File Service India' : eventType === 'status_change' ? `Your order status is now ${currentStatus} – ECU File Service India` : 'We received your order – ECU File Service India';
       const eventIntro = eventType === 'paid_order'
         ? 'Payment has been verified by the server and the order is confirmed.'
         : eventType === 'status_change'
@@ -1221,7 +1221,7 @@ async function flushNotificationOutbox() {
       `.trim();
       const appUrl = (process.env.PUBLIC_APP_URL || 'https://ecufileservice.in').replace(/\/$/, '');
       const adminHtml = `<div style="font-family:sans-serif;line-height:1.5"><h2>${esc(eventTitle)} – ECU File Service India</h2><p>${eventIntro}</p>${detailHtml}<p><a href="${esc(appUrl)}/admin.html">Open Admin Orders</a></p></div>`;
-      const customerHtml = `<div style="font-family:sans-serif;line-height:1.5"><h2>${esc(eventTitle)} – ECU SOLUTION</h2><p>Hi ${esc(order.contact_name || 'Customer')},</p><p>${eventType === 'status_change' ? `Your order status has changed from ${esc(previousStatus)} to <strong>${esc(currentStatus)}</strong>.` : eventType === 'paid_order' ? 'We have verified your payment successfully. Your order is confirmed.' : 'We have received your order successfully. Our team will review it and update you as it progresses.'}</p>${detailHtml}<p>Sign in to your account at <a href="${esc(appUrl)}/">${esc(appUrl)}</a> to review your order.</p><p>Regards,<br>ECU SOLUTION · ECU File Service India</p></div>`;
+      const customerHtml = `<div style="font-family:sans-serif;line-height:1.5"><h2>${esc(eventTitle)} – ECU File Service India</h2><p>Hi ${esc(order.contact_name || 'Customer')},</p><p>${eventType === 'status_change' ? `Your order status has changed from ${esc(previousStatus)} to <strong>${esc(currentStatus)}</strong>.` : eventType === 'paid_order' ? 'We have verified your payment successfully. Your order is confirmed.' : 'We have received your order successfully. Our team will review it and update you as it progresses.'}</p>${detailHtml}<p>Sign in to your account at <a href="${esc(appUrl)}/">${esc(appUrl)}</a> to review your order.</p><p>Regards,<br>ECU File Service India · ECU File Service India</p></div>`;
       const eventKey = String(row.event_key || `${row.order_id}:${eventType}`).replace(/[^a-zA-Z0-9._:/-]/g, '_').slice(0, 180);
       try {
         const sendEmail = async (recipient, subject, html, recipientLabel) => {
@@ -1522,7 +1522,7 @@ async function handleAdminAdvertisingQuotes(request, response) {
         if (!update.ok || !(await update.json())?.length) { jsonResponse(response, 409, { error:'Quote changed while issuing. Refresh and retry.' }); return true; }
         const quoteUrl = 'https://ecufileservice.in/advertising-quote.html#' + rawToken;
         const htmlEscape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        const emailBody = { from:emailFrom, to:[inquiry.email], subject:'Advertising quote from ECU SOLUTION', html:'<p>Hello '+htmlEscape(inquiry.business_name)+',</p><p>Your advertising quote is ready for review.</p><p><strong>Amount:</strong> ₹'+(Number(quote.amount_paise)/100).toFixed(2)+' INR<br><strong>Placement:</strong> '+htmlEscape(quote.placement)+'<br><strong>Schedule:</strong> '+htmlEscape(quote.starts_at)+' to '+htmlEscape(quote.ends_at)+'<br><strong>Quote expiry:</strong> '+htmlEscape(quote.expires_at)+'</p><p><a href="'+quoteUrl+'">Review quote and accept</a></p><p>'+htmlEscape(quote.terms_snapshot)+'</p><p>Payment does not automatically publish the advertisement; creative approval is separate.</p>' };
+        const emailBody = { from:emailFrom, to:[inquiry.email], subject:'Advertising quote from ECU File Service India', html:'<p>Hello '+htmlEscape(inquiry.business_name)+',</p><p>Your advertising quote is ready for review.</p><p><strong>Amount:</strong> ₹'+(Number(quote.amount_paise)/100).toFixed(2)+' INR<br><strong>Placement:</strong> '+htmlEscape(quote.placement)+'<br><strong>Schedule:</strong> '+htmlEscape(quote.starts_at)+' to '+htmlEscape(quote.ends_at)+'<br><strong>Quote expiry:</strong> '+htmlEscape(quote.expires_at)+'</p><p><a href="'+quoteUrl+'">Review quote and accept</a></p><p>'+htmlEscape(quote.terms_snapshot)+'</p><p>Payment does not automatically publish the advertisement; creative approval is separate.</p>' };
         let mail;
         try { mail = await requestHttps('https://api.resend.com/emails', { method:'POST', headers:{ Authorization:'Bearer '+resendApiKey, 'Content-Type':'application/json' }, body:JSON.stringify(emailBody), timeoutMs:15000 }); }
         catch { mail = null; }
@@ -1576,7 +1576,7 @@ async function handleCreateAdvertisingPayment(request, response) {
     if (!quote) { jsonResponse(response, 404, { error:'This quote is unavailable or has expired.' }); return true; }
     if (quote.status === 'paid') { jsonResponse(response, 200, { status:'paid' }); return true; }
     const quoteExpired = new Date(quote.expires_at).getTime() <= Date.now();
-    if (quoteExpired && quote.status !== 'payment_pending') { jsonResponse(response, 410, { error:'This quote has expired. Contact ECU SOLUTION for a renewed quote.' }); return true; }
+    if (quoteExpired && quote.status !== 'payment_pending') { jsonResponse(response, 410, { error:'This quote has expired. Contact ECU File Service India for a renewed quote.' }); return true; }
     if (!['accepted','payment_pending'].includes(quote.status)) { jsonResponse(response, 409, { error:'Accept the valid quote before starting payment.' }); return true; }
     const token = serviceToken();
     const existingResult = await supabaseRequest(token, 'rest/v1/advertising_payments?select=id,status,amount_paise,currency,provider_order_id,provider_payment_id,created_at&id=not.is.null&quote_id=eq.'+encodeURIComponent(quote.id)+'&status=in.(creating,created,authorized,captured,verified)&order=created_at.desc&limit=1', { timeoutMs:12000 });
@@ -1602,7 +1602,7 @@ async function handleCreateAdvertisingPayment(request, response) {
       if (!staleRows?.length) { jsonResponse(response, 409, { error:'The payment session changed while recovery was attempted. Refresh and retry.' }); return true; }
       paymentRow = null;
     }
-    if (!paymentRow && quoteExpired) { jsonResponse(response, 410, { error:'The quote expired before a payment order was ready. Contact ECU SOLUTION; do not pay again.' }); return true; }
+    if (!paymentRow && quoteExpired) { jsonResponse(response, 410, { error:'The quote expired before a payment order was ready. Contact ECU File Service India; do not pay again.' }); return true; }
     if (!paymentRow) {
       const idempotencyKey = 'adquote:'+quote.id+':'+crypto.randomUUID();
       const inserted = await supabaseRequest(token, 'rest/v1/advertising_payments?select=id,status,amount_paise,currency,provider_order_id', { method:'POST', prefer:'return=representation', body:{ quote_id:quote.id, status:'creating', amount_paise:quote.amount_paise, currency:quote.currency, idempotency_key:idempotencyKey }, timeoutMs:12000 });
