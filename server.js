@@ -21,6 +21,7 @@ const maxOriginalFileBytes = 50 * 1024 * 1024;
 const maxAirbagPhotoBytes = 10 * 1024 * 1024;
 const allowedAirbagPhotoMimes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const allowedCorsOrigins = new Set(['https://ecufileservice.in', 'https://www.ecufileservice.in']);
+const premiumTwoWheelerBrands = new Set(['Aprilia','BMW Motorrad','Benelli','Ducati','Harley-Davidson','Kawasaki','KTM','Moto Guzzi','MV Agusta','Triumph']);
 const publicFiles = new Set(['index.html', 'admin.html', 'advertising-quote.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'googlea2bbe9d2fd8bede2.html']);
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -78,13 +79,13 @@ function hasPayPalConfig() {
 function hasResendConfig() {
   return /^re_[A-Za-z0-9_-]{10,}$/.test(resendApiKey) && emailFrom.includes('@') && adminNotificationEmail.includes('@');
 }
-function paymentsConfigured() { return hasSafeSupabaseConfig && Boolean(supabaseServiceRoleKey) && paymentStateReady() && (hasRazorpayConfig() || hasPayPalConfig()); }
+function paymentsConfigured() { return hasSafeSupabaseConfig && Boolean(supabaseServiceRoleKey) && paymentStateReady() && hasRazorpayConfig(); }
 function paymentReadinessChecks() {
   return {
     supabaseUrl: /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(supabaseUrl),
     supabasePublicKey: isPublicClientKey(supabaseAnonKey),
     razorpay: hasRazorpayConfig(),
-    paypal: hasPayPalConfig(),
+    paypal: false,
     resend: hasResendConfig(),
     paymentProofSecret: paymentGateProofSecret.length >= 32,
     schemaReady: paymentGateSchemaReady,
@@ -105,8 +106,6 @@ function requestHttps(urlValue, { method = 'GET', headers = {}, body, timeoutMs 
   const allowed = url.protocol === 'https:' && (
     (supabaseHostname && url.hostname === supabaseHostname) ||
     url.hostname === 'api.razorpay.com' ||
-    url.hostname === 'api-m.sandbox.paypal.com' ||
-    url.hostname === 'api-m.paypal.com' ||
     url.hostname === 'api.resend.com'
   );
   if (!allowed) return Promise.reject(new Error('Blocked unsupported upstream HTTPS destination.'));
@@ -256,6 +255,8 @@ function normalizePaymentRequest(value) {
   if (!clean(value?.vehicleBrand) || !clean(value?.vehicleType) || !clean(value?.vehicleModel) || !clean(value?.contactName) || !clean(value?.contactPhone) || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error('Complete the required vehicle, contact and valid email details.');
   }
+  if (/\b(?:EV|BEV|electric)\b/i.test(clean(value?.vehicleModel))) throw new Error('Electric vehicles are not currently supported. Select a non-EV vehicle variant.');
+  if (clean(value?.vehicleType) === 'Two-wheeler' && !premiumTwoWheelerBrands.has(clean(value?.vehicleBrand))) throw new Error('Two-wheeler requests are limited to selected imported/premium motorcycle brands.');
   if (year !== null && (!Number.isInteger(year) || year < 1950 || year > 2100)) throw new Error('Enter a valid vehicle year.');
   if (category === 'AIRBAG' && year === null) throw new Error('Year is required for Airbag Crash Clear requests.');
   if (category === 'AIRBAG' && (services.length !== 1 || services[0] !== 'Crash Clear')) throw new Error('Airbag requests support Crash Clear only.');
@@ -715,7 +716,7 @@ async function handleReconcilePayment(request, response) {
       }
       return handleVerifyRazorpay(request, response, { reconcile: true, bodyData: body });
     }
-    if (intent.payment_provider === 'paypal') return handleCapturePayPal(request, response, { reconcile: true, bodyData: body });
+    if (intent.payment_provider === 'paypal') { jsonResponse(response, 410, { error: 'PayPal payment recovery is disabled. Contact support before retrying this saved checkout.' }); return true; }
     jsonResponse(response, 409, { error: 'This checkout has not started payment yet.' });
   } catch (error) {
     console.error('[payment-recovery] Failed', { intentId: recoveryIntentId, statusCode: error.statusCode || null, code: error.code || null, message: String(error.message || 'Payment recovery failed.').slice(0, 300) });
@@ -1713,8 +1714,7 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/payment/create-order' || url.pathname === '/api/payments/orders') return handleCreateRazorpayOrder(request, response);
   if (url.pathname === '/api/payment/verify' || url.pathname === '/api/payments/complete') return handleVerifyRazorpay(request, response);
   if (url.pathname === '/api/payment/reconcile') return handleReconcilePayment(request, response);
-  if (url.pathname === '/api/payment/paypal/create-order') return handleCreatePayPalOrder(request, response);
-  if (url.pathname === '/api/payment/paypal/capture') return handleCapturePayPal(request, response);
+  if (url.pathname === '/api/payment/paypal/create-order' || url.pathname === '/api/payment/paypal/capture') { jsonResponse(response, 410, { error: 'PayPal is disabled. Use Razorpay checkout instead.' }); return true; }
   if (url.pathname === '/api/admin/orders/status') return handleAdminStatus(request, response);
   if (url.pathname === '/api/admin/payment-status') return handleAdminPaymentStatus(request, response);
   if (url.pathname === '/api/admin/orders/second-stage-amount' || url.pathname === '/api/admin/orders/set-second-stage' || url.pathname === '/api/admin/orders/second-stage/create-payment-link') return handleAdminCreateSecondStagePaymentLink(request, response);

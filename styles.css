@@ -34,5 +34,7 @@
 /* Keep the forum discoverable on compact/mobile navigation. */
 .forum-header-cta{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:9px 13px;border:1px solid var(--line);border-radius:3px;color:var(--ink);font-size:11px;font-weight:800;letter-spacing:.03em;white-space:nowrap;}
 .forum-header-cta:hover{background:var(--lime);border-color:var(--lime);}
+.forum-hero-link{border-color:rgba(211,237,114,.65);}
+.hero-actions{flex-wrap:wrap;}
 @media(max-width:740px){.forum-header-cta{min-height:32px;padding:8px 9px;font-size:10px}.header-actions{gap:7px}}
 @media(max-width:400px){.forum-header-cta{padding:7px 6px;font-size:9px}.header-actions{gap:4px}}

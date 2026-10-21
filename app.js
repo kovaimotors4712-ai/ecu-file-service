@@ -16,10 +16,10 @@
   const modulePhotoInput = document.querySelector('#airbag-module-photo');
   const partNumberPhotoInput = document.querySelector('#airbag-part-photo');
   const brands = [
-    'Acura','Aixam','Alfa Romeo','Aprilia','Aston Martin','Audi','Bajaj','Benelli','Bentley','BMW','BMW Motorrad','Bugatti','Buick','Cadillac','Caterpillar','Changan','Chevrolet','Chrysler','Citroën','Dacia','Daewoo','Daihatsu','Datsun','Dodge','Ducati','Eicher','Ferrari','Fiat','Force Motors','Ford','Foton','Geely','Genesis','GMC','Great Wall','Harley-Davidson','Hino','Holden','Honda','Hyundai','Infiniti','Isuzu','Iveco','JAC','Jaguar','Jeep','JCB','Kawasaki','Kia','KTM','Kubota','Lamborghini','Lancia','Land Rover','Lexus','Lincoln','Lotus','Mahindra','Mahindra Truck and Bus','Mahindra Tractors','MAN','Maserati','Maruti Suzuki','Maserati','Mazda','McLaren','Mercedes-Benz','MG Motor','Mini','Mitsubishi','Mitsubishi Fuso','Mitsubishi Heavy Industries','Moto Guzzi','MV Agusta','Nissan','Opel','Perodua','Peugeot','Piaggio Commercial Vehicles','Polaris','Porsche','Proton','Ram','Renault','Rolls-Royce','Saab','Scania','Seat','Skoda','SML Isuzu','Smart','Sonalika','SsangYong','Subaru','Suzuki','Tata Motors','Tata Motors Commercial Vehicles','TAFE' ,'Toyota','Triumph','TVS','Vauxhall','Volkswagen','Volvo','Volvo Construction Equipment','VST Tillers Tractors','Yamaha','Yanmar','Other / Not Listed'
+    'Acura','Aixam','Alfa Romeo','Aprilia','Aston Martin','Ashok Leyland','Audi','Bajaj','BEML','Benelli','BharatBenz','Bentley','BMW','BMW Motorrad','Borgward','Bugatti','Buick','Cadillac','Caterpillar','Changan','Chery','Chevrolet','Chrysler','Citroën','CNH Industrial','Dacia','Daewoo','Daihatsu','Datsun','Dodge','Dongfeng','Ducati','Eicher','Escorts Kubota','Ferrari','Fiat','Force Motors','Ford','Foton','Geely','Genesis','GMC','Great Wall','Harley-Davidson','Higer','Hindustan Motors','Hino','HMT','Holden','Honda','Hyundai','Infiniti','Isuzu','Iveco','JAC','Jaguar','Jeep','JCB','JMC','John Deere','Kawasaki','Kia','King Long','KTM','Kubota','Lada','Lamborghini','Lancia','Land Rover','Lexus','Lifan','Lincoln','Lotus','Mahindra','Mahindra Truck and Bus','Mahindra Tractors','MAN','Maserati','Maruti Suzuki','Maserati','Mazda','McLaren','Mercedes-Benz','MG Motor','Mini','Mitsubishi','Mitsubishi Fuso','Mitsubishi Heavy Industries','Moto Guzzi','MV Agusta','New Holland','Nissan','Opel','Perodua','Peugeot','Piaggio Commercial Vehicles','Polaris','Porsche','Premier','Proton','Ram','Renault','Rolls-Royce','Roewe','Saab','Scania','Seat','Sinotruk','Skoda','SML Isuzu','Smart','Sonalika','SsangYong','Subaru','Suzuki','Swaraj','Tata Motors','Tata Motors Commercial Vehicles','TAFE','Toyota','Triumph','TVS','Vauxhall','Volkswagen','Volvo','Volvo Construction Equipment','VST Tillers Tractors','Yamaha','Yanmar','Yutong','Other / Not Listed'
   ];
   const premiumTwoWheelerBrands = new Set(['Aprilia','BMW Motorrad','Benelli','Ducati','Harley-Davidson','Kawasaki','KTM','Moto Guzzi','MV Agusta','Triumph']);
-  const twoWheelerOnlyBrands = new Set(['BMW Motorrad','Ducati','Harley-Davidson','Kawasaki','KTM','Moto Guzzi','MV Agusta','Triumph','Aprilia','Benelli','Polaris']);
+  const twoWheelerOnlyBrands = new Set(['Aprilia','Bajaj','Benelli','BMW Motorrad','Ducati','Harley-Davidson','Kawasaki','KTM','Moto Guzzi','MV Agusta','Polaris','Triumph','TVS','Yamaha']);
   const modelCatalog = {
     'Maruti Suzuki':['Alto','Alto K10','S-Presso','Celerio','Wagon R','Swift','Dzire','Baleno','Fronx','Brezza','Ertiga','XL6','Grand Vitara','Ignis','Eeco','Jimny','Ciaz','S-Cross','Vitara Brezza'],
     'Tata Motors':['Nano','Tiago','Tigor','Altroz','Punch','Nexon','Harrier','Safari','Indica','Indigo','Bolt','Zest','Sumo','Hexa','Aria'],
@@ -27,7 +27,7 @@
     'Mahindra':['Bolero','Bolero Neo','Scorpio','Scorpio-N','XUV300','XUV 3XO','XUV500','XUV700','Thar','Thar Roxx','KUV100','TUV300','Marazzo','Xylo','Quanto','Verito','Jeeto','Supro'],
     'Mahindra Truck and Bus':['Blazo','Furio','Loadking','Jayo','Bolero Pik-Up','Voyager'],
     'Mahindra Tractors':['265 DI','275 DI','575 DI','585 DI','Arjun','Yuvo','Jivo','Novo'],
-    'Hyundai':['Santro','i10','Grand i10','i20','Accent','Verna','Aura','Xcent','Venue','Creta','Alcazar','Tucson','Santa Fe','Eon','Getz','Elantra','Kona'],
+    'Hyundai':['Santro','i10','Grand i10','Grand i10 Nios','i20','Accent','Verna','Aura','Xcent','Venue','Creta','Alcazar','Tucson','Santa Fe','Eon','Getz','Elantra','Sonata','Terracan','Exter'],
     'Honda':['Amaze','City','Civic','Accord','Jazz','Brio','WR-V','BR-V','CR-V','Mobilio','Elevate'],
     'Toyota':['Etios','Glanza','Urban Cruiser','Urban Cruiser Hyryder','Innova','Innova Crysta','Innova Hycross','Fortuner','Hilux','Camry','Corolla Altis','Yaris','Qualis','Land Cruiser','Vellfire'],
     'Kia':['Seltos','Sonet','Carens','Carnival'],
@@ -40,12 +40,12 @@
     'Isuzu':['D-Max','V-Cross','MU-7','MU-X','S-Cab'],
     'Jeep':['Compass','Meridian','Wrangler','Grand Cherokee','Cherokee'],
     'Mercedes-Benz':['A-Class','B-Class','C-Class','E-Class','S-Class','CLA','GLA','GLB','GLC','GLE','GLS','G-Class','V-Class','Sprinter'],
-    'BMW':['1 Series','2 Series','3 Series','5 Series','7 Series','X1','X3','X5','X7','Z4','i8'],
+    'BMW':['1 Series','2 Series','3 Series','5 Series','7 Series','X1','X3','X4','X5','X6','X7','Z4'],
     'Audi':['A3','A4','A6','A8','Q3','Q5','Q7','Q8','TT','R8'],
     'Land Rover':['Defender','Discovery','Discovery Sport','Range Rover','Range Rover Sport','Range Rover Evoque','Freelander'],
     'Volvo':['S60','S90','V40','XC40','XC60','XC90','V90'],
     'Mitsubishi':['Lancer','Cedia','Pajero','Outlander','Montero','Eclipse Cross'],
-    'MG Motor':['Hector','Hector Plus','Astor','Gloster' ,'ZS'],
+    'MG Motor':['Hector','Hector Plus','Astor','Gloster'],
     'BMW Motorrad':['S 1000 RR','M 1000 RR','R 1250 GS','R 1300 GS','F 900 GS','F 850 GS','G 310 R','G 310 GS','K 1600 GTL'],
     'Triumph':['Street Triple','Speed Triple','Bonneville T100','Bonneville T120','Tiger 900','Tiger 1200','Trident 660','Daytona 660','Speed 400','Scrambler 400 X','Rocket 3'],
     'Ducati':['Panigale V2','Panigale V4','Streetfighter V4','Monster','Multistrada V4','Diavel','Scrambler','DesertX'],
@@ -56,6 +56,45 @@
     'Benelli':['TNT 300','TNT 600i','TRK 502','Leoncino 500'],
     'Moto Guzzi':['V7','V85 TT','V100 Mandello'],
     'MV Agusta':['Brutale 800','F3 800','Dragster 800','Turismo Veloce'],
+    'Ashok Leyland':['Dost','Bada Dost','Partner','Boss','Ecomet','Captain','U-Truck','Viking','Cheetah','MiTR'],
+    'BEML':['BD50','BD65','BG825','BH100'],
+    'BharatBenz':['914R','1017R','1217C','1417R','1617R','1923C','2523R','2823C','3528C','5528TT','School Bus'],
+    'Borgward':['BX5','BX7'],
+    'Chery':['Tiggo 4','Tiggo 7','Tiggo 8','Arrizo 5'],
+    'CNH Industrial':['Agricultural tractor','Construction equipment'],
+    'Citroën':['C3','C3 Aircross','C5 Aircross','Basalt'],
+    'Dongfeng':['Light commercial truck','Heavy commercial truck','Bus'],
+    'Eicher':['Pro 2049','Pro 2059','Pro 3015','Pro 3019','Pro 6028','Pro 6035','Skyline Pro','Starline'],
+    'Escorts Kubota':['Farmtrac 45','Farmtrac 60','Powertrac 439','Powertrac 445','Kubota MU4501','Kubota MU5501'],
+    'Fiat':['Punto','Linea','Palio','Grande Punto','Avventura','Urban Cross'],
+    'Force Motors':['Traveller','Trax Cruiser','Gurkha','Urbania','Shaktiman','Kargo King'],
+    'GWM':['Haval H6','Haval Jolion','Tank 300','Poer'],
+    'Higer':['KLQ6119','KLQ6129','Coach / bus'],
+    'Hindustan Motors':['Ambassador','Contessa'],
+    'Hino':['300 Series','500 Series','700 Series'],
+    'HMT':['Agricultural tractor'],
+    'JAC':['N-series','T6','T8','X200'],
+    'JCB':['3DX','4DX','NXT 140','JS 81','JS 205','430ZX','457ZX'],
+    'JMC':['Vigus','Carrying','Conquer'],
+    'John Deere':['5036 D','5045 D','5050 D','5310','5405','6110 B'],
+    'King Long':['XMQ6119','XMQ6127','Coach / bus'],
+    'Lada':['Niva','Granta','Vesta'],
+    'Lexus':['ES','NX','RX','LX','LS','LC'],
+    'Lifan':['X60','X70','Solano'],
+    'MAN':['TGS','TGX','TGM','Lion’s Coach'],
+    'Mitsubishi Fuso':['Canter','Fighter','Super Great','Rosa'],
+    'New Holland':['3630 TX','3230 TX','4710','5630 TX Plus','T6'],
+    'Porsche':['911','Cayenne','Macan','Panamera','718 Cayman','718 Boxster'],
+    'Premier':['Padmini','Rio'],
+    'Roewe':['RX5','i5','i6'],
+    'Scania':['P-series','G-series','R-series','K-series bus'],
+    'Sinotruk':['Howo light truck','Howo heavy truck'],
+    'SML Isuzu':['S7','S9','Sartaj GS','Samrat GS','Prestige','Executive LX','Cosmo'],
+    'Sonalika':['DI 35','DI 42','DI 47','DI 50','Tiger DI 55'],
+    'Swaraj':['717','735 FE','744 FE','855 FE','963 FE'],
+    'TAFE':['MF 241 DI','MF 245 DI','MF 9500','MF 1035 DI','MF 7250 DI'],
+    'Volvo Construction Equipment':['EC210','EC220','EC250','L120H','L150H','A40G'],
+    'Yutong':['ZK6118','ZK6122','ZK6128','Coach / bus'],
     'Other / Not Listed':[]
   };
   let currentPage = 0;
@@ -95,7 +134,8 @@
     if (index === 1) {
       const year = values.vehicleYear;
       if (!values.vehicleBrand || !values.vehicleType || !values.vehicleModel) { setError(index, 'Brand, vehicle type and model are required.'); return false; }
-      if (values.vehicleType === 'Two-wheeler' && !premiumTwoWheelerBrands.has(values.vehicleBrand)) { setError(index, 'Two-wheeler requests are currently limited to selected imported/premium motorcycle brands.'); return false; }
+      if (values.vehicleType === 'Two-wheeler' && !premiumTwoWheelerBrands.has(values.vehicleBrand)) { setError(index, 'Two-wheeler requests are limited to selected imported/premium motorcycle brands.'); return false; }
+      if (/\b(?:EV|BEV|electric)\b/i.test(values.vehicleModel)) { setError(index, 'Electric vehicles are not currently supported. Select a petrol, diesel, CNG or other non-EV variant.'); return false; }
       if (values.category === 'AIRBAG' && !year) { setError(index, 'Year is required for Airbag Crash Clear requests.'); return false; }
       if (year && (!/^\d{4}$/.test(year) || Number(year)<1950 || Number(year)>2100)) { setError(index, 'Enter a valid vehicle year.'); return false; }
     }
@@ -176,7 +216,7 @@
 
   function brandsForCurrentVehicleType() {
     const type = String(vehicleTypeSelect?.value || '');
-    if (type === 'Two-wheeler') return brands.filter(brand => premiumTwoWheelerBrands.has(brand) || brand === 'Other / Not Listed');
+    if (type === 'Two-wheeler') return brands.filter(brand => premiumTwoWheelerBrands.has(brand));
     return brands.filter(brand => !twoWheelerOnlyBrands.has(brand) || brand === 'Other / Not Listed');
   }
   function renderModelSuggestions() {
