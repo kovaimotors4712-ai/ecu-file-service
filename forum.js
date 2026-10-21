@@ -7,6 +7,7 @@
   const topicsMessage = $('#forum-topics-message');
   const categoryFilter = $('#forum-category-filter');
   const searchInput = $('#forum-search');
+  const statusFilter = $('#forum-status-filter');
   let user = api && api.getSession() ? api.getSession().user : null;
   let categories = [];
   let topics = [];
@@ -73,6 +74,7 @@
     const categoryId = categoryFilter.value;
     const visible = topics.filter(function (topic) {
       if (categoryId && topic.category_id !== categoryId) return false;
+      if (statusFilter && statusFilter.value === 'unanswered' && Number(topic.reply_count || 0) > 0) return false;
       if (!query) return true;
       return (topic.title + ' ' + topic.body + ' ' + (categories.find(function (item) { return item.id === topic.category_id; }) || {}).title)
         .toLocaleLowerCase().includes(query);
@@ -90,7 +92,8 @@
       return "<article class='topic-card'>" +
         "<div class='topic-card-top'><span class='topic-tag'>" + escapeHtml(category ? category.title : 'Discussion') + "</span>" +
         (topic.is_pinned ? "<span class='topic-pin'>PINNED</span>" : '') +
-        (topic.is_locked ? "<span class='topic-locked'>LOCKED</span>" : '') + "</div>" +
+        (topic.is_locked ? "<span class='topic-locked'>LOCKED</span>" : '') +
+        (Number(topic.reply_count || 0) === 0 ? "<span class='topic-tag'>UNANSWERED</span>" : "<span class='topic-tag'>" + Number(topic.reply_count || 0) + (Number(topic.reply_count || 0) === 1 ? ' REPLY' : ' REPLIES') + "</span>") + "</div>" +
         "<h3><button type='button' class='topic-open' data-topic-id='" + escapeHtml(topic.id) + "'>" + escapeHtml(topic.title) + "</button></h3>" +
         "<p class='topic-preview'>" + escapeHtml(preview) + "</p>" +
         "<div class='topic-meta'><span>By <strong>" + escapeHtml(displayNameFor(topic.author_id, profiles)) + "</strong></span><span>" + escapeHtml(formatDate(topic.created_at)) + "</span></div>" +
@@ -107,6 +110,17 @@
     try {
       const rows = await api.rest('forum_topics?select=id,category_id,author_id,title,body,is_pinned,is_locked,created_at&order=is_pinned.desc,created_at.desc&limit=100');
       topics = Array.isArray(rows) ? rows : [];
+      topics.forEach(function (topic) { topic.reply_count = 0; });
+      const topicIds = topics.filter(function (topic) { return validUuid(topic.id); }).map(function (topic) { return topic.id; });
+      if (topicIds.length) {
+        try {
+          const replyRows = await api.rest('forum_replies?select=topic_id&topic_id=in.(' + topicIds.join(',') + ')&is_hidden=eq.false&limit=5000');
+          (Array.isArray(replyRows) ? replyRows : []).forEach(function (reply) {
+            const topic = topics.find(function (item) { return item.id === reply.topic_id; });
+            if (topic) topic.reply_count += 1;
+          });
+        } catch (_) { /* Topic browsing remains available if reply counts cannot be loaded. */ }
+      }
       topicList._profiles = await profilesFor(topics.map(function (topic) { return topic.author_id; }));
       setMessage(topicsMessage, '');
       renderTopics();
@@ -443,6 +457,7 @@
     if (button) openTopic(button.getAttribute('data-topic-id'));
   });
   categoryFilter.addEventListener('change', renderTopics);
+  if (statusFilter) statusFilter.addEventListener('change', renderTopics);
   searchInput.addEventListener('input', renderTopics);
 
   $('#forum-back-topics').addEventListener('click', function () {
