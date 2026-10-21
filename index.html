@@ -66,9 +66,19 @@
       <div class="hero-index">EFSI <span>·</span> 2025</div>
     </section>
 
+    <section class="quick-service-strip" aria-label="Quick service selection">
+      <div class="quick-service-heading"><span class="quick-kicker">START HERE</span><h2>Choose your file service.</h2><p>Begin your request first. Vehicle details and the original file come next.</p></div>
+      <a class="quick-service-card" href="/?category=ECU#order"><span class="quick-service-icon">01 / ECU</span><strong>ECU file services</strong><span>Engine ECU · Diagnostics · File review</span><b>Start ECU request <span aria-hidden="true">↗</span></b></a>
+      <a class="quick-service-card" href="/?category=AIRBAG#order"><span class="quick-service-icon">02 / SRS</span><strong>Airbag Crash Clear</strong><span>SRS module · Photos · Original readout</span><b>Start Airbag request <span aria-hidden="true">↗</span></b></a>
+      <a class="quick-service-card quick-store-card" href="/store.html"><span class="quick-service-icon">03 / STORE</span><strong>Workshop software & tools</strong><span>Explore available products and resources</span><b>Explore store <span aria-hidden="true">↗</span></b></a>
+    </section>
     <section class="trust-strip" aria-label="Service categories"><span class="strip-label">OUR SPECIALITY</span><div class="strip-item"><span class="strip-icon">▦</span> ECU <small>01</small></div><div class="strip-item"><span class="strip-icon">◈</span> AIRBAG <small>02</small></div><div class="strip-note">Technical precision for every module.</div></section>
 
     <section id="homepage-promotion-slot" class="section" hidden style="padding-top:34px;padding-bottom:20px"><div id="homepage-promotion-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px"></div></section>
+    <section class="home-community-section" id="workshop-community">
+      <div class="home-community-copy"><span class="quick-kicker">WORKSHOP COMMUNITY</span><h2>Live workshop desk.<br><span>Search the knowledge.</span></h2><p>Join real discussions, ask questions and search past topics by DTC, ECU family, vehicle or symptom. New community? Be the first to start a useful discussion.</p><div class="home-community-actions"><a class="button button-lime" href="/forum.html#live-chat">Open live chat <span>↗</span></a><a class="button button-ghost" href="/forum.html#topics-heading">Search forum history <span>⌕</span></a></div><small>Member counts and conversations are real; no fake member activity is displayed.</small></div>
+      <div class="home-community-panel"><div class="community-panel-head"><span class="live-pulse"></span><strong>COMMUNITY DESK</strong><span>PUBLIC TOPICS</span></div><div class="community-sample"><b>01</b><div><strong>Search previous workshop cases</strong><p>Filter by DTC, ECU, vehicle and solved status.</p></div></div><div class="community-sample"><b>02</b><div><strong>Ask the community</strong><p>Post a real question and receive replies from members.</p></div></div><div class="community-sample"><b>03</b><div><strong>Community Assistant</strong><p>Clearly labelled automated guidance, never impersonating a technician.</p></div></div><a class="community-all-link" href="/forum.html">Go to workshop community <span>↗</span></a></div>
+    </section>
     <section class="section services-section" id="services">
       <div class="section-heading"><div><div class="eyebrow eyebrow-dark"><span class="eyebrow-line"></span> WHAT WE DO</div><h2>Specialist file work<br><span>for workshops.</span></h2></div><p>From engine management to SRS airbag modules, submit your workshop file request securely with ECU File Service India.</p></div>
       <div class="service-cards">
@@ -129,6 +139,19 @@
       const cards=items.filter(x=>x.placement==='homepage'&&(x.kind==='offer'||x.kind==='ad'));
       if(cards.length){section.hidden=false;cards.slice(0,6).forEach(item=>{const card=node('article');card.style.cssText='padding:22px;background:#fff;border:1px solid var(--line);min-width:0;';const tag=node('small',item.kind==='ad'?'PARTNER ADVERTISEMENT':'WORKSHOP OFFER');tag.style.cssText='font:10px var(--mono);letter-spacing:.1em;color:#758b2c;text-transform:uppercase;';card.append(tag);const imgUrl=safeUrl(item.image_url);if(imgUrl){const img=node('img');img.src=imgUrl;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';img.style.cssText='display:block;width:100%;max-height:180px;object-fit:cover;margin:12px 0;';card.append(img);}const h=node('h3',item.title||'');h.style.cssText='font:700 20px var(--display);margin:12px 0;';card.append(h);const p=node('p',item.body||'');p.style.cssText='font-size:13px;line-height:1.75;color:#66716a;';card.append(p);const url=safeUrl(item.cta_url);if(url&&item.cta_label){const a=node('a',item.cta_label+' ↗');a.href=url;a.target='_blank';a.rel='noopener noreferrer sponsored';a.style.cssText='display:inline-block;margin-top:10px;font-size:12px;font-weight:700;';card.append(a);}grid.append(card);});}
     }).catch(()=>{});
+  })();
+  </script>
+  <script>
+  (function () {
+    var hero = document.querySelector('main#home > .hero');
+    var order = document.querySelector('#order.order-section');
+    if (hero && order) hero.insertAdjacentElement('afterend', order);
+    var params = new URLSearchParams(window.location.search);
+    var category = (params.get('category') || '').toUpperCase();
+    if (category === 'ECU' || category === 'AIRBAG') {
+      var radio = document.querySelector('input[name="category"][value="' + category + '"]');
+      if (radio) { radio.checked = true; radio.dispatchEvent(new Event('change', { bubbles: true })); }
+    }
   })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase.js?v=ba583d0"></script><script src="auth.js?v=payment-recovery-feedback-20261017"></script><script src="app.js?v=payment-recovery-feedback-20261017"></script>
