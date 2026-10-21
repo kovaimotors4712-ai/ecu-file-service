@@ -1392,6 +1392,44 @@ async function handlePublicSiteContent(request, response) {
   jsonResponse(response, 200, { items });
   return true;
 }
+async function handlePublicSiteSettings(request, response) {
+  if (request.method !== 'GET') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
+  if (!supabaseServiceRoleKey) { jsonResponse(response, 200, { settings:{ contact_phone:'', telegram_url:'', contact_email:'' } }); return true; }
+  const result = await supabaseRequest(serviceToken(), 'rest/v1/site_public_settings?select=contact_phone,telegram_url,contact_email&id=eq.true&limit=1', { timeoutMs:12000 });
+  if (!result.ok) { jsonResponse(response, 200, { settings:{ contact_phone:'', telegram_url:'', contact_email:'' } }); return true; }
+  const row = (await result.json())?.[0] || {};
+  jsonResponse(response, 200, { settings:{ contact_phone:row.contact_phone||'', telegram_url:row.telegram_url||'', contact_email:row.contact_email||'' } });
+  return true;
+}
+async function handleAdminSiteSettings(request, response) {
+  const admin = await requireAdmin(request);
+  if (!admin) { jsonResponse(response, 403, { error:'Administrator role is required.' }); return true; }
+  if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'Public contact settings are unavailable.' }); return true; }
+  const token = serviceToken();
+  if (request.method === 'GET') {
+    const result = await supabaseRequest(token, 'rest/v1/site_public_settings?select=contact_phone,telegram_url,contact_email&id=eq.true&limit=1', { timeoutMs:12000 });
+    if (!result.ok) { jsonResponse(response, 502, { error:'Contact settings could not be loaded.' }); return true; }
+    const row=(await result.json())?.[0]||{};
+    jsonResponse(response,200,{settings:{contact_phone:row.contact_phone||'',telegram_url:row.telegram_url||'',contact_email:row.contact_email||''}});return true;
+  }
+  if (request.method === 'PATCH') {
+    try {
+      const body=await readJson(request,4096);
+      const phone=cleanSiteText(body.contact_phone,40);
+      const telegram=cleanSiteText(body.telegram_url,500);
+      const email=cleanSiteText(body.contact_email,254).toLowerCase();
+      if (telegram) { let parsed; try { parsed=new URL(telegram); } catch { throw Object.assign(new Error('Enter a valid Telegram URL.'),{statusCode:400}); } if (parsed.protocol!=='https:' || !['t.me','telegram.me','www.t.me','www.telegram.me'].includes(parsed.hostname.toLowerCase()) || parsed.username || parsed.password) throw Object.assign(new Error('Telegram link must use an HTTPS t.me or telegram.me address.'),{statusCode:400}); }
+      if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) throw Object.assign(new Error('Enter a valid contact email address.'),{statusCode:400});
+      if (phone && phone.replace(/[^\\d]/g,'').length<7) throw Object.assign(new Error('Enter a valid phone number, or leave it empty.'),{statusCode:400});
+      if (!phone && !telegram && !email) throw Object.assign(new Error('Enter at least one public contact method.'),{statusCode:400});
+      const payload={id:true,contact_phone:phone,telegram_url:telegram,contact_email:email,updated_at:new Date().toISOString(),updated_by:admin.id};
+      const result=await supabaseRequest(token,'rest/v1/site_public_settings?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=representation',body:payload,timeoutMs:12000});
+      if(!result.ok){jsonResponse(response,502,{error:'Contact settings could not be saved.'});return true;}
+      jsonResponse(response,200,{settings:{contact_phone:phone,telegram_url:telegram,contact_email:email}});return true;
+    } catch(error) { jsonResponse(response,error.statusCode||400,{error:error.message||'Invalid contact settings.'});return true; }
+  }
+  jsonResponse(response,405,{error:'Method Not Allowed'});return true;
+}
 async function handleAdminSiteContent(request, response) {
   const admin = await requireAdmin(request);
   if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
@@ -1741,6 +1779,8 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/advertising/payment/verify') return handleVerifyAdvertisingPayment(request, response);
   if (url.pathname === '/api/advertising/payment/reconcile') return handleReconcileAdvertisingPayment(request, response);
   if (url.pathname === '/api/advertising/inquiries') return handleAdvertisingInquiry(request, response);
+  if (url.pathname === '/api/site-settings') return handlePublicSiteSettings(request, response);
+  if (url.pathname === '/api/admin/site-settings') return handleAdminSiteSettings(request, response);
   if (url.pathname === '/api/admin/site-content') return handleAdminSiteContent(request, response);
   if (url.pathname === '/api/admin/advertising/inquiries') return handleAdminAdvertisingInquiries(request, response);
   if (url.pathname === '/api/pricing') return handlePricing(request, response);
