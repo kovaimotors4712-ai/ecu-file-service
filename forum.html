@@ -66,6 +66,15 @@
       <div id="forum-moderation-list" class="forum-topic-list"></div>
     </section>
 
+      <section class="panel live-chat-panel" id="live-chat" aria-labelledby="live-chat-heading">
+        <div class="section-heading"><div><p class="forum-kicker"><span></span> LIVE WORKSHOP CHAT</p><h2 id="live-chat-heading">Community live desk</h2></div><span class="state-pill"><span class="live-pulse"></span> Refreshes automatically</span></div>
+        <p class="muted">Chat with signed-in community members. The Community Assistant is explicitly labelled when it responds; example messages are not presented as real members.</p>
+        <div id="forum-chat-list" class="forum-chat-list" aria-live="polite"><p class="muted">Loading recent messages…</p></div>
+        <form id="forum-chat-form" class="forum-chat-form">
+          <label for="forum-chat-input">Message to the workshop community<textarea id="forum-chat-input" rows="2" maxlength="1200" placeholder="Ask a concise diagnostic question. Never share VINs, passwords or customer data." required></textarea></label>
+          <div class="forum-chat-actions"><small id="forum-chat-status" class="muted">Sign in to post. Public messages are visible to visitors.</small><button type="submit" class="button button-lime" id="forum-chat-send" disabled>Send message ↗</button></div>
+        </form>
+      </section>
     <section class="forum-workspace">
       <aside class="forum-sidebar">
         <div class="panel">
@@ -142,6 +151,6 @@
   </footer>
   <script src="/supabase.js"></script>
   <script src="/auth.js"></script>
-  <script src="/forum.js?v=20261022-accepted-solution"></script>
+  <script src="/forum.js?v=20261022-community-live-chat"></script>
 </body>
 </html>
