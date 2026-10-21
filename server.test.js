@@ -807,9 +807,25 @@ test('health reports provider and email readiness', async () => {
   assert.equal(result.response.status, 200);
   assert.equal(result.payload.paymentConfigured, true);
   assert.equal(result.payload.paymentReadiness.razorpay, true);
-  assert.equal(result.payload.paymentReadiness.paypal, true);
+  assert.equal(result.payload.paymentReadiness.paypal, false);
   assert.equal(result.payload.paymentReadiness.resend, true);
   assert.equal(result.payload.paymentReadiness.serviceRoleAvailable, true);
+});
+
+test('rejects electric vehicle variants before creating a checkout', async () => {
+  const { request } = customerRequest();
+  request.vehicleModel = 'Nexon EV';
+  const result = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request } });
+  assert.equal(result.response.status,400);
+});
+
+test('rejects non-premium two-wheelers before creating a checkout', async () => {
+  const { request } = customerRequest();
+  request.vehicleType = 'Two-wheeler';
+  request.vehicleBrand = 'Bajaj';
+  request.vehicleModel = 'Pulsar 220';
+  const result = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request } });
+  assert.equal(result.response.status,400);
 });
 
 test('creates a durable checkout intent with a content-addressed private storage path', async () => {
@@ -915,35 +931,15 @@ test('Razorpay reconciliation reuses the parsed request body and does not requir
   assert.equal(result.payload.status,'PAID');
 });
 
-test('PayPal create flow returns an approval URL and persists provider order ID', async () => {
+test('PayPal checkout and capture endpoints are disabled', async () => {
   const created = await createAndStageIntent();
-  const result = await call('/api/payment/paypal/create-order', { method:'POST', token:tokens.customer, body:{ intentId:created.intentId } });
-  assert.equal(result.response.status,200);
-  assert.equal(result.payload.provider,'paypal');
-  assert.match(result.payload.approvalUrl,/paypal\.com/);
-  assert.equal(state.intents.get(created.intentId).payment_provider,'paypal');
-  assert.equal(state.paypalOrderCalls,1);
-});
-
-test('PayPal capture verifies the order, capture, amount, and finalizes once', async () => {
-  const { created, capture } = await paidPayPalIntent();
-  assert.equal(capture.response.status,200);
-  assert.equal(capture.payload.status,'PAID');
-  const order = [...state.orders.values()][0];
-  assert.equal(order.payment_provider,'paypal');
-  assert.equal(order.provider_order_id,'PAYPAL-ORDER-LOCAL-1');
-  assert.equal(order.provider_payment_id,'CAPTURE-LOCAL-1');
-  assert.equal(state.paypalCaptureCalls,1);
-  assert.equal(state.intents.get(created.intentId).status,'PAID');
-});
-
-test('PayPal capture is idempotent when called again', async () => {
-  const first = await paidPayPalIntent();
-  const second = await call('/api/payment/paypal/capture', { method:'POST', token:tokens.customer, body:{ intentId:first.created.intentId, paypalOrderId:'PAYPAL-ORDER-LOCAL-1' } });
-  assert.equal(second.response.status,200);
-  assert.equal(second.payload.status,'PAID');
-  assert.equal(state.orders.size,1);
-  assert.equal(state.paypalCaptureCalls,1);
+  const create = await call('/api/payment/paypal/create-order', { method:'POST', token:tokens.customer, body:{ intentId:created.intentId } });
+  const capture = await call('/api/payment/paypal/capture', { method:'POST', token:tokens.customer, body:{ intentId:created.intentId, paypalOrderId:'PAYPAL-ORDER-LOCAL-1' } });
+  assert.equal(create.response.status,410);
+  assert.equal(capture.response.status,410);
+  assert.match(create.payload.error,/PayPal is disabled/);
+  assert.equal(state.paypalOrderCalls,0);
+  assert.equal(state.paypalCaptureCalls,0);
 });
 
 test('prevents switching a checkout that already has a provider order to the other gateway', async () => {
@@ -951,7 +947,7 @@ test('prevents switching a checkout that already has a provider order to the oth
   const razor = await call('/api/payment/create-order', { method:'POST', token:tokens.customer, body:{ intentId:created.intentId } });
   assert.equal(razor.response.status,200);
   const paypal = await call('/api/payment/paypal/create-order', { method:'POST', token:tokens.customer, body:{ intentId:created.intentId } });
-  assert.equal(paypal.response.status,409);
+  assert.equal(paypal.response.status,410);
 });
 
 test('customer cannot use the admin status endpoint', async () => {
@@ -1130,7 +1126,7 @@ test('static source contains category field isolation, provider routes, Resend, 
   assert.doesNotMatch(index,/id="pay-paypal"/);
   assert.match(index,/class="[^"]*\becu-only\b[^"]*"/);
   assert.match(admin,/class="order-status-select"/);
-  assert.match(serverSource,/\/api\/payment\/paypal\/create-order/);
+  assert.match(serverSource,/PayPal is disabled\. Use Razorpay checkout instead\./);
   assert.match(serverSource,/api\.resend\.com\/emails/);
   assert.match(serverSource,/notification_outbox/);
 });
