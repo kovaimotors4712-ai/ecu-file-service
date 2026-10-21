@@ -54,6 +54,15 @@
         </form>
       </section>
       
+      <section class="pricing-settings" aria-labelledby="public-contact-title" style="margin-top:28px;display:block">
+        <div><span class="form-kicker">PUBLIC CONTACT DETAILS</span><h2 id="public-contact-title">Homepage contact links</h2><p>Update the phone number, Telegram link and Gmail/contact email shown to visitors. Leave a field empty to hide that contact method when at least one other method is configured.</p></div>
+        <form id="public-contact-form" class="pricing-form" style="margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+          <label>Phone / WhatsApp number<input name="contact_phone" type="tel" maxlength="40" placeholder="+91 98765 43210" autocomplete="tel"></label>
+          <label>Telegram URL<input name="telegram_url" type="url" maxlength="500" placeholder="https://t.me/your_channel"></label>
+          <label>Email / Gmail<input name="contact_email" type="email" maxlength="254" placeholder="you@example.com" autocomplete="email"></label>
+          <div style="grid-column:1/-1"><button class="button button-dark" type="submit">Save contact details →</button><p id="public-contact-message" class="admin-message" role="status"></p></div>
+        </form>
+      </section>
       <section class="pricing-settings" aria-labelledby="site-content-title" style="margin-top:28px;display:block">
         <div><span class="form-kicker">WEBSITE CONTENT</span><h2 id="site-content-title">Announcements, Offers & Ads</h2><p>Create a post, schedule its display, or hide it from the public site. Use only approved HTTPS image and destination URLs.</p></div>
         <form id="site-content-form" class="pricing-form" style="margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
