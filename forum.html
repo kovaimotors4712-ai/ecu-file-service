@@ -59,6 +59,13 @@
       <p id="forum-profile-message" class="status-message" aria-live="polite"></p>
     </section>
 
+    <section class="panel forum-moderation-panel" id="forum-moderation-panel" hidden aria-labelledby="forum-moderation-heading">
+      <div class="section-heading"><div><p class="forum-kicker"><span></span> MODERATION</p><h2 id="forum-moderation-heading">Open reports</h2></div><button type="button" id="forum-refresh-reports" class="button button-outline">Refresh reports</button></div>
+      <p class="muted">This panel is available only to accounts with an admin or moderator role. Review reports before hiding content or locking a discussion.</p>
+      <p id="forum-moderation-message" class="status-message" aria-live="polite"></p>
+      <div id="forum-moderation-list" class="forum-topic-list"></div>
+    </section>
+
     <section class="forum-workspace">
       <aside class="forum-sidebar">
         <div class="panel">
