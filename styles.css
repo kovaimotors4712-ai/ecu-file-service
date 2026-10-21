@@ -101,7 +101,7 @@ body{line-height:1.55}h1,h2,h3,p,label,button,a{overflow-wrap:break-word}button,
 @media(max-width:620px){.quick-service-strip{grid-template-columns:minmax(0,1fr);padding:25px 18px;gap:10px}.quick-service-heading{grid-column:auto;padding-bottom:4px}.quick-service-card{padding:17px}.home-community-section{padding:46px 20px;gap:24px}.home-community-actions{display:grid;grid-template-columns:minmax(0,1fr)}.home-community-actions .button{width:100%;justify-content:space-between}.home-community-panel{padding:17px}.community-panel-head{font-size:9px}.quick-service-card>strong{font-size:18px}}
 
 /* Homepage conversion hierarchy and compact, mobile-safe cards */
-.quick-service-strip{grid-template-columns:minmax(0,1fr) repeat(3,minmax(0,1fr));align-items:stretch;gap:14px;padding:26px clamp(18px,4vw,58px);background:#f6f8f2;border-bottom:1px solid #e3e8df}
+.quick-service-strip{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch;gap:14px;padding:26px clamp(18px,4vw,58px);background:#f6f8f2;border-bottom:1px solid #e3e8df}
 .quick-service-heading{grid-column:1/-1;max-width:760px;padding:0 0 4px}
 .quick-service-heading h2{margin:6px 0 7px;font:800 clamp(25px,3vw,36px)/1.12 var(--display);letter-spacing:-.04em;color:var(--ink)}
 .quick-service-heading p{margin:0;color:#68746b;font-size:13px;line-height:1.7}
