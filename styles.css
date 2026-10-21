@@ -99,3 +99,29 @@ img, svg, video, canvas { max-width:100%; }
 body{line-height:1.55}h1,h2,h3,p,label,button,a{overflow-wrap:break-word}button,input,select,textarea{font:inherit}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #a3c644;outline-offset:3px}
 @media(max-width:1000px){.quick-service-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.quick-service-heading{grid-column:1/-1}.home-community-section{padding:54px 6%;grid-template-columns:minmax(0,1fr)}}
 @media(max-width:620px){.quick-service-strip{grid-template-columns:minmax(0,1fr);padding:25px 18px;gap:10px}.quick-service-heading{grid-column:auto;padding-bottom:4px}.quick-service-card{padding:17px}.home-community-section{padding:46px 20px;gap:24px}.home-community-actions{display:grid;grid-template-columns:minmax(0,1fr)}.home-community-actions .button{width:100%;justify-content:space-between}.home-community-panel{padding:17px}.community-panel-head{font-size:9px}.quick-service-card>strong{font-size:18px}}
+
+/* Homepage conversion hierarchy and compact, mobile-safe cards */
+.quick-service-strip{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch;gap:14px;padding:26px clamp(18px,4vw,58px);background:#f6f8f2;border-bottom:1px solid #e3e8df}
+.quick-service-heading{grid-column:1/-1;max-width:760px;padding:0 0 4px}
+.quick-service-heading h2{margin:6px 0 7px;font:800 clamp(25px,3vw,36px)/1.12 var(--display);letter-spacing:-.04em;color:var(--ink)}
+.quick-service-heading p{margin:0;color:#68746b;font-size:13px;line-height:1.7}
+.quick-service-card{display:flex;flex-direction:column;gap:10px;min-width:0;min-height:198px;padding:22px;background:#fff;border:1px solid #dfe6da;box-shadow:0 5px 18px #17251b08;text-decoration:none;color:var(--ink);transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.quick-service-card:hover{transform:translateY(-2px);border-color:#9bac65;box-shadow:0 12px 28px #17251b12}
+.quick-service-card>strong{font:800 clamp(17px,1.55vw,22px)/1.25 var(--display);letter-spacing:-.025em}
+.quick-service-card>span:not(.quick-service-icon){font-size:12px;line-height:1.7;color:#667269}
+.quick-service-card>b{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:auto;padding-top:12px;border-top:1px solid #e8ede4;font-size:11px}
+.quick-service-card .quick-service-icon{font:800 9px var(--mono);letter-spacing:.12em;color:#72882d}
+.quick-file-services-card{background:#18231e;color:#fff;border-color:#18231e}
+.quick-file-services-card>span:not(.quick-service-icon){color:#c5d0c7}
+.quick-service-subchoices{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto;padding-top:10px}
+.quick-service-subchoices a{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px;background:#29372f;border:1px solid #405045;color:#f8faf6;font-size:12px;font-weight:800;text-decoration:none}
+.quick-service-subchoices a:hover{background:#35483a;border-color:#d4ed72}
+.quick-store-card{background:#f0f4e8;border-color:#dce5cb}
+.contact-buttons{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;max-width:720px}
+.contact-button{min-width:0}
+.contact-button b{overflow-wrap:anywhere}
+@media(max-width:1000px){.quick-service-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.quick-service-heading{grid-column:1/-1}}
+@media(max-width:620px){.quick-service-strip{grid-template-columns:minmax(0,1fr);padding:24px 16px;gap:10px}.quick-service-heading{grid-column:auto}.quick-service-card{min-height:0;padding:18px}.quick-service-card>strong{font-size:19px}.quick-service-subchoices a{min-height:44px}.contact-buttons{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){.quick-service-card{transition:none}.quick-service-card:hover{transform:none}}
+/* Keep the workshop forum panel narrower than the phone viewport with safe gutters. */
+@media(max-width:620px){.forum-main{width:100%;max-width:100%;box-sizing:border-box;padding:18px 12px 48px}.forum-page .panel,.forum-hero{min-width:0;max-width:100%;box-sizing:border-box}.forum-workspace{grid-template-columns:minmax(0,1fr);gap:12px}.forum-page input,.forum-page select,.forum-page textarea{box-sizing:border-box;max-width:100%}.forum-chat-panel,.live-chat-panel{min-width:0;max-width:100%;overflow:hidden}.forum-chat-messages,.live-chat-messages{max-width:100%;overflow-wrap:anywhere;word-break:break-word}}
