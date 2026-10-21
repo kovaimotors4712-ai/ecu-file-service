@@ -127,9 +127,102 @@
     setMessage($('#forum-profile-message'), profile ? 'Your public profile is saved.' : 'Choose a display name and save your profile before creating a topic or reply.');
   }
 
+  async function loadModerationQueue() {
+    const panel = $('#forum-moderation-panel');
+    const list = $('#forum-moderation-list');
+    const message = $('#forum-moderation-message');
+    if (!panel || !user || !['admin', 'moderator'].includes(String(user.app_metadata && user.app_metadata.role || '').toLowerCase())) return;
+    setMessage(message, 'Loading open reports…');
+    try {
+      const reports = await api.rest('forum_reports?select=id,reporter_id,topic_id,reply_id,reason,status,created_at&status=eq.open&order=created_at.asc&limit=50');
+      const rows = Array.isArray(reports) ? reports : [];
+      const targets = await Promise.all(rows.map(async function (report) {
+        try {
+          if (report.topic_id) {
+            const found = await api.rest('forum_topics?select=id,title,is_hidden,is_locked&id=eq.' + encodeURIComponent(report.topic_id) + '&limit=1');
+            return { report: report, target: Array.isArray(found) ? found[0] : null, kind: 'topic' };
+          }
+          const found = await api.rest('forum_replies?select=id,body,is_hidden,topic_id&id=eq.' + encodeURIComponent(report.reply_id) + '&limit=1');
+          return { report: report, target: Array.isArray(found) ? found[0] : null, kind: 'reply' };
+        } catch (_) { return { report: report, target: null, kind: report.topic_id ? 'topic' : 'reply' }; }
+      }));
+      if (!targets.length) {
+        list.innerHTML = "<div class='empty-state'>No open reports. The moderation queue is clear.</div>";
+        setMessage(message, '');
+        return;
+      }
+      list.innerHTML = targets.map(function (entry) {
+        const report = entry.report;
+        const target = entry.target;
+        const targetText = target ? (entry.kind === 'topic' ? target.title : target.body) : 'Target content is unavailable or was removed.';
+        const status = target && target.is_hidden ? ' · Already hidden' : '';
+        const topicActions = entry.kind === 'topic' && target ? "<button type='button' class='button button-outline' data-mod-action='lock-topic' data-target-id='" + escapeHtml(target.id) + "'>" + (target.is_locked ? 'Unlock topic' : 'Lock topic') + "</button>" : '';
+        const hideAction = target && !target.is_hidden ? "<button type='button' class='button button-outline' data-mod-action='hide-" + entry.kind + "' data-target-id='" + escapeHtml(target.id) + "'>Hide " + entry.kind + "</button>" : '';
+        const resolveAction = "<button type='button' class='button button-lime' data-mod-action='resolve-report' data-report-id='" + escapeHtml(report.id) + "'>Resolve report</button>";
+        return "<article class='topic-card'><div class='topic-card-top'><span class='topic-tag'>" + (entry.kind === 'topic' ? 'Reported topic' : 'Reported reply') + "</span><span class='state-pill'>" + escapeHtml(report.status) + "</span></div>" +
+          "<h3>" + escapeHtml(targetText.slice(0, 220)) + "</h3><p class='topic-preview'>" + escapeHtml(report.reason) + "</p>" +
+          "<div class='topic-meta'><span>Reported " + escapeHtml(formatDate(report.created_at)) + escapeHtml(status) + "</span></div>" +
+          "<div class='auth-actions'>" + hideAction + topicActions + resolveAction + "</div></article>";
+      }).join('');
+      setMessage(message, targets.length + ' open report(s).');
+    } catch (_) {
+      list.innerHTML = '';
+      setMessage(message, 'The moderation queue could not be loaded. Confirm the account has an admin or moderator role.', 'error');
+    }
+  }
+
+  async function handleModerationAction(button) {
+    if (!user || !['admin', 'moderator'].includes(String(user.app_metadata && user.app_metadata.role || '').toLowerCase())) return;
+    const action = button.getAttribute('data-mod-action');
+    const targetId = button.getAttribute('data-target-id');
+    const reportId = button.getAttribute('data-report-id');
+    button.disabled = true;
+    try {
+      if (action === 'resolve-report' && validUuid(reportId)) {
+        await api.rest('forum_reports?id=eq.' + encodeURIComponent(reportId), {
+          method: 'PATCH',
+          body: { status: 'resolved', resolved_by: user.id, resolved_at: new Date().toISOString() },
+          prefer: 'return=minimal'
+        });
+      } else if ((action === 'hide-topic' || action === 'hide-reply') && validUuid(targetId)) {
+        const table = action === 'hide-topic' ? 'forum_topics' : 'forum_replies';
+        await api.rest(table + '?id=eq.' + encodeURIComponent(targetId), {
+          method: 'PATCH', body: { is_hidden: true }, prefer: 'return=minimal'
+        });
+      } else if (action === 'lock-topic' && validUuid(targetId)) {
+        const topic = await api.rest('forum_topics?select=id,is_locked&id=eq.' + encodeURIComponent(targetId) + '&limit=1');
+        const row = Array.isArray(topic) ? topic[0] : null;
+        if (!row) throw new Error('Topic not found');
+        await api.rest('forum_topics?id=eq.' + encodeURIComponent(targetId), {
+          method: 'PATCH', body: { is_locked: !row.is_locked }, prefer: 'return=minimal'
+        });
+      } else {
+        throw new Error('Invalid moderation action');
+      }
+      setMessage($('#forum-moderation-message'), 'Moderation action saved.', 'success');
+      await loadModerationQueue();
+      await loadTopics();
+      if (activeTopic) {
+        const current = topics.find(function (item) { return item.id === activeTopic.id; });
+        if (!current || current.is_hidden) {
+          activeTopic = null;
+          $('#forum-thread-panel').hidden = true;
+          $('.topics-panel').hidden = false;
+        }
+      }
+    } catch (_) {
+      setMessage($('#forum-moderation-message'), 'The action could not be saved. Check moderator permissions and try again.', 'error');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   async function refreshAuthState() {
     user = api && api.getSession() ? api.getSession().user : null;
     const signedIn = Boolean(user && validUuid(user.id));
+    const isModerator = Boolean(user && ['admin', 'moderator'].includes(String(user.app_metadata && user.app_metadata.role || '').toLowerCase()));
+    $('#forum-moderation-panel').hidden = !isModerator;
+    if (isModerator) loadModerationQueue();
     $('#account-state').textContent = signedIn ? 'Signed in' : 'Not signed in';
     $('#forum-auth-email').closest('label').hidden = signedIn;
     $('#forum-auth-password').closest('label').hidden = signedIn;
@@ -360,6 +453,11 @@
     window.scrollTo({ top: $('.topics-panel').getBoundingClientRect().top + window.scrollY - 12, behavior: 'smooth' });
   });
   $('#forum-load-topics').addEventListener('click', loadTopics);
+  $('#forum-refresh-reports').addEventListener('click', loadModerationQueue);
+  $('#forum-moderation-list').addEventListener('click', function (event) {
+    const button = event.target.closest('[data-mod-action]');
+    if (button) handleModerationAction(button);
+  });
   $('#forum-report-topic').addEventListener('click', function () {
     if (activeTopic) submitReport(activeTopic.id, null);
   });
