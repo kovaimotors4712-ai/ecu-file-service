@@ -7,12 +7,57 @@
   const verificationPriceLabel = document.querySelector('#verification-price');
   const brandInput = document.querySelector('#brand');
   const brandResults = document.querySelector('#brand-results');
+  const vehicleTypeSelect = document.querySelector('#vehicle-type');
+  const vehicleModelInput = document.querySelector('#vehicle-model');
+  const modelSuggestions = document.querySelector('#vehicle-model-suggestions');
   const maxFileSize = 50 * 1024 * 1024;
   const maxAirbagPhotoBytes = 10 * 1024 * 1024;
   const allowedPhotoTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
   const modulePhotoInput = document.querySelector('#airbag-module-photo');
   const partNumberPhotoInput = document.querySelector('#airbag-part-photo');
-  const brands = ['Ather','Bajaj','BYD','Citroën','Daewoo','Datsun','Eicher','Force Motors','Honda','Hyundai','Isuzu','JCB','Jeep','Kia','Kubota','Land Rover','Mahindra','Mahindra Truck and Bus','Mahindra Tractors','Maruti Suzuki','Mercedes-Benz','MG Motor','Mitsubishi','Nissan','OLA Electric','Piaggio Commercial Vehicles','Porsche','Renault','Royal Enfield','Scania Industrial','Skoda','SML Isuzu','Sonalika','Suzuki','Tata Motors','Tata Motors Commercial Vehicles','TAFE','Toyota','TVS','Volkswagen','Volvo Construction Equipment','VST Tillers Tractors','Yanmar','Other / Not Listed'];
+  const brands = [
+    'Acura','Aixam','Alfa Romeo','Aprilia','Aston Martin','Audi','Bajaj','Benelli','Bentley','BMW','BMW Motorrad','Bugatti','Buick','Cadillac','Caterpillar','Changan','Chevrolet','Chrysler','Citroën','Dacia','Daewoo','Daihatsu','Datsun','Dodge','Ducati','Eicher','Ferrari','Fiat','Force Motors','Ford','Foton','Geely','Genesis','GMC','Great Wall','Harley-Davidson','Hino','Holden','Honda','Hyundai','Infiniti','Isuzu','Iveco','JAC','Jaguar','Jeep','JCB','Kawasaki','Kia','KTM','Kubota','Lamborghini','Lancia','Land Rover','Lexus','Lincoln','Lotus','Mahindra','Mahindra Truck and Bus','Mahindra Tractors','MAN','Maserati','Maruti Suzuki','Maserati','Mazda','McLaren','Mercedes-Benz','MG Motor','Mini','Mitsubishi','Mitsubishi Fuso','Mitsubishi Heavy Industries','Moto Guzzi','MV Agusta','Nissan','Opel','Perodua','Peugeot','Piaggio Commercial Vehicles','Polaris','Porsche','Proton','Ram','Renault','Rolls-Royce','Saab','Scania','Seat','Skoda','SML Isuzu','Smart','Sonalika','SsangYong','Subaru','Suzuki','Tata Motors','Tata Motors Commercial Vehicles','TAFE' ,'Toyota','Triumph','TVS','Vauxhall','Volkswagen','Volvo','Volvo Construction Equipment','VST Tillers Tractors','Yamaha','Yanmar','Other / Not Listed'
+  ];
+  const premiumTwoWheelerBrands = new Set(['Aprilia','BMW Motorrad','Benelli','Ducati','Harley-Davidson','Kawasaki','KTM','Moto Guzzi','MV Agusta','Triumph']);
+  const twoWheelerOnlyBrands = new Set(['BMW Motorrad','Ducati','Harley-Davidson','Kawasaki','KTM','Moto Guzzi','MV Agusta','Triumph','Aprilia','Benelli','Polaris']);
+  const modelCatalog = {
+    'Maruti Suzuki':['Alto','Alto K10','S-Presso','Celerio','Wagon R','Swift','Dzire','Baleno','Fronx','Brezza','Ertiga','XL6','Grand Vitara','Ignis','Eeco','Jimny','Ciaz','S-Cross','Vitara Brezza'],
+    'Tata Motors':['Nano','Tiago','Tigor','Altroz','Punch','Nexon','Harrier','Safari','Indica','Indigo','Bolt','Zest','Sumo','Hexa','Aria'],
+    'Tata Motors Commercial Vehicles':['Ace','Intra V10','Intra V20','Intra V30','Yodha','407','709','1109','1613','2518','Prima','Signa','Ultra','LPT','LPK','Winger'],
+    'Mahindra':['Bolero','Bolero Neo','Scorpio','Scorpio-N','XUV300','XUV 3XO','XUV500','XUV700','Thar','Thar Roxx','KUV100','TUV300','Marazzo','Xylo','Quanto','Verito','Jeeto','Supro'],
+    'Mahindra Truck and Bus':['Blazo','Furio','Loadking','Jayo','Bolero Pik-Up','Voyager'],
+    'Mahindra Tractors':['265 DI','275 DI','575 DI','585 DI','Arjun','Yuvo','Jivo','Novo'],
+    'Hyundai':['Santro','i10','Grand i10','i20','Accent','Verna','Aura','Xcent','Venue','Creta','Alcazar','Tucson','Santa Fe','Eon','Getz','Elantra','Kona'],
+    'Honda':['Amaze','City','Civic','Accord','Jazz','Brio','WR-V','BR-V','CR-V','Mobilio','Elevate'],
+    'Toyota':['Etios','Glanza','Urban Cruiser','Urban Cruiser Hyryder','Innova','Innova Crysta','Innova Hycross','Fortuner','Hilux','Camry','Corolla Altis','Yaris','Qualis','Land Cruiser','Vellfire'],
+    'Kia':['Seltos','Sonet','Carens','Carnival'],
+    'Volkswagen':['Polo','Vento','Virtus','Taigun','Tiguan','Passat','Jetta','Ameo','T-Roc'],
+    'Skoda':['Fabia','Rapid','Octavia','Superb','Kushaq','Slavia','Kodiaq','Laura','Yeti'],
+    'Nissan':['Micra','Sunny','Terrano','Kicks','Magnite','X-Trail'],
+    'Renault':['Kwid','Triber','Kiger','Duster','Lodgy','Fluence','Pulse','Scala'],
+    'Ford':['Figo','Aspire','Freestyle','EcoSport','Endeavour','Fiesta','Ikon','Mondeo','Ranger','Mustang'],
+    'Chevrolet':['Spark','Beat','Sail','Aveo','Cruze','Tavera','Captiva','Enjoy','Trailblazer'],
+    'Isuzu':['D-Max','V-Cross','MU-7','MU-X','S-Cab'],
+    'Jeep':['Compass','Meridian','Wrangler','Grand Cherokee','Cherokee'],
+    'Mercedes-Benz':['A-Class','B-Class','C-Class','E-Class','S-Class','CLA','GLA','GLB','GLC','GLE','GLS','G-Class','V-Class','Sprinter'],
+    'BMW':['1 Series','2 Series','3 Series','5 Series','7 Series','X1','X3','X5','X7','Z4','i8'],
+    'Audi':['A3','A4','A6','A8','Q3','Q5','Q7','Q8','TT','R8'],
+    'Land Rover':['Defender','Discovery','Discovery Sport','Range Rover','Range Rover Sport','Range Rover Evoque','Freelander'],
+    'Volvo':['S60','S90','V40','XC40','XC60','XC90','V90'],
+    'Mitsubishi':['Lancer','Cedia','Pajero','Outlander','Montero','Eclipse Cross'],
+    'MG Motor':['Hector','Hector Plus','Astor','Gloster' ,'ZS'],
+    'BMW Motorrad':['S 1000 RR','M 1000 RR','R 1250 GS','R 1300 GS','F 900 GS','F 850 GS','G 310 R','G 310 GS','K 1600 GTL'],
+    'Triumph':['Street Triple','Speed Triple','Bonneville T100','Bonneville T120','Tiger 900','Tiger 1200','Trident 660','Daytona 660','Speed 400','Scrambler 400 X','Rocket 3'],
+    'Ducati':['Panigale V2','Panigale V4','Streetfighter V4','Monster','Multistrada V4','Diavel','Scrambler','DesertX'],
+    'Kawasaki':['Ninja 300','Ninja 400','Ninja 650','Ninja ZX-6R','Ninja ZX-10R','Z650','Z900','Versys 650','Versys 1000'],
+    'KTM':['Duke 390','Duke 790','Duke 890','RC 390','Adventure 390','Adventure 790','Adventure 890'],
+    'Harley-Davidson':['Sportster S','Nightster','Fat Boy','Street Glide','Road Glide','Pan America','Iron 883'],
+    'Aprilia':['RS 457','RS 660','RSV4','Tuono 660','Tuono V4','Tuareg 660'],
+    'Benelli':['TNT 300','TNT 600i','TRK 502','Leoncino 500'],
+    'Moto Guzzi':['V7','V85 TT','V100 Mandello'],
+    'MV Agusta':['Brutale 800','F3 800','Dragster 800','Turismo Veloce'],
+    'Other / Not Listed':[]
+  };
   let currentPage = 0;
   let activeBrandOption = -1;
   let fileVerificationPricePaise = null;
@@ -50,6 +95,7 @@
     if (index === 1) {
       const year = values.vehicleYear;
       if (!values.vehicleBrand || !values.vehicleType || !values.vehicleModel) { setError(index, 'Brand, vehicle type and model are required.'); return false; }
+      if (values.vehicleType === 'Two-wheeler' && !premiumTwoWheelerBrands.has(values.vehicleBrand)) { setError(index, 'Two-wheeler requests are currently limited to selected imported/premium motorcycle brands.'); return false; }
       if (values.category === 'AIRBAG' && !year) { setError(index, 'Year is required for Airbag Crash Clear requests.'); return false; }
       if (year && (!/^\d{4}$/.test(year) || Number(year)<1950 || Number(year)>2100)) { setError(index, 'Enter a valid vehicle year.'); return false; }
     }
@@ -128,9 +174,20 @@
     updatePaymentButtons();
   }
 
+  function brandsForCurrentVehicleType() {
+    const type = String(vehicleTypeSelect?.value || '');
+    if (type === 'Two-wheeler') return brands.filter(brand => premiumTwoWheelerBrands.has(brand) || brand === 'Other / Not Listed');
+    return brands.filter(brand => !twoWheelerOnlyBrands.has(brand) || brand === 'Other / Not Listed');
+  }
+  function renderModelSuggestions() {
+    if (!modelSuggestions) return;
+    const brand = String(brandInput.value || '').trim();
+    const models = modelCatalog[brand] || [];
+    modelSuggestions.innerHTML = models.map(model => '<option value="' + escapeHtml(model) + '"></option>').join('');
+  }
   function renderBrands(query='') {
     const needle = query.trim().toLowerCase();
-    const matches = brands.filter(brand => !needle || brand.toLowerCase().includes(needle)).slice(0,20);
+    const matches = brandsForCurrentVehicleType().filter(brand => !needle || brand.toLowerCase().includes(needle)).slice(0,30);
     brandResults.innerHTML = matches.map((brand,index)=>`<button type="button" class="brand-option" role="option" data-brand="${escapeHtml(brand)}" aria-selected="false">${escapeHtml(brand)}</button>`).join('');
     brandResults.classList.toggle('open', matches.length>0 && document.activeElement===brandInput);
     activeBrandOption = -1;
@@ -139,8 +196,10 @@
   brandInput.addEventListener('input',()=>{renderBrands(brandInput.value);brandInput.setAttribute('aria-expanded','true');});
   brandInput.addEventListener('focus',()=>{renderBrands(brandInput.value);brandInput.setAttribute('aria-expanded','true');});
   brandInput.addEventListener('keydown',event=>{const options=[...brandResults.querySelectorAll('.brand-option')]; if (!options.length) return; if (event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();activeBrandOption=(activeBrandOption+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;options.forEach((o,i)=>o.classList.toggle('keyboard-active',i===activeBrandOption));options[activeBrandOption]?.scrollIntoView({block:'nearest'});} else if(event.key==='Enter'&&activeBrandOption>=0){event.preventDefault();options[activeBrandOption].click();} else if(event.key==='Escape') closeBrandResults();});
-  brandResults.addEventListener('click',event=>{const button=event.target.closest('.brand-option');if(!button)return;brandInput.value=button.dataset.brand;closeBrandResults();updateSummary();});
+  brandResults.addEventListener('click',event=>{const button=event.target.closest('.brand-option');if(!button)return;brandInput.value=button.dataset.brand;closeBrandResults();renderModelSuggestions();updateSummary();});
   document.addEventListener('click',event=>{if(!event.target.closest('.brand-search-wrap'))closeBrandResults();});
+  vehicleTypeSelect?.addEventListener('change',()=>{const allowed=brandsForCurrentVehicleType();if(brandInput.value && !allowed.includes(brandInput.value)){brandInput.value='';if(vehicleModelInput)vehicleModelInput.value='';}renderBrands(brandInput.value);renderModelSuggestions();updateSummary();});
+  brandInput.addEventListener('change',()=>{renderModelSuggestions();});
   document.querySelectorAll('input[name="category"]').forEach(radio=>radio.addEventListener('change',()=>{document.querySelectorAll('.choice-card').forEach(card=>card.classList.toggle('selected',card.querySelector('input')?.checked));fileStagedInStorage=false;activeIntent=null;originalFileSha256='';updateSummary();}));
   document.querySelectorAll('input[name="service"],#vehicle-type,#vehicle-model,#vehicle-year,#ecu-maker,#ecu-model,#reading-tool,#customer-name,#customer-phone,#customer-email,#request-notes,#airbag-module-details').forEach(el=>el.addEventListener('input',updateSummary));
   document.querySelector('#original-file').addEventListener('change',()=>{fileStagedInStorage=false;activeIntent=null;originalFileSha256=''; const label=document.querySelector('.file-selected'); if(label) label.textContent=fileInput.files[0] ? `${fileInput.files[0].name} · ${formatSize(fileInput.files[0].size)}` : ''; updateSummary();});
@@ -281,7 +340,7 @@
   document.querySelector('#pay-paypal')?.addEventListener('click',()=>beginPayment('paypal'));
   document.querySelector('.start-over')?.addEventListener('click',()=>{form.reset();activeIntent=null;fileStagedInStorage=false;paymentRecoveryRequired=false;originalFileSha256='';document.querySelectorAll('input[name="category"]').forEach(r=>r.checked=r.value==='ECU');document.querySelectorAll('.choice-card').forEach((card,i)=>card.classList.toggle('selected',i===0));const fs=document.querySelector('.file-selected');if(fs)fs.textContent='';document.querySelector('.module-photo-selected').textContent='';document.querySelector('.part-photo-selected').textContent='';setPage(0);updateSummary();});
   window.addEventListener('efsi:resume-checkout',event=>resumeFromIntent(event.detail));
-  fetch('/api/health',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(health=>{providerReadiness={razorpay:Boolean(health?.paymentReadiness?.razorpay),paypal:Boolean(health?.paymentReadiness?.paypal)};paymentReady=Boolean(health?.paymentConfigured);const status=document.querySelector('.verification-status');const gateways=document.querySelector('.payment-gateway-note');if(gateways)gateways.textContent=health?.paymentReadiness?.razorpay&&health?.paymentReadiness?.paypal?'Razorpay or PayPal secure checkout is available.':health?.paymentReadiness?.razorpay?'Razorpay secure checkout is available.':health?.paymentReadiness?.paypal?'PayPal secure checkout is available.':'Secure payment is not configured yet.';updatePaymentButtons();}).catch(()=>{paymentReady=false;updatePaymentButtons();});
+  fetch('/api/health',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(health=>{providerReadiness={razorpay:Boolean(health?.paymentReadiness?.razorpay),paypal:false};paymentReady=Boolean(health?.paymentConfigured);const status=document.querySelector('.verification-status');const gateways=document.querySelector('.payment-gateway-note');if(gateways)gateways.textContent=health?.paymentReadiness?.razorpay?'Razorpay secure checkout is available.':'Secure payment is not configured yet.';updatePaymentButtons();}).catch(()=>{paymentReady=false;updatePaymentButtons();});
   fetch('/api/pricing',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(pricing=>{if(!pricing)throw new Error('pricing');fileVerificationPricePaise=pricing.fileVerificationPricePaise;const fee=formatINR(fileVerificationPricePaise);verificationPriceLabel.textContent=fee;document.querySelectorAll('[data-fee-inline]').forEach(el=>el.textContent=fee);updateSummary();}).catch(()=>{verificationPriceLabel.textContent='Price unavailable';document.querySelector('.verification-status').dataset.error='true';document.querySelector('.verification-status').textContent='The verification fee could not be loaded. Reload and retry.';});
   const queryCategory = new URLSearchParams(location.search).get('category');
   if (queryCategory === 'ECU' || queryCategory === 'AIRBAG') {

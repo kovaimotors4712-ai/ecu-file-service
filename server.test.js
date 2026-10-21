@@ -1127,7 +1127,7 @@ test('static source contains category field isolation, provider routes, Resend, 
   assert.match(index,/value="Crash Clear"/);
   assert.match(index,/id="airbag-module-photo"/);
   assert.match(index,/id="airbag-part-photo"/);
-  assert.match(index,/id="pay-paypal"/);
+  assert.doesNotMatch(index,/id="pay-paypal"/);
   assert.match(index,/class="[^"]*\becu-only\b[^"]*"/);
   assert.match(admin,/class="order-status-select"/);
   assert.match(serverSource,/\/api\/payment\/paypal\/create-order/);
