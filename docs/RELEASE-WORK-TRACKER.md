@@ -53,3 +53,11 @@ Latest verified production commit: 930a76c2ea8fc09586d6b029ccf06b138552907b
 - Never apply migrations blindly or against a different/inactive Supabase project.
 - Preserve the private-ecu-files bucket, existing order/payment tables and checkout path.
 - After each release, run tests and syntax checks, inspect the exact diff, verify the live Render deployment/health, and validate payment and private-file delivery without creating unauthorized real charges.
+
+
+## 2026-10-21 — user-requested UI follow-up
+- PayPal is no longer offered in the public checkout UI; Razorpay remains the active payment option. Existing backend PayPal code is dormant for compatibility and production health reports PayPal not configured. Do not add PayPal back unless explicitly requested.
+- Added a persistent, mobile-visible Forum link so the route is discoverable without opening the hamburger menu.
+- Expanded vehicle makes and added model suggestions for common non-EV vehicles. Model suggestions are convenience data, not proof of Launch diagnostic coverage; users can type a model not listed. The public LAUNCH coverage inquiry page did not return a complete downloadable vehicle dataset during the review, so do not claim every Launch model is imported or supported.
+- Two-wheeler selection is limited in suggestions to imported/premium brands (Triumph, Ducati, BMW Motorrad, Kawasaki, KTM, Aprilia, Benelli, Harley-Davidson, Moto Guzzi, MV Agusta). Other vehicle types retain car, commercial, tractor and off-road makes. This is a UI filter only; confirm actual coverage for the exact model/year before accepting a job.
+- Supabase security advisor still flags leaked-password protection disabled and one authenticated SECURITY DEFINER payment finalizer. The finalizer verifies an HMAC proof and customer-owned checkout intent; do not revoke it without redesigning the server call. Enabling leaked-password protection requires the project owner's Auth dashboard setting and remains outstanding.
