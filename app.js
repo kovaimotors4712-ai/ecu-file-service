@@ -415,6 +415,24 @@
   window.addEventListener('efsi:resume-checkout',event=>resumeFromIntent(event.detail));
   fetch('/api/health',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(health=>{providerReadiness={razorpay:Boolean(health?.paymentReadiness?.razorpay),paypal:false};paymentReady=Boolean(health?.paymentConfigured);const status=document.querySelector('.verification-status');const gateways=document.querySelector('.payment-gateway-note');if(gateways)gateways.textContent=health?.paymentReadiness?.razorpay?'Razorpay secure checkout is available.':'Secure payment is not configured yet.';updatePaymentButtons();}).catch(()=>{paymentReady=false;updatePaymentButtons();});
   fetch('/api/pricing',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(pricing=>{if(!pricing)throw new Error('pricing');fileVerificationPricePaise=pricing.fileVerificationPricePaise;const fee=formatINR(fileVerificationPricePaise);verificationPriceLabel.textContent=fee;document.querySelectorAll('[data-fee-inline]').forEach(el=>el.textContent=fee);updateSummary();}).catch(()=>{verificationPriceLabel.textContent='Price unavailable';document.querySelector('.verification-status').dataset.error='true';document.querySelector('.verification-status').textContent='The verification fee could not be loaded. Reload and retry.';});
+  document.querySelectorAll('[data-quick-category]').forEach(button => button.addEventListener('click', () => {
+    const category = button.dataset.quickCategory;
+    const radio = document.querySelector(`input[name="category"][value="${category}"]`);
+    if (radio) {
+      radio.checked = true;
+      document.querySelectorAll('.choice-card').forEach(card => card.classList.toggle('selected', card.querySelector('input')?.checked));
+      document.querySelectorAll('[data-quick-category]').forEach(option => {
+        const selected = option.dataset.quickCategory === category;
+        option.classList.toggle('is-selected', selected);
+        option.setAttribute('aria-pressed', String(selected));
+      });
+      updateSummary();
+    }
+  }));
+  document.querySelector('.quick-module-continue')?.addEventListener('click', () => {
+    document.querySelector('#order')?.scrollIntoView({behavior:'smooth', block:'start'});
+    setPage(0);
+  });
   const queryCategory = new URLSearchParams(location.search).get('category');
   if (queryCategory === 'ECU' || queryCategory === 'AIRBAG') {
     const requested = document.querySelector(`input[name="category"][value="${queryCategory}"]`);
