@@ -418,7 +418,17 @@
   const queryCategory = new URLSearchParams(location.search).get('category');
   if (queryCategory === 'ECU' || queryCategory === 'AIRBAG') {
     const requested = document.querySelector(`input[name="category"][value="${queryCategory}"]`);
-    if (requested) { requested.checked = true; document.querySelectorAll('.choice-card').forEach(card=>card.classList.toggle('selected',card.querySelector('input')?.checked)); if (queryCategory === 'AIRBAG') setPage(1); }
+    if (requested) {
+      requested.checked = true;
+      document.querySelectorAll('.choice-card').forEach(card=>card.classList.toggle('selected',card.querySelector('input')?.checked));
+      applyCategoryFields();
+      updateSummary();
+      // Category links should open the form at its first step, with the requested
+      // category preselected, rather than skipping "Choose module".
+      if (location.hash === '#order') {
+        requestAnimationFrame(() => document.querySelector('#order')?.scrollIntoView({ behavior: 'auto', block: 'start' }));
+      }
+    }
   }
   updateSummary();
   resumePaypalReturn();
