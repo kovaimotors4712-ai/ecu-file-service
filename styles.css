@@ -140,3 +140,24 @@ body{line-height:1.55}h1,h2,h3,p,label,button,a{overflow-wrap:break-word}button,
   .hero-index{bottom:12px;right:20px;font-size:8px}
   .hero-art{display:none}
 }
+
+/* Mobile hero workflow: keep all three numbered steps visible below the CTA buttons. */
+@media(max-width:620px){
+  .hero-meta{display:grid!important;grid-template-columns:minmax(0,1fr);gap:0;margin-top:22px;padding:4px 14px;background:#202c26;border:1px solid #3e4b41;color:#d0d8d0;font-size:11px;line-height:1.5;letter-spacing:0}
+  .hero-meta div{display:grid;grid-template-columns:25px minmax(0,1fr);align-items:center;gap:8px;padding:12px 0}
+  .hero-meta div+div{border-top:1px solid #3d4941}
+  .hero-meta .meta-value{font-size:12px;font-weight:500;color:var(--lime)}
+  .hero-meta>i{display:none}
+}
+/* Complete module selection is embedded directly in the second homepage card. */
+.quick-module-picker{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+.quick-module-option{display:flex;align-items:center;gap:9px;min-width:0;padding:12px 10px;border:1px solid #526157;background:#29372f;color:#f8faf6;text-align:left;cursor:pointer}
+.quick-module-option>span:nth-child(2){display:flex;flex-direction:column;gap:3px;min-width:0}
+.quick-module-option b{font-size:13px}
+.quick-module-option small{font-size:10px;line-height:1.35;color:#c5d0c7}
+.quick-module-option>span:last-child{margin-left:auto}
+.quick-module-symbol{font-size:18px;color:var(--lime)}
+.quick-module-option.is-selected{background:#e8f4bc;color:var(--ink);border-color:var(--lime)}
+.quick-module-option.is-selected small{color:#4d5a40}
+.quick-module-continue{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;margin-top:10px;padding:13px 14px;background:var(--lime);border:0;color:var(--ink);font-size:12px;font-weight:800;cursor:pointer}
+@media(max-width:620px){.quick-module-picker{gap:7px}.quick-module-option{padding:12px 8px}.quick-module-continue{min-height:46px}}
