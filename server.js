@@ -57,7 +57,7 @@ function isUnsupportedElectricModel(brand, model) {
   });
 }
 
-const publicFiles = new Set(['index.html', 'admin.html', 'advertising-quote.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'googlea2bbe9d2fd8bede2.html']);
+const publicFiles = new Set(['index.html', 'admin.html', 'advertising-quote.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'terms.html', 'googlea2bbe9d2fd8bede2.html']);
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
@@ -1416,7 +1416,20 @@ async function handleAdminSiteSettings(request, response) {
     try {
       const body=await readJson(request,4096);
       const phone=cleanSiteText(body.contact_phone,40);
-      const telegram=cleanSiteText(body.telegram_url,500);
+      const telegramRaw=cleanSiteText(body.telegram_url,500);
+      let telegram='';
+      if (telegramRaw) {
+        let parsed;
+        try { parsed = new URL(/^https:\/\//i.test(telegramRaw) ? telegramRaw : 'https://' + telegramRaw); }
+        catch { throw Object.assign(new Error('Enter a valid Telegram username or https://t.me link.'),{statusCode:400}); }
+        const host=parsed.hostname.toLowerCase().replace(/^www\./,'');
+        if (parsed.protocol!=='https:' || !['t.me','telegram.me'].includes(host) || parsed.username || parsed.password) {
+          throw Object.assign(new Error('Use a Telegram link such as https://t.me/your_channel or https://t.me/+invitecode.'),{statusCode:400});
+        }
+        parsed.hostname='t.me';
+        parsed.hash='';
+        telegram=parsed.href.replace(/\/$/,'');
+      }
       const email=cleanSiteText(body.contact_email,254).toLowerCase();
       if (telegram) { let parsed; try { parsed=new URL(telegram); } catch { throw Object.assign(new Error('Enter a valid Telegram URL.'),{statusCode:400}); } if (parsed.protocol!=='https:' || !['t.me','telegram.me','www.t.me','www.telegram.me'].includes(parsed.hostname.toLowerCase()) || parsed.username || parsed.password) throw Object.assign(new Error('Telegram link must use an HTTPS t.me or telegram.me address.'),{statusCode:400}); }
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw Object.assign(new Error('Enter a valid contact email address.'),{statusCode:400});
