@@ -71,3 +71,9 @@
 .admin-airbag-photo { display: block; width: 100%; max-width: 220px; height: 130px; object-fit: contain; background: #f5f7f2; border: 1px solid #e3e8df; }
 .admin-airbag-photo.photo-unavailable { font-size: 10px; color: #8a5148; }
 @media(max-width:640px) { .admin-airbag-attachment { grid-template-columns: 1fr; } .admin-airbag-photo { max-width: 100%; height: 180px; } }
+
+
+/* Keep the Orders refresh control readable on the light admin page. */
+.admin-title > #refresh-orders.button-ghost { color: var(--ink); border-color: #cbd4c6; background: #fff; }
+.admin-title > #refresh-orders.button-ghost:hover { background: #f0f4e8; border-color: #9aaa62; }
+.admin-title > #refresh-orders.button-ghost:focus-visible { outline: 2px solid #819638; outline-offset: 2px; }
