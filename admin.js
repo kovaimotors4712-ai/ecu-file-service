@@ -446,7 +446,7 @@
   }
   publicContactForm?.addEventListener('submit',async event=>{
     event.preventDefault();const button=publicContactForm.querySelector('button[type="submit"]');button.disabled=true;publicContactMessage.classList.remove('admin-error');publicContactMessage.textContent='Saving…';
-    try{const data=new FormData(publicContactForm);const result=await adminApi('/api/admin/site-settings',{method:'PATCH',body:JSON.stringify({contact_phone:String(data.get('contact_phone')||'').trim(),telegram_url:String(data.get('telegram_url')||'').trim(),contact_email:String(data.get('contact_email')||'').trim()})});publicContactMessage.textContent='Saved. The public homepage contact links will update on refresh.';}
+    try{const data=new FormData(publicContactForm);const result=await adminApi('/api/admin/site-settings',{method:'PATCH',body:JSON.stringify({contact_phone:String(data.get('contact_phone')||'').trim(),telegram_url:String(data.get('telegram_url')||'').trim(),contact_email:String(data.get('contact_email')||'').trim()})});publicContactForm.elements.namedItem('telegram_url').value=result.settings?.telegram_url||'';publicContactForm.elements.namedItem('contact_phone').value=result.settings?.contact_phone||'';publicContactForm.elements.namedItem('contact_email').value=result.settings?.contact_email||'';publicContactMessage.textContent='Saved successfully. Reload the homepage to verify each contact link.';}
     catch(error){publicContactMessage.textContent=error.message;publicContactMessage.classList.add('admin-error');}
     finally{button.disabled=false;}
   });
