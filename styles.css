@@ -125,3 +125,18 @@ body{line-height:1.55}h1,h2,h3,p,label,button,a{overflow-wrap:break-word}button,
 @media(prefers-reduced-motion:reduce){.quick-service-card{transition:none}.quick-service-card:hover{transform:none}}
 /* Keep the workshop forum panel narrower than the phone viewport with safe gutters. */
 @media(max-width:620px){.forum-main{width:100%;max-width:100%;box-sizing:border-box;padding:18px 12px 48px}.forum-page .panel,.forum-hero{min-width:0;max-width:100%;box-sizing:border-box}.forum-workspace{grid-template-columns:minmax(0,1fr);gap:12px}.forum-page input,.forum-page select,.forum-page textarea{box-sizing:border-box;max-width:100%}.forum-chat-panel,.live-chat-panel{min-width:0;max-width:100%;overflow:hidden}.forum-chat-messages,.live-chat-messages{max-width:100%;overflow-wrap:anywhere;word-break:break-word}}
+
+/* Mobile hero: keep the three workflow steps readable and separate from the CTA buttons. */
+@media(max-width:620px){
+  .hero{min-height:0;padding:54px 20px 36px;align-items:flex-start}
+  .hero-content{width:100%;max-width:none}
+  .hero-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:9px;width:100%}
+  .hero-actions .button{width:100%;min-height:54px;justify-content:space-between;padding:0 18px;font-size:13px}
+  .hero-meta{position:relative;display:grid;grid-template-columns:minmax(0,1fr);gap:0;margin-top:24px;padding:5px 14px;background:#202c26;border:1px solid #3e4b41;color:#d0d8d0;font-size:11px;line-height:1.5;letter-spacing:0}
+  .hero-meta div{display:grid;grid-template-columns:25px minmax(0,1fr);align-items:center;gap:8px;padding:12px 0}
+  .hero-meta div+div{border-top:1px solid #3d4941}
+  .hero-meta .meta-value{font-size:12px;font-weight:500}
+  .hero-meta>i{display:none}
+  .hero-index{bottom:12px;right:20px;font-size:8px}
+  .hero-art{display:none}
+}
