@@ -181,7 +181,7 @@
   const title=form.querySelector('[name="title"]');
   const body=form.querySelector('[name="body"]');
   if(title&&!title.value)title.value='Purchase enquiry: '+product;
-  if(body&&!body.value)body.value='I would like to purchase or enquire about this software.\nSoftware: '+product+(price?'\nListed price: '+price:'')+'\nPlease confirm availability, compatibility, licence terms and payment/delivery steps.';
+  if(body&&!body.value)body.value='I am requesting this software. Please confirm availability, compatibility and licence terms. If approved, please send me your official payment link; I will pay through that link.\nSoftware: '+product+(price?'\nListed price: '+price:'')+'\nPlease do not process this as a purchase until I receive the payment link and complete payment.';
   const heading=document.getElementById('request-software');
   if(heading)heading.setAttribute('data-purchase-enquiry','true');
  }catch(_){}
