@@ -1426,7 +1426,7 @@ test('regression test: role="admin" is preserved when getUser() returns a user w
 test('regression test: index.html references auth.js with version parameter and server serves static assets correctly', async () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   assert.ok(indexHtml.includes('auth.js?v=20261023-customer-archive'));
-  assert.ok(indexHtml.includes('app.js?v=payment-recovery-feedback-20261017'));
+  assert.ok(indexHtml.includes('app.js?v=20261023-customer-archive'));
   assert.ok(indexHtml.includes('supabase.js?v=ba583d0'));
 });
 
