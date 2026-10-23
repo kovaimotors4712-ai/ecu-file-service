@@ -506,9 +506,10 @@
   const contentQuoteField=siteContentForm?.elements.namedItem('advertising_quote_id');
   function updateAdQuoteRequirement(){
     if(!contentQuoteField)return;
-    const required=contentKindField?.value==='ad'&&contentPublishedField?.checked;
-    contentQuoteField.required=Boolean(required);
-    contentQuoteField.setCustomValidity(required&&!contentQuoteField.value?'Select a paid quote before publishing an advertisement.':'');
+    // Directly managed advertisements may be published after admin review without an online quote.
+    // If a paid quote is linked, the database trigger still verifies payment and the schedule.
+    contentQuoteField.required=false;
+    contentQuoteField.setCustomValidity('');
   }
   contentKindField?.addEventListener('change',updateAdQuoteRequirement);
   contentPublishedField?.addEventListener('change',updateAdQuoteRequirement);
