@@ -571,7 +571,35 @@
     finally { button.disabled=false; }
   });
 
-  async function enterAdmin(){
+  const softwareProductForm=document.querySelector('#software-product-form');
+  const softwareProductList=document.querySelector('#software-product-list');
+  const softwareProductMessage=document.querySelector('#software-product-message');
+  function resetSoftwareProductForm(){if(!softwareProductForm)return;softwareProductForm.reset();softwareProductForm.elements.namedItem('id').value='';softwareProductForm.elements.namedItem('sort_order').value='100';softwareProductForm.querySelector('button[type="submit"]').textContent='Save software listing →';document.querySelector('#software-product-cancel').hidden=true;}
+  async function loadSoftwareProducts(){
+    if(!softwareProductList)return;
+    try{
+      const result=await adminApi('/api/admin/software-products');
+      softwareProductList.innerHTML=(result.items||[]).map(item=>'<article class="admin-order-card" style="padding:14px;margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><span class="form-kicker">'+escape(item.is_published?'PUBLISHED':'DRAFT / HIDDEN')+' · '+escape(item.version||'No version')+'</span><h3>'+escape(item.title)+'</h3><p>'+escape(item.description||'')+'</p><strong>'+escape((Number(item.price_paise||0)/100).toLocaleString('en-IN',{style:'currency',currency:item.currency||'INR'}))+'</strong></div><div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap"><button type="button" class="button button-ghost" data-edit-software="'+escape(item.id)+'">Edit</button><button type="button" class="button button-ghost" data-publish-software="'+escape(item.id)+'" data-published="'+String(Boolean(item.is_published))+'">'+(item.is_published?'Hide':'Publish')+'</button></div></div></article>').join('')||'<p>No software listings yet. Add the first listing above.</p>';
+      softwareProductList.querySelectorAll('[data-edit-software]').forEach(button=>button.addEventListener('click',()=>{const item=(result.items||[]).find(x=>x.id===button.dataset.editSoftware);if(!item)return;const set=(name,value)=>{const f=softwareProductForm.elements.namedItem(name);if(f)f.value=value??'';};set('id',item.id);set('title',item.title);set('version',item.version);set('price',(Number(item.price_paise||0)/100).toFixed(2));set('sort_order',item.sort_order);set('description',item.description);set('image_url',item.image_url);set('product_url',item.product_url);set('contact_url',item.contact_url);softwareProductForm.elements.namedItem('is_published').checked=Boolean(item.is_published);softwareProductForm.querySelector('button[type="submit"]').textContent='Update software listing →';document.querySelector('#software-product-cancel').hidden=false;softwareProductMessage.textContent='Editing '+item.title;softwareProductForm.scrollIntoView({behavior:'smooth',block:'start'});}));
+      softwareProductList.querySelectorAll('[data-publish-software]').forEach(button=>button.addEventListener('click',async()=>{button.disabled=true;try{await adminApi('/api/admin/software-products',{method:'PATCH',body:JSON.stringify({id:button.dataset.publishSoftware,is_published:button.dataset.published!=='true'})});await loadSoftwareProducts();softwareProductMessage.textContent='Software listing visibility updated.';}catch(error){softwareProductMessage.textContent=error.message;softwareProductMessage.classList.add('admin-error');}finally{button.disabled=false;}}));
+    }catch(error){softwareProductList.textContent=error.message;}
+  }
+  document.querySelector('#software-product-cancel')?.addEventListener('click',resetSoftwareProductForm);
+  softwareProductForm?.addEventListener('submit',async event=>{
+    event.preventDefault();const button=softwareProductForm.querySelector('button[type="submit]');button.disabled=true;softwareProductMessage.classList.remove('admin-error');softwareProductMessage.textContent='Saving software listing…';
+    try{
+      const data=new FormData(softwareProductForm),priceText=String(data.get('price')||'').trim();
+      if(!/^\d+(?:\.\d{1,2})?$/.test(priceText))throw new Error('Enter a valid price with up to two decimal places.');
+      const parts=priceText.split('.'),pricePaise=Number(parts[0])*100+Number((parts[1]||'').padEnd(2,'0'));
+      if(!Number.isSafeInteger(pricePaise)||pricePaise<0)throw new Error('Enter a valid non-negative price.');
+      const id=String(data.get('id')||'').trim(),payload={title:data.get('title'),version:data.get('version'),description:data.get('description'),price_paise:pricePaise,sort_order:Number(data.get('sort_order')||100),image_url:data.get('image_url'),product_url:data.get('product_url'),contact_url:data.get('contact_url'),is_published:data.get('is_published')==='on'};
+      if(id)payload.id=id;
+      await adminApi('/api/admin/software-products',{method:id?'PATCH':'POST',body:JSON.stringify(payload)});
+      resetSoftwareProductForm();softwareProductMessage.textContent='Software listing saved.';await loadSoftwareProducts();
+    }catch(error){softwareProductMessage.textContent=error.message;softwareProductMessage.classList.add('admin-error');}
+    finally{button.disabled=false;}
+  });
+\n  async function enterAdmin(){
     const session = backend.getSession();
     if (!session?.user) { setSignedOut(); return; }
     if (session.user.app_metadata?.role !== 'admin') {
