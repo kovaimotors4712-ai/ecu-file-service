@@ -1462,6 +1462,18 @@ async function handleAdminSiteContent(request, response) {
       jsonResponse(response, 201, { item:(await result.json())?.[0] || null }); return true;
     } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Invalid content.' }); return true; }
   }
+  if (request.method === 'DELETE') {
+    try {
+      const body = await readJson(request, 2048);
+      const id = String(body.id || '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) { jsonResponse(response, 400, { error:'Invalid content reference.' }); return true; }
+      const result = await supabaseRequest(token, 'rest/v1/site_announcements?id=eq.'+encodeURIComponent(id)+'&select=id', { method:'DELETE', prefer:'return=representation', timeoutMs:12000 });
+      if (!result.ok) { jsonResponse(response, 502, { error:'Announcement could not be deleted.' }); return true; }
+      const rows = await result.json();
+      if (!rows || !rows.length) { jsonResponse(response, 404, { error:'Announcement not found.' }); return true; }
+      jsonResponse(response, 200, { deleted:true }); return true;
+    } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Announcement could not be deleted.' }); return true; }
+  }
   if (request.method === 'PATCH') {
     try {
       const body = await readJson(request, 8192);
