@@ -114,7 +114,7 @@
 <script>
 (function(){
 const host=document.getElementById('homepage-forum-topics');if(!host)return;
-const esc=v=>String(v==null?'':v).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));
+const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,function(ch){if(ch==='&')return '&amp;';if(ch==='<')return '&lt;';if(ch==='>')return '&gt;';if(ch==='"')return '&quot;';return '&#39;';});
 async function refresh(){try{
 const r=await fetch('/api/supabase/rest/v1/forum_topics?select=id,category_id,title,body,created_at,accepted_reply_id,is_locked&order=created_at.desc&limit=5',{cache:'no-store',headers:{Accept:'application/json'}});if(!r.ok)throw Error();const rows=await r.json();
 const cr=await fetch('/api/supabase/rest/v1/forum_categories?select=id,title&is_active=eq.true',{cache:'no-store',headers:{Accept:'application/json'}});const cats=cr.ok?await cr.json():[];
