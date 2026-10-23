@@ -17,6 +17,8 @@
   const sortSelect = document.querySelector('#order-sort-order');
 
   let orders = [];
+  let showArchivedOrders = false;
+  let showArchivedCustomerRequests = false;
   let attachmentPreviewUrls = [];
   let photoPreviewObserver = null;
   let realtimeClient = null;
@@ -85,10 +87,14 @@
 
   async function loadOrders(){
     const statusMessage=document.querySelector('#orders-message');
+    const orderList=document.querySelector('#order-list');
+    let archiveToggle=document.querySelector('#admin-orders-archive-toggle');
+    if(orderList&&!archiveToggle){archiveToggle=document.createElement('button');archiveToggle.id='admin-orders-archive-toggle';archiveToggle.type='button';archiveToggle.className='button button-ghost';orderList.parentElement.insertBefore(archiveToggle,orderList);archiveToggle.addEventListener('click',function(){showArchivedOrders=!showArchivedOrders;loadOrders();});}
+    if(archiveToggle)archiveToggle.textContent=showArchivedOrders?'Show active orders':'Show archived orders';
     statusMessage.textContent='Loading orders…';
     statusMessage.classList.remove('admin-error');
     try{
-      orders=await backend.rest('orders?select=id,customer_id,status,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,module_details,selected_services,notes,contact_name,contact_phone,contact_email,payment_status,payment_provider,provider_order_id,provider_payment_id,verification_amount_paise,second_stage_amount,second_stage_status,second_stage_paid_at,second_stage_payment_link,created_at,updated_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,size_bytes,created_at),order_attachments!order_attachments_order_id_fkey(id,kind,original_name,object_path,mime_type,size_bytes,created_at)&order=created_at.desc&limit=500');
+      orders=await backend.rest(`orders?select=id,customer_id,status,admin_archived_at,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,module_details,selected_services,notes,contact_name,contact_phone,contact_email,payment_status,payment_provider,provider_order_id,provider_payment_id,verification_amount_paise,second_stage_amount,second_stage_status,second_stage_paid_at,second_stage_payment_link,created_at,updated_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,size_bytes,created_at),order_attachments!order_attachments_order_id_fkey(id,kind,original_name,object_path,mime_type,size_bytes,created_at)&admin_archived_at=${showArchivedOrders?'not.is.null':'is.null'}&order=created_at.desc&limit=500`);
       if(!Array.isArray(orders))throw new Error('The orders response was not a list.');
       document.querySelector('#stat-total').textContent = orders.length;
       document.querySelector('#stat-payment-pending').textContent = orders.filter(function(o){return o.status==='Payment Pending'||o.payment_status==='PENDING';}).length;
@@ -225,6 +231,7 @@
               statuses.map(function(st){return '<option value="'+st+'" '+(order.status===st?'selected':'')+'>'+st+'</option>';}).join('')+
             '</select>'+
             '<button class="button button-ghost" type="button" onclick="window.openAdminMessages(\''+escape(order.id)+'\')">Customer Support Messages</button>'+
+            '<button class="button button-ghost admin-order-archive-action" type="button" data-order-id="'+escape(order.id)+'" data-archived="'+(order.admin_archived_at?'true':'false')+'">'+(order.admin_archived_at?'Restore order':'Archive order')+'</button>'+
           '</div>'+
           '<p class="admin-message" role="status"></p>'+
         '</div>'+
@@ -267,7 +274,17 @@
     }else{await Promise.all(images.map(loadOne));}
   }
 
-  document.querySelector('#order-list')?.addEventListener('click',function(event){
+  document.querySelector('#order-list')?.addEventListener('click',async function(event){
+    const archiveButton=event.target.closest('.admin-order-archive-action');
+    if(archiveButton){
+      const orderId=archiveButton.getAttribute('data-order-id');
+      const wasArchived=archiveButton.getAttribute('data-archived')==='true';
+      if(!orderId)return;
+      archiveButton.disabled=true;
+      try{await backend.rest('rpc/efsi_admin_archive_order',{method:'POST',body:{p_order_id:orderId,p_archived:!wasArchived}});await loadOrders();document.querySelector('#orders-message').textContent=wasArchived?'Order restored to active list.':'Order archived. Payment and file records are retained.';}
+      catch(error){document.querySelector('#orders-message').textContent='Archive update failed: '+(error.message||'Please retry.');document.querySelector('#orders-message').classList.add('admin-error');archiveButton.disabled=false;}
+      return;
+    }
     const button=event.target.closest('button[data-admin-download]');
     if(!button)return;
     window.downloadAdminFile(button.dataset.objectPath,button.dataset.fileName);
@@ -668,9 +685,13 @@
   }
   async function loadAdminCustomerRequests() {
     const list=document.querySelector('#admin-customer-requests-list'),status=document.querySelector('#admin-customer-requests-message');if(!list||!status)return;
+    let archiveToggle=document.querySelector('#admin-customer-requests-archive-toggle');
+    if(!archiveToggle){archiveToggle=document.createElement('button');archiveToggle.id='admin-customer-requests-archive-toggle';archiveToggle.type='button';archiveToggle.className='button button-ghost';list.parentElement.insertBefore(archiveToggle,list);archiveToggle.addEventListener('click',function(){showArchivedCustomerRequests=!showArchivedCustomerRequests;loadAdminCustomerRequests();});}
+    archiveToggle.textContent=showArchivedCustomerRequests?'Show active requests':'Show archived requests';
     status.classList.remove('admin-error');status.textContent='Loading customer requirements…';
     try{
-      const rows=await backend.rest('forum_customer_requests?select=id,user_id,request_type,title,body,status,admin_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_url,created_at,updated_at&order=created_at.asc&limit=200');
+      const archiveFilter=showArchivedCustomerRequests?'not.is.null':'is.null';
+      const rows=await backend.rest(`forum_customer_requests?select=id,user_id,request_type,title,body,status,admin_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_url,created_at,updated_at,admin_archived_at&admin_archived_at=${archiveFilter}&order=created_at.asc&limit=200`);
       adminRequestRows=Array.isArray(rows)?rows:[];list.replaceChildren();
       if(!adminRequestRows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='No customer requirements have been submitted yet.';list.append(empty);}
       adminRequestRows.forEach(function(row){
@@ -692,8 +713,9 @@
         }
         const statusSelect=document.createElement('select');statusSelect.className='admin-request-status';['open','in_review','waiting_for_customer','resolved','closed'].forEach(function(value){const option=document.createElement('option');option.value=value;option.textContent=value.replace(/_/g,' ');statusSelect.append(option);});statusSelect.value=row.status||'open';
         const save=document.createElement('button');save.type='button';save.className='button button-dark';save.textContent='Save reply & status';
+        const archive=document.createElement('button');archive.type='button';archive.className='button button-ghost';archive.textContent=row.admin_archived_at?'Restore request':'Archive request';archive.addEventListener('click',async function(){archive.disabled=true;const wasArchived=Boolean(row.admin_archived_at);try{await backend.rest('rpc/efsi_admin_archive_customer_request',{method:'POST',body:{p_request_id:row.id,p_archived:!wasArchived}});await loadAdminCustomerRequests();status.textContent=wasArchived?'Request restored to active list.':'Request archived. Customer replies and audit history are retained.';}catch(error){status.textContent='Archive update failed: '+(error.message||'Please retry.');status.classList.add('admin-error');archive.disabled=false;}});
         save.addEventListener('click',async function(){save.disabled=true;status.textContent='Saving private reply…';status.classList.remove('admin-error');try{const patch={admin_reply:reply.value.trim(),status:statusSelect.value,updated_at:new Date().toISOString()};if(isSoftware){const priceText=String(quotePrice.value||'').trim();if(priceText&&!/^\\d+(?:\\.\\d{1,2})?$/.test(priceText))throw new Error('Enter a valid quote price.');const toPaise=priceText?Math.round(Number(priceText)*100):null;for(const [label,value] of [['Payment link',paymentLink.value],['Delivery link',deliveryLink.value]])if(value){const url=new URL(value);if(url.protocol!=='https:')throw new Error(label+' must use HTTPS.');}patch.software_status=softwareStatus.value;patch.quoted_price_paise=toPaise;patch.software_payment_link=paymentLink.value.trim()||null;patch.software_delivery_url=deliveryLink.value.trim()||null;if(softwareStatus.value==='awaiting_payment'&&!patch.software_payment_link)throw new Error('Add the payment link before setting Awaiting payment.');if(softwareStatus.value==='delivered'&&!patch.software_delivery_url)throw new Error('Add the delivery link before marking Delivered.');}await backend.rest('forum_customer_requests?id=eq.'+encodeURIComponent(row.id),{method:'PATCH',body:patch,prefer:'return=minimal'});status.textContent='Private reply saved.';await loadAdminCustomerRequests();}catch(error){status.textContent=error.message||'Could not save the reply.';status.classList.add('admin-error');}finally{save.disabled=false;}});
-        if(isSoftware){const workflow=document.createElement('div');workflow.className='admin-software-request-fields';workflow.style.cssText='display:grid;gap:10px;padding:12px;border:1px solid #dce4d8;background:#f6f8f2;margin:10px 0';const label=document.createElement('label');label.textContent='Software order status';label.append(softwareStatus);workflow.append(label,...softwareFields);card.append(workflow);}card.append(type,heading,meta,body,reply,statusSelect,save);list.append(card);
+        if(isSoftware){const workflow=document.createElement('div');workflow.className='admin-software-request-fields';workflow.style.cssText='display:grid;gap:10px;padding:12px;border:1px solid #dce4d8;background:#f6f8f2;margin:10px 0';const label=document.createElement('label');label.textContent='Software order status';label.append(softwareStatus);workflow.append(label,...softwareFields);card.append(workflow);}card.append(type,heading,meta,body,reply,statusSelect,save,archive);list.append(card);
       });
       updateAdminFolderBadges();
     }catch(error){adminRequestRows=[];list.replaceChildren();const empty=document.createElement('p');empty.className='admin-message admin-error';empty.textContent='Customer requests could not load. Apply the forum live desk migration after reviewing it, then refresh.';list.append(empty);status.textContent=error.message||'Request inbox unavailable.';status.classList.add('admin-error');updateAdminFolderBadges();}

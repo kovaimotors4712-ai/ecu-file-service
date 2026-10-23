@@ -7,6 +7,8 @@
   let configured = false;
   let authEvent = null;
   let ordersRequest = 0;
+  let showHiddenOrders = false;
+  let showHiddenPrivateRequests = false;
   let ordersChannel = null;
   let filesChannel = null;
   let realtimeClient = null;
@@ -137,12 +139,15 @@
     const list=document.querySelector('#customer-private-request-list');
     const customerId=session?.user?.id;
     if(!panel||!list||!customerId)return;
+    let historyToggle=document.querySelector('#customer-private-request-history-toggle');
+    if(!historyToggle){historyToggle=document.createElement('button');historyToggle.id='customer-private-request-history-toggle';historyToggle.type='button';historyToggle.className='button button-ghost';list.parentElement.insertBefore(historyToggle,list);historyToggle.addEventListener('click',function(){showHiddenPrivateRequests=!showHiddenPrivateRequests;loadCustomerPrivateRequests();});}
+    historyToggle.textContent=showHiddenPrivateRequests?'Show active requests':'Show hidden requests';
     list.replaceChildren();
     const loading=document.createElement('p');loading.className='muted';loading.textContent='Loading your private requests…';list.append(loading);
     try{
-      const rows=await rest('forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_url,created_at,updated_at&customer_hidden_at=is.null&order=created_at.desc&limit=50');
+      const rows=await rest(`forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_url,created_at,updated_at,customer_hidden_at&customer_hidden_at=${showHiddenPrivateRequests?'not.is.null':'is.null'}&order=created_at.desc&limit=50`);
       list.replaceChildren();
-      if(!Array.isArray(rows)||!rows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='No private requests yet. Use Request payment link on a software listing or send a request through the Forum.';list.append(empty);return;}
+      if(!Array.isArray(rows)||!rows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent=showHiddenPrivateRequests?'No hidden private requests.':'No private requests yet. Use Request payment link on a software listing or send a request through the Forum.';list.append(empty);return;}
       const labels={software_requirement:'Software / payment-link request',wiring_diagram:'Wiring request',suggestion:'Suggestion',service_requirement:'Service request',feature_request:'Website feature',issue:'Support request',other:'Other request'};
       rows.forEach(item=>{
         const card=document.createElement('article');card.className='customer-private-request-card';
@@ -155,6 +160,7 @@
         const date=document.createElement('small');date.textContent='Submitted '+new Date(item.created_at).toLocaleString();
         card.append(head,title,body,date);
         if(item.customer_auto_reply){const reply=document.createElement('div');reply.className='customer-private-request-reply';const label=document.createElement('strong');label.textContent='AUTOMATIC CONFIRMATION';const text=document.createElement('p');text.textContent=item.customer_auto_reply;reply.append(label,text);card.append(reply);}if(item.admin_reply){const reply=document.createElement('div');reply.className='customer-private-request-reply';const label=document.createElement('strong');label.textContent='TEAM MESSAGE';const text=document.createElement('p');text.textContent=item.admin_reply;reply.append(label,text);card.append(reply);}if(item.software_product_id){const wf=document.createElement('div');wf.className='customer-private-request-reply';const st=document.createElement('strong');st.textContent='SOFTWARE ORDER · '+String(item.software_status||'requested').replace(/_/g,' ').toUpperCase();wf.append(st);if(item.quoted_price_paise!=null){const q=document.createElement('p');q.textContent='Quoted price: '+new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(Number(item.quoted_price_paise)/100);wf.append(q);}if(item.software_payment_link){const pay=document.createElement('a');pay.href=item.software_payment_link;pay.target='_blank';pay.rel='noopener noreferrer';pay.className='button button-dark';pay.textContent='Open payment link ↗';wf.append(pay);}if(item.software_delivery_url&&item.software_status==='delivered'){const dl=document.createElement('a');dl.href=item.software_delivery_url;dl.target='_blank';dl.rel='noopener noreferrer';dl.className='button button-dark';dl.textContent='Download software ↗';wf.append(dl);}card.append(wf);}
+        const hideRequest=document.createElement('button');hideRequest.type='button';hideRequest.className='button button-ghost';hideRequest.textContent=item.customer_hidden_at?'Restore to history':'Hide from history';hideRequest.addEventListener('click',async function(){hideRequest.disabled=true;try{await rest('rpc/forum_hide_customer_request',{method:'POST',body:{p_request_id:item.id,p_hidden:!item.customer_hidden_at}});await loadCustomerPrivateRequests();}catch(error){hideRequest.disabled=false;const notice=document.createElement('p');notice.className='admin-message admin-error';notice.textContent='History update failed: '+(error.message||'Please retry.');card.append(notice);}});card.append(hideRequest);
         list.append(card);
       });
     }catch(error){list.replaceChildren();const p=document.createElement('p');p.className='admin-message admin-error';p.textContent='Your private requests could not be loaded. '+(error.message||'Please retry.');list.append(p);}
@@ -165,12 +171,16 @@
     const list = panel?.querySelector('.customer-order-list');
     const customerId = session?.user?.id;
     if (!panel || !list || !customerId) return;
+    let historyToggle=document.querySelector('#customer-order-history-toggle');
+    if(!historyToggle){historyToggle=document.createElement('button');historyToggle.id='customer-order-history-toggle';historyToggle.type='button';historyToggle.className='button button-ghost';list.parentElement.insertBefore(historyToggle,list);historyToggle.addEventListener('click',function(){showHiddenOrders=!showHiddenOrders;loadCustomerOrders();});}
+    historyToggle.textContent=showHiddenOrders?'Show active orders':'Show hidden orders';
+    if(!panel.dataset.customerOrderArchiveBound){panel.dataset.customerOrderArchiveBound='true';panel.addEventListener('click',async function(event){const button=event.target.closest('.customer-order-hide');if(!button)return;const orderId=button.getAttribute('data-order-id');if(!orderId||!session?.user?.id)return;const wasHidden=button.getAttribute('data-hidden')==='true';button.disabled=true;try{await rest('rpc/efsi_customer_hide_order',{method:'POST',body:{p_order_id:orderId,p_hidden:!wasHidden}});await loadCustomerOrders();}catch(error){button.disabled=false;const notice=document.createElement('p');notice.className='admin-message admin-error';notice.textContent='History update failed: '+(error.message||'Please retry.');list.prepend(notice);}});}
     const requestId = ++ordersRequest;
     list.textContent = 'Loading your orders…';
     try {
-      const rows = await rest(`orders?select=id,status,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,selected_services,payment_status,payment_provider,provider_order_id,provider_payment_id,second_stage_amount,second_stage_status,second_stage_payment_link,created_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,created_at)&customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.desc&limit=50`);
+      const rows = await rest(`orders?select=id,status,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,selected_services,payment_status,payment_provider,provider_order_id,provider_payment_id,second_stage_amount,second_stage_status,second_stage_payment_link,created_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,created_at),customer_hidden_at&customer_id=eq.${encodeURIComponent(customerId)}&customer_hidden_at=${showHiddenOrders?'not.is.null':'is.null'}&order=created_at.desc&limit=50`);
       if (requestId !== ordersRequest || session?.user?.id !== customerId) return;
-      if (!Array.isArray(rows) || !rows.length) { list.textContent = 'No orders yet. Your active and completed requests will appear here.'; return; }
+      if (!Array.isArray(rows) || !rows.length) { list.textContent = showHiddenOrders?'No hidden orders.':'No orders yet. Your active and completed requests will appear here.'; return; }
       list.innerHTML = rows.map(order => {
         const files = Array.isArray(order.order_files) ? order.order_files : [];
         const processed = files.filter(file => file.kind === 'processed' && String(file.object_path || '').startsWith(`${customerId}/${order.id}/processed/`));
@@ -198,6 +208,7 @@
           <div class="customer-order-actions">
             ${processed.length > 0 ? `<button type="button" class="customer-file-download" data-order-id="${escapeHtml(order.id)}" data-object-path="${escapeHtml(processed[0].object_path)}" data-file-name="${escapeHtml(processed[0].original_name)}">Result Ready · Download</button>` : '<small>Processing...</small>'}
             <button type="button" class="customer-messages-open" data-order-id="${escapeHtml(order.id)}">Messages</button>
+            <button type="button" class="customer-order-hide" data-order-id="${escapeHtml(order.id)}" data-hidden="${order.customer_hidden_at ? 'true' : 'false'}">${order.customer_hidden_at ? 'Restore to history' : 'Hide from history'}</button>
           </div>
         </article>`;
       }).join('');
