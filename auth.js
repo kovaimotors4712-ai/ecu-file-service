@@ -193,11 +193,11 @@
             <p style="margin:0 0 5px;font-size:12px"><strong>Second-Stage Payment:</strong> ${formatINR(order.second_stage_amount)} (${order.second_stage_status === 'paid' ? '<span style="color:#586b24">Paid</span>' : '<span style="color:#a87a2a">Pending</span>'})</p>
             ${(order.second_stage_status !== 'paid' && order.second_stage_payment_link) ? `<a href="${escapeHtml(order.second_stage_payment_link)}" target="_blank" rel="noopener noreferrer" class="button button-dark" style="font-size:10px;padding:5px 10px;text-decoration:none;display:inline-block">Pay Now</a>` : ''}
           </div>` : '';
-        return `<article class="customer-order-card" data-order-id="${escapeHtml(order.id)}">
-          <div class="customer-order-top">
-            <b>Order: ${escapeHtml(order.id.slice(0, 8))}</b>
-            <span>${escapeHtml(order.status)}</span>
-          </div>
+        return `<details class="customer-order-card customer-order-collapsible" data-order-id="${escapeHtml(order.id)}">
+          <summary class="customer-order-top">
+            <b>Order: ${escapeHtml(order.id.slice(0, 8))} · ${escapeHtml(vehicle || order.category)}</b>
+            <span>${escapeHtml(order.status)} <span aria-hidden="true">＋</span></span>
+          </summary>
           <div class="customer-order-body">
             <p><strong>Vehicle:</strong> ${escapeHtml(vehicle || order.category)}</p>
             <p><strong>Services:</strong> ${escapeHtml((order.selected_services || []).join(', '))}</p>
@@ -210,7 +210,7 @@
             <button type="button" class="customer-messages-open" data-order-id="${escapeHtml(order.id)}">Messages</button>
             <button type="button" class="customer-order-hide" data-order-id="${escapeHtml(order.id)}" data-hidden="${order.customer_hidden_at ? 'true' : 'false'}">${order.customer_hidden_at ? 'Restore to history' : 'Hide from history'}</button>
           </div>
-        </article>`;
+        </details>`;
       }).join('');
     } catch (error) { if (requestId === ordersRequest) list.textContent = `Your order history could not be loaded. ${error.message || 'Retry.'}`; }
   }
