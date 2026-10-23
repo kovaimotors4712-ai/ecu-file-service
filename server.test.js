@@ -1914,3 +1914,14 @@ test('software requests can create a server-side Razorpay payment link with admi
   assert.match(adminSource, /adminApi\('\/api\/admin\/software-requests\/payment-link'/);
   assert.match(customerSource, /Pay now ↗/);
 });
+
+
+test('admin controls enforce readable contrast and cache-busted current assets', () => {
+  const adminCss = fs.readFileSync(path.join(__dirname, 'admin.css'), 'utf8');
+  const adminHtml = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
+  assert.match(adminCss, /\.admin-page select option[\s\S]*?color:#111a19 !important/);
+  assert.match(adminCss, /#site-content-list \.button-ghost[\s\S]*?opacity:1 !important/);
+  assert.match(adminCss, /button:disabled[\s\S]*?opacity:1 !important/);
+  assert.match(adminHtml, /admin\.css\?v=20261024-final-contrast/);
+  assert.match(adminHtml, /admin\.js\?v=20261024-final-contrast/);
+});
