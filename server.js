@@ -1368,7 +1368,7 @@ function announcementPayload(body, adminId, partial = false) {
   }
   if (out.starts_at && out.ends_at && new Date(out.ends_at) <= new Date(out.starts_at)) throw Object.assign(new Error('End date must be after start date.'), { statusCode: 400 });
   if (!partial || body.is_published !== undefined) out.is_published = body.is_published === true;
-  if (out.kind === 'ad' && out.is_published === true && !out.advertising_quote_id) throw Object.assign(new Error('A paid advertising quote is required before publishing an advertisement.'), { statusCode:400 });
+
   if (adminId && !partial) out.created_by = adminId;
   out.updated_at = new Date().toISOString();
   return out;
@@ -1783,9 +1783,44 @@ async function handleReconcileAdvertisingPayment(request, response) {
   return true;
 }
 
+
+function softwareProductPayload(body, adminId, partial = false) {
+  const out = {};
+  if (!partial || body.title !== undefined) { out.title = cleanSiteText(body.title, 180); if (!out.title) throw Object.assign(new Error('Software title is required.'), {statusCode:400}); }
+  if (!partial || body.description !== undefined) out.description = cleanSiteText(body.description, 4000);
+  if (!partial || body.version !== undefined) out.version = cleanSiteText(body.version, 80);
+  if (!partial || body.price_paise !== undefined) { const amount=Number(body.price_paise); if(!Number.isSafeInteger(amount)||amount<0||amount>100000000000) throw Object.assign(new Error('Enter a valid price in INR.'),{statusCode:400}); out.price_paise=amount; }
+  for(const field of ['image_url','product_url','contact_url']) if(!partial||body[field]!==undefined){const value=cleanSiteText(body[field],1000);if(!validHttpsUrl(value))throw Object.assign(new Error(field+' must use HTTPS.'),{statusCode:400});out[field]=value||null;}
+  if(!partial||body.sort_order!==undefined){const order=Number(body.sort_order??100);if(!Number.isInteger(order)||order<0||order>100000)throw Object.assign(new Error('Enter a valid listing order.'),{statusCode:400});out.sort_order=order;}
+  if(!partial||body.is_published!==undefined)out.is_published=body.is_published===true;
+  if(adminId&&!partial)out.created_by=adminId;
+  out.updated_at=new Date().toISOString();return out;
+}
+async function handlePublicSoftwareProducts(request,response){
+  if(request.method!=='GET'){jsonResponse(response,405,{error:'Method Not Allowed'});return true;}
+  if(!supabaseServiceRoleKey){jsonResponse(response,200,{items:[]});return true;}
+  const result=await supabaseRequest(serviceToken(),'rest/v1/software_products?select=id,title,description,version,price_paise,currency,image_url,product_url,contact_url,sort_order&is_published=eq.true&order=sort_order.asc,created_at.desc&limit=100',{timeoutMs:12000});
+  if(!result.ok){console.warn('[software-products] Public query failed',{status:result.status});jsonResponse(response,502,{error:'Software listings could not be loaded.'});return true;}
+  jsonResponse(response,200,{items:await result.json()});return true;
+}
+async function handleAdminSoftwareProducts(request,response){
+  const admin=await requireAdmin(request);if(!admin){jsonResponse(response,403,{error:'Administrator role is required.'});return true;}
+  if(!supabaseServiceRoleKey){jsonResponse(response,503,{error:'Software catalogue is unavailable.'});return true;}
+  const token=serviceToken();
+  if(request.method==='GET'){const result=await supabaseRequest(token,'rest/v1/software_products?select=*&order=sort_order.asc,created_at.desc&limit=200',{timeoutMs:12000});if(!result.ok){jsonResponse(response,502,{error:'Software listings could not be loaded.'});return true;}jsonResponse(response,200,{items:await result.json()});return true;}
+  if(request.method==='POST'||request.method==='PATCH'){try{const body=await readJson(request,12000),partial=request.method==='PATCH';let id='';if(partial){id=String(body.id||'');if(!/^[0-9a-f-]{36}$/i.test(id)){jsonResponse(response,400,{error:'Invalid software listing reference.'});return true;}}
+    const payload=softwareProductPayload(body,admin.id,partial),endpoint=partial?'rest/v1/software_products?id=eq.'+encodeURIComponent(id)+'&select=*':'rest/v1/software_products?select=*';
+    const result=await supabaseRequest(token,endpoint,{method:partial?'PATCH':'POST',prefer:'return=representation',body:payload,timeoutMs:12000});if(!result.ok){jsonResponse(response,502,{error:'Software listing could not be saved.'});return true;}
+    const rows=await result.json();if(partial&&!rows?.length){jsonResponse(response,404,{error:'Software listing not found.'});return true;}jsonResponse(response,partial?200:201,{item:rows?.[0]||null});return true;
+  }catch(error){jsonResponse(response,error.statusCode||400,{error:error.message||'Invalid software listing.'});return true;}}
+  jsonResponse(response,405,{error:'Method Not Allowed'});return true;
+}
+
 async function handleApi(request, response, url) {
   if (url.pathname === '/api/health') { jsonResponse(response, 200, { configured: hasSafeSupabaseConfig, paymentConfigured: paymentsConfigured(), paymentReadiness: paymentReadinessChecks() }); return true; }
   if (url.pathname === '/api/site-content') return handlePublicSiteContent(request, response);
+  if (url.pathname === '/api/software-products') return handlePublicSoftwareProducts(request, response);
+  if (url.pathname === '/api/admin/software-products') return handleAdminSoftwareProducts(request, response);
   if (url.pathname === '/api/admin/advertising/quotes') return handleAdminAdvertisingQuotes(request, response);
   if (url.pathname === '/api/advertising/quote') return handlePublicAdvertisingQuote(request, response);
   if (url.pathname === '/api/advertising/payment/create-order') return handleCreateAdvertisingPayment(request, response);
