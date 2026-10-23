@@ -306,6 +306,23 @@
   function showPasswordReset(text = '') { authTabs.hidden = true; form.hidden = true; resetForm.hidden = false; document.querySelector('.auth-reset').hidden = true; accountTitle.textContent = 'Set a new password'; accountIntro.textContent = 'Choose a new password for your customer account.'; message.textContent = text; if (!dialog.open) dialog.showModal(); document.querySelector('#auth-new-password').focus(); }
 
   document.querySelector('#account-trigger').addEventListener('click', () => { dialog.showModal(); if (session?.user?.id) { loadCustomerOrders(); loadPendingCheckouts(); subscribeToOrders(); } });
+  function openCustomerMessagesFromHash() {
+    if (!['#account-messages','#check-your-messages'].includes(window.location.hash)) return;
+    if (!dialog.open) dialog.showModal();
+    if (session?.user?.id) {
+      loadCustomerPrivateRequests();
+      loadCustomerOrders();
+      loadPendingCheckouts();
+      subscribeToOrders();
+      const requests = document.querySelector('#customer-private-requests');
+      if (requests) { requests.hidden = false; requests.scrollIntoView({block:'start',behavior:'smooth'}); }
+    } else {
+      const intro = document.querySelector('.account-intro');
+      if (intro) intro.textContent = 'Sign in to view your software requests, payment links and private replies from ECU SOLUTION.';
+    }
+  }
+  window.addEventListener('hashchange', openCustomerMessagesFromHash);
+  if (['#account-messages','#check-your-messages'].includes(window.location.hash)) setTimeout(openCustomerMessagesFromHash, 0);
   document.querySelector('#refresh-private-requests')?.addEventListener('click',loadCustomerPrivateRequests);
   document.querySelector('#customer-notification-list')?.addEventListener('click', async event => {
     const item = event.target.closest('.notification-item');
