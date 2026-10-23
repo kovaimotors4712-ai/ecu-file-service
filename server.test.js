@@ -1425,8 +1425,8 @@ test('regression test: role="admin" is preserved when getUser() returns a user w
 
 test('regression test: index.html references auth.js with version parameter and server serves static assets correctly', async () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-  assert.ok(indexHtml.includes('auth.js?v=payment-recovery-feedback-20261017'));
-  assert.ok(indexHtml.includes('app.js?v=payment-recovery-feedback-20261017'));
+  assert.ok(indexHtml.includes('auth.js?v=20261023-customer-archive'));
+  assert.ok(indexHtml.includes('app.js?v=20261023-customer-archive'));
   assert.ok(indexHtml.includes('supabase.js?v=ba583d0'));
 });
 
@@ -1606,9 +1606,9 @@ test('payment finalization and notification failures are visible in safe operati
 test('updated customer and admin scripts use cache-busted recovery assets', () => {
   const indexSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   const adminSource = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
-  assert.match(indexSource, /auth\.js\?v=payment-recovery-feedback-20261017/);
-  assert.match(indexSource, /app\.js\?v=payment-recovery-feedback-20261017/);
-  assert.match(adminSource, /auth\.js\?v=payment-recovery-feedback-20261017/);
+  assert.match(indexSource, /auth\.js\?v=20261023-customer-archive/);
+  assert.match(indexSource, /app\.js\?v=20261023-customer-archive/);
+  assert.match(adminSource, /auth\.js\?v=20261023-customer-archive/);
 });
 
 test('saved checkout shows immediate payment-check feedback and bounded recovery timeouts', () => {
@@ -1621,7 +1621,7 @@ test('saved checkout shows immediate payment-check feedback and bounded recovery
   assert.match(authSource, /Loading the saved checkout timed out/);
   assert.match(authSource, /No new payment was started/);
   const indexSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-  assert.match(indexSource, /auth\.js\?v=payment-recovery-feedback-20261017/);
+  assert.match(indexSource, /auth\.js\?v=20261023-customer-archive/);
 });
 test('second-stage trigger permits normal first-stage paid-order inserts with default pending state', () => {
   const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261017_fix_second_stage_insert_guard.sql'), 'utf8');
