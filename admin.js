@@ -491,7 +491,7 @@
     const list = document.querySelector('#site-content-list');
     try {
       const result = await adminApi('/api/admin/site-content');
-      list.innerHTML = (result.items||[]).map(item => '<article class="admin-order-card" style="padding:14px;margin-bottom:10px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><div><span class="form-kicker">'+escape(item.kind)+' · '+escape(item.placement)+'</span><h3>'+escape(item.title)+'</h3><p>'+escape(item.body||'')+'</p><small>'+escape(item.is_published?'Published':'Draft / hidden')+' · Starts '+escape(item.starts_at?new Date(item.starts_at).toLocaleString():'now')+(item.ends_at?' · Ends '+escape(new Date(item.ends_at).toLocaleString()):'')+'</small></div><div style="display:flex;gap:8px;align-items:flex-start"><button type="button" class="button button-ghost" data-edit-content-id="'+escape(item.id)+'">Edit</button><button type="button" class="button button-ghost" data-content-id="'+escape(item.id)+'" data-published="'+String(Boolean(item.is_published))+'">'+(item.is_published?'Hide':'Publish')+'</button></div></div></article>').join('') || '<p>No announcements, offers or ads have been created.</p>';
+      list.innerHTML = (result.items||[]).map(item => '<article class="admin-order-card" style="padding:14px;margin-bottom:10px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><div><span class="form-kicker">'+escape(item.kind)+' · '+escape(item.placement)+'</span><h3>'+escape(item.title)+'</h3><p>'+escape(item.body||'')+'</p><small>'+escape(item.is_published?'Published':'Draft / hidden')+' · Starts '+escape(item.starts_at?new Date(item.starts_at).toLocaleString():'now')+(item.ends_at?' · Ends '+escape(new Date(item.ends_at).toLocaleString()):'')+'</small></div><div style="display:flex;gap:8px;align-items:flex-start"><button type="button" class="button button-ghost" data-edit-content-id="'+escape(item.id)+'">Edit</button><button type="button" class="button button-ghost" data-content-id="'+escape(item.id)+'" data-published="'+String(Boolean(item.is_published))+'">'+(item.is_published?'Hide':'Publish')+'</button><button type="button" class="button button-ghost" data-delete-content-id="'+escape(item.id)+'">Delete</button></div></div></article>').join('') || '<p>No announcements, offers or ads have been created.</p>';
       list.querySelectorAll('button[data-edit-content-id]').forEach(button => button.addEventListener('click', () => {
         const item=(result.items||[]).find(x=>x.id===button.dataset.editContentId); if(!item)return;
         const set=(name,value)=>{const field=siteContentForm.elements.namedItem(name);if(field)field.value=value??'';};
@@ -502,6 +502,13 @@
         document.querySelector('#site-content-cancel-edit').hidden=false;
         siteContentMessage.textContent='Editing: '+item.title;
         siteContentForm.scrollIntoView({behavior:'smooth',block:'start'});
+      }));
+      list.querySelectorAll('button[data-delete-content-id]').forEach(button => button.addEventListener('click', async () => {
+        const item=(result.items||[]).find(x=>x.id===button.dataset.deleteContentId);
+        if(!item || !window.confirm('Permanently delete this content? This cannot be undone.')) return;
+        button.disabled=true;
+        try { await adminApi('/api/admin/site-content',{method:'DELETE',body:JSON.stringify({id:item.id})}); siteContentMessage.textContent='Content deleted.'; resetSiteContentForm(); await loadSiteContent(); }
+        catch(error){siteContentMessage.textContent=error.message;siteContentMessage.classList.add('admin-error');button.disabled=false;}
       }));
       list.querySelectorAll('button[data-content-id]').forEach(button => button.addEventListener('click', async () => {
         button.disabled = true;
