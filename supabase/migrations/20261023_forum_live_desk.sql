@@ -15,7 +15,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS public.forum_customer_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  request_type text NOT NULL CHECK (request_type IN ('service_requirement','feature_request','suggestion','issue','other')),
+  request_type text NOT NULL CHECK (request_type IN ('service_requirement','feature_request','suggestion','software_requirement','wiring_diagram','issue','other')),
   title text NOT NULL CHECK (char_length(btrim(title)) BETWEEN 4 AND 120),
   body text NOT NULL CHECK (char_length(btrim(body)) BETWEEN 10 AND 4000),
   status text NOT NULL DEFAULT 'open' CHECK (status IN ('open','in_review','waiting_for_customer','resolved','closed')),
@@ -44,3 +44,26 @@ CREATE POLICY forum_customer_requests_update_moderator ON public.forum_customer_
 REVOKE ALL ON public.forum_customer_requests FROM anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.forum_customer_requests TO authenticated;
 COMMIT;
+
+-- Admin-managed software catalogue. Public reads are served through the server's service-role endpoint.
+CREATE TABLE IF NOT EXISTS public.software_products (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL CHECK (char_length(btrim(title)) BETWEEN 1 AND 180),
+  description text NOT NULL DEFAULT '' CHECK (char_length(description) <= 4000),
+  version text NOT NULL DEFAULT '' CHECK (char_length(version) <= 80),
+  price_paise bigint NOT NULL CHECK (price_paise >= 0 AND price_paise <= 100000000000),
+  currency text NOT NULL DEFAULT 'INR' CHECK (currency = 'INR'),
+  image_url text,
+  product_url text,
+  contact_url text,
+  sort_order integer NOT NULL DEFAULT 100 CHECK (sort_order BETWEEN 0 AND 100000),
+  is_published boolean NOT NULL DEFAULT false,
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS software_products_published_order_idx
+  ON public.software_products(is_published, sort_order, created_at DESC);
+ALTER TABLE public.software_products ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.software_products FROM PUBLIC, anon, authenticated;
+GRANT ALL ON public.software_products TO service_role;
