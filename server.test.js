@@ -1883,3 +1883,20 @@ test('homepage forum preview, collapsible customer orders, and protected announc
   assert.match(serverSource, /async function handleAdminSiteContent\(request, response\) \{\s*const admin = await requireAdmin\(request\)/);
   assert.match(serverSource, /if \(request\.method === 'DELETE'\)[\s\S]*?site_announcements\?id=eq\./);
 });
+
+
+test('software requests expose an explicit pay and verified-download workflow', () => {
+  const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const customer = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  const grants = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261024_grant_site_announcement_delete_service_role.sql'), 'utf8');
+  assert.match(admin, /Add the payment link before this status/);
+  assert.match(admin, /Mark the request Paid only after verifying payment/);
+  assert.match(admin, /Add the secure software download\/delivery link before marking Delivered/);
+  assert.match(admin, /patch\.status=softwareStatus\.value==='awaiting_payment'\?'waiting_for_customer'/);
+  assert.match(customer, /Payment required/);
+  assert.match(customer, /Payment verified/);
+  assert.match(customer, /Download available/);
+  assert.match(customer, /Pay now ↗/);
+  assert.match(customer, /Download software ↗/);
+  assert.match(grants, /grant delete on table public\.site_announcements to service_role/i);
+});

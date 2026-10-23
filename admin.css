@@ -123,3 +123,10 @@
 .admin-customer-orders{display:grid;gap:10px;padding:12px;background:#fbfcf9}
 .admin-customer-orders .admin-order{margin:0}
 @media(max-width:560px){.admin-customer-folder>summary{align-items:flex-start;padding:12px;flex-direction:column}.admin-customer-folder-count{white-space:normal}.admin-customer-orders{padding:7px}}
+
+/* Keep admin announcement actions readable on white cards, including mobile. */
+#site-content-list button.button-ghost{color:#26332b!important;background:#fff!important;border:1px solid #aebaa7!important;opacity:1!important;font-weight:700;min-height:44px;padding:10px 14px}
+#site-content-list button.button-ghost:hover{background:#f0f4e8!important;border-color:#829a32!important}
+#site-content-list button.button-ghost:disabled{color:#5b655e!important;opacity:.75!important}
+.admin-software-request-fields label{display:grid;gap:6px;font-weight:700;line-height:1.5}
+.admin-software-request-fields input,.admin-software-request-fields select{width:100%;min-height:44px;color:#1d2924;background:#fff;border:1px solid #b9c5b3;padding:10px;font:inherit}
