@@ -1443,6 +1443,43 @@ async function handleAdminSiteSettings(request, response) {
   }
   jsonResponse(response,405,{error:'Method Not Allowed'});return true;
 }
+
+async function handleAdminCreateSoftwarePaymentLink(request, response) {
+  if (request.method !== 'POST') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
+  try {
+    const admin = await requireAdmin(request);
+    if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
+    if (!hasRazorpayConfig()) { jsonResponse(response, 503, { error: 'Razorpay is not configured. Configure live/test keys on the server first.' }); return true; }
+    const body = await readJson(request);
+    const requestId = String(body?.requestId || '');
+    const rupees = Number(body?.amountRupees);
+    if (!/^[0-9a-f-]{36}$/i.test(requestId)) { jsonResponse(response, 400, { error: 'Invalid software request reference.' }); return true; }
+    if (!Number.isFinite(rupees) || rupees <= 0 || !Number.isSafeInteger(Math.round(rupees * 100))) { jsonResponse(response, 400, { error: 'Enter a valid price greater than zero.' }); return true; }
+    const amountPaise = Math.round(rupees * 100);
+    const loaded = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,title,software_product_id,software_status,quoted_price_paise,software_payment_link,user_id', { timeoutMs: 12000 });
+    if (!loaded.ok) { jsonResponse(response, 502, { error: 'Software request could not be loaded.' }); return true; }
+    const rows = await loaded.json(); const row = rows?.[0];
+    if (!row || !row.software_product_id) { jsonResponse(response, 404, { error: 'Software purchase request not found.' }); return true; }
+    if (['paid','delivered','cancelled'].includes(String(row.software_status || '').toLowerCase())) { jsonResponse(response, 409, { error: 'A payment link cannot be generated for this request status.' }); return true; }
+    const link = await razorpayApi('payment_links', { method:'POST', body:{
+      amount: amountPaise, currency:'INR', accept_partial:false,
+      description: String(row.title || 'Software purchase').slice(0,240),
+      reference_id: requestId.replace(/-/g,'').slice(0,40),
+      reminder_enable:true, notes:{ request_id:requestId, software_product_id:String(row.software_product_id), type:'software_purchase' }
+    }});
+    const paymentUrl=String(link?.short_url || link?.url || '').trim();
+    let parsed; try { parsed=new URL(paymentUrl); } catch { parsed=null; }
+    if (!parsed || parsed.protocol!=='https:' || !/(?:^|\.)(?:rzp\.io|razorpay\.com)$/i.test(parsed.hostname) || parsed.username || parsed.password) {
+      jsonResponse(response, 502, { error:'Razorpay returned an invalid payment link.' }); return true;
+    }
+    const patch={ quoted_price_paise:amountPaise, software_payment_link:paymentUrl, software_status:'awaiting_payment', status:'waiting_for_customer', updated_at:new Date().toISOString() };
+    const saved=await supabaseRequest(admin.token,'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,quoted_price_paise,software_payment_link,software_status,status',{method:'PATCH',prefer:'return=representation',body:patch,timeoutMs:12000});
+    if(!saved.ok){jsonResponse(response,502,{error:'Payment link was created, but could not be saved to the request. Check Razorpay before retrying.'});return true;}
+    jsonResponse(response,200,{item:(await saved.json())?.[0]||null,paymentLink:paymentUrl});
+  } catch(error) { jsonResponse(response,error.statusCode || (error.code==='RAZORPAY_UPSTREAM'?502:400),{error:error.message||'Could not create the software payment link.'}); }
+  return true;
+}
+
 async function handleAdminSiteContent(request, response) {
   const admin = await requireAdmin(request);
   if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
@@ -1841,6 +1878,7 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/advertising/inquiries') return handleAdvertisingInquiry(request, response);
   if (url.pathname === '/api/site-settings') return handlePublicSiteSettings(request, response);
   if (url.pathname === '/api/admin/site-settings') return handleAdminSiteSettings(request, response);
+  if (url.pathname === '/api/admin/software-requests/payment-link') return handleAdminCreateSoftwarePaymentLink(request, response);
   if (url.pathname === '/api/admin/site-content') return handleAdminSiteContent(request, response);
   if (url.pathname === '/api/admin/advertising/inquiries') return handleAdminAdvertisingInquiries(request, response);
   if (url.pathname === '/api/pricing') return handlePricing(request, response);
