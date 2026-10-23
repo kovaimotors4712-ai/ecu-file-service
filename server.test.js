@@ -1849,3 +1849,17 @@ test('advertising foreign-key performance indexes cover audit and content attrib
   assert.match(sql, /advertising_quotes_created_by_idx/i);
   assert.match(sql, /site_announcements_created_by_idx/i);
 });
+
+test('customer software-request insert policy blocks customer-supplied quotes, delivery links, and archive markers', () => {
+  const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261023_harden_customer_software_request_insert.sql'), 'utf8');
+  assert.match(migration, /DROP POLICY IF EXISTS forum_customer_requests_insert_owner/i);
+  assert.match(migration, /user_id = \(SELECT auth\.uid\(\)\)/i);
+  assert.match(migration, /status = 'open'/i);
+  assert.match(migration, /quoted_price_paise IS NULL/i);
+  assert.match(migration, /software_payment_link IS NULL/i);
+  assert.match(migration, /software_delivery_url IS NULL/i);
+  assert.match(migration, /customer_hidden_at IS NULL/i);
+  assert.match(migration, /admin_archived_at IS NULL/i);
+  assert.match(migration, /software_status = 'requested'/i);
+  assert.match(migration, /software_status = 'not_applicable'/i);
+});
