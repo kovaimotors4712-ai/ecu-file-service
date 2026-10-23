@@ -126,20 +126,8 @@
     if (notificationPanel) notificationPanel.hidden = !email;
     if (email && dialog?.open) {
       loadCustomerOrders(); loadPendingCheckouts(); loadCustomerNotifications(); loadCustomerPrivateRequests(); subscribeToOrders();
-      api.auth.getUser().then(user => {
-        if (user?.id === session.user.id) {
-          saveSession({
-            ...session,
-            user: {
-              ...user,
-              app_metadata: {
-                ...(session.user.app_metadata || {}),
-                ...(user.app_metadata || {})
-              }
-            }
-          });
-        }
-      }).catch(console.error);
+      // Do not call saveSession() from renderAccountState(): it re-enters this function
+      // and previously caused an unbounded getUser → saveSession → render loop.
     }
   }
 
