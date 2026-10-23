@@ -215,8 +215,14 @@
     .software-home-card .software-purchase-request{background:#17201e!important;color:#fff!important;border:1px solid #17201e!important;min-height:46px;padding:0 16px;text-align:left}
     .software-home-section .section-heading>a.button-ghost{color:#17201e!important;background:#fff!important;border:1px solid #59665d!important;box-shadow:0 2px 0 #dce5d8!important}
     .software-home-section .section-heading>a.button-ghost:hover{color:#17201e!important;background:#e8f1d2!important}
-    .software-home-grid{gap:10px}
-    .software-home-card{padding:13px 15px!important;gap:7px!important}
+    .software-home-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),280px));align-items:start;gap:10px}
+    .software-home-card{padding:10px 12px!important;gap:6px!important;max-width:280px}
+    .software-home-card h3{font-size:16px!important;line-height:1.3!important}
+    .software-home-card p{font-size:12px!important;line-height:1.4!important}
+    .software-home-card .software-price{font-size:18px!important;line-height:1.25!important}
+    .software-home-card .software-version{font-size:9px!important}
+    .software-home-card .software-purchase-request{font-size:13px!important;min-height:40px!important;padding:0 12px!important;white-space:normal;line-height:1.25}
+    .software-home-card .software-purchase-request.is-check-messages{background:#dff18a!important;color:#17201e!important;border-color:#8aa33e!important;box-shadow:0 2px 0 #c5d98b!important;font-weight:700}
     .software-home-card h3{font-size:18px!important;margin:2px 0!important}
     .software-home-card p{font-size:12px!important;line-height:1.45!important;margin:0!important}
     .software-home-card .software-price{font-size:18px!important;margin:2px 0!important}
@@ -256,7 +262,7 @@
         const price=el('div',new Intl.NumberFormat('en-IN',{style:'currency',currency:item.currency||'INR',maximumFractionDigits:2}).format(Number(item.price_paise||0)/100));price.className='software-price';card.append(price);
         const target=https(item.contact_url)||https(item.product_url);
         if(target){const link=el('a',item.contact_url?'Seller contact / details ↗':'Product details ↗');link.href=target;link.target='_blank';link.rel='noopener noreferrer';link.className='button button-dark';card.append(link);}
-        const buy=el('a','Request payment link ↗');buy.href='/forum.html?purchase='+encodeURIComponent(item.title||'Software')+'&price='+encodeURIComponent(price.textContent)+'#request-software';buy.className='button button-dark software-purchase-request';card.append(buy);
+        const buy=el('a','Request payment link ↗');buy.href='/forum.html?purchase='+encodeURIComponent(item.title||'Software')+'&price='+encodeURIComponent(price.textContent)+'#request-software';buy.className='button button-dark software-purchase-request';buy.addEventListener('click',()=>{try{sessionStorage.setItem('efsi-software-message-followup','1');sessionStorage.setItem('efsi-software-message-item',item.title||'Software');}catch(_){} });card.append(buy);
         grid.append(card);
       });
     }).catch(()=>{grid.replaceChildren();const empty=el('article','Software listings are temporarily unavailable. Please try again later.');empty.className='software-home-empty';grid.append(empty);});
