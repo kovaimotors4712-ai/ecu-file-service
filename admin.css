@@ -130,3 +130,16 @@
 #site-content-list button.button-ghost:disabled{color:#5b655e!important;opacity:.75!important}
 .admin-software-request-fields label{display:grid;gap:6px;font-weight:700;line-height:1.5}
 .admin-software-request-fields input,.admin-software-request-fields select{width:100%;min-height:44px;color:#1d2924;background:#fff;border:1px solid #b9c5b3;padding:10px;font:inherit}
+
+/* High-contrast admin form controls: keep the established dark/olive site theme. */
+#site-content-form input,#site-content-form select,#site-content-form textarea,
+.admin-software-request-fields input,.admin-software-request-fields select,.admin-software-request-fields textarea{color:#111a19!important;-webkit-text-fill-color:#111a19;background:#fff!important;border:1px solid #59665b!important;border-radius:4px;font-weight:600;opacity:1!important;min-height:46px}
+#site-content-form input::placeholder,#site-content-form textarea::placeholder,.admin-software-request-fields input::placeholder,.admin-software-request-fields textarea::placeholder{color:#59645d!important;opacity:1}
+#site-content-form input:focus,#site-content-form select:focus,#site-content-form textarea:focus,.admin-software-request-fields input:focus,.admin-software-request-fields select:focus{outline:3px solid #829a32;outline-offset:1px}
+#site-content-form label{color:#202b25;font-weight:800}
+#site-content-list .admin-order-card h3{color:#111a19;font-weight:800}
+#site-content-list .admin-order-card p,#site-content-list .admin-order-card small{color:#39453d}
+#site-content-list button.button-ghost{color:#111a19!important;background:#fff!important;border:2px solid #4c5b4e!important;font-weight:800!important;text-shadow:none!important;box-shadow:none!important}
+#site-content-list button.button-ghost:focus-visible{outline:3px solid #829a32;outline-offset:2px}
+.admin-section-help{margin:8px 0 18px;color:#344239;font-size:13px;line-height:1.7;max-width:900px}
+@media(max-width:560px){#site-content-list .admin-order-card>div>div:last-child{width:100%;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px!important}#site-content-list button.button-ghost{width:100%;padding:9px 5px!important;font-size:12px;overflow-wrap:anywhere}}
