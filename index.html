@@ -166,6 +166,47 @@
     }
   })();
   </script>
+
+  <style>
+    .software-home-section{padding-top:clamp(42px,6vw,76px);padding-bottom:clamp(42px,6vw,76px);background:#f3f6ee}
+    .software-home-section .section-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:24px}
+    .software-home-section .section-heading h2{font:700 clamp(30px,4vw,44px)/1.1 var(--display);letter-spacing:-.04em;margin:10px 0}
+    .software-home-section .section-heading p{max-width:620px;color:#66716a;line-height:1.75;font-size:13px;margin:0}
+    .section-eyebrow{font:10px var(--mono);letter-spacing:.14em;color:#758b2c}
+    .software-home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:16px}
+    .software-home-card{min-width:0;background:#fff;border:1px solid #dfe6d8;padding:18px;display:flex;flex-direction:column;gap:10px}
+    .software-home-card img{width:100%;height:150px;object-fit:contain;background:#f7f9f4}
+    .software-home-card h3{font:700 19px/1.3 var(--display);margin:0;overflow-wrap:anywhere}
+    .software-home-card p{font-size:12px;line-height:1.7;color:#66716a;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+    .software-home-card .software-price{font-size:22px;font-weight:800;color:#253b29;margin-top:auto}
+    .software-home-card .software-version{font:10px var(--mono);letter-spacing:.06em;color:#758b2c}
+    .software-home-card a{align-self:flex-start;margin-top:6px}
+    .software-home-empty{background:#fff;border:1px dashed #cfd9c8;padding:24px;color:#66716a;font-size:13px;line-height:1.8}
+  </style>
+  <script>
+  (function(){
+    const grid=document.getElementById('homepage-software-grid');if(!grid)return;
+    const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
+    const https=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch(_){return '';}};
+    fetch('/api/software-products',{headers:{Accept:'application/json'}}).then(r=>r.ok?r.json():Promise.reject()).then(data=>{
+      const items=Array.isArray(data.items)?data.items:[];
+      grid.replaceChildren();
+      if(!items.length){const empty=el('article','Software listings are being prepared. Please check back soon or contact ECU SOLUTION to ask about a specific tool.');empty.className='software-home-empty';grid.append(empty);return;}
+      items.slice(0,6).forEach(item=>{
+        const card=el('article');card.className='software-home-card';
+        const image=https(item.image_url);if(image){const img=el('img');img.src=image;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';card.append(img);}
+        const version=el('span',item.version?'VERSION '+item.version:'SOFTWARE LISTING');version.className='software-version';card.append(version);
+        card.append(el('h3',item.title||'Software'));
+        if(item.description)card.append(el('p',item.description));
+        const price=el('div',new Intl.NumberFormat('en-IN',{style:'currency',currency:item.currency||'INR',maximumFractionDigits:2}).format(Number(item.price_paise||0)/100));price.className='software-price';card.append(price);
+        const target=https(item.contact_url)||https(item.product_url);
+        if(target){const link=el('a',item.contact_url?'Enquire to purchase ↗':'Product details ↗');link.href=target;link.target='_blank';link.rel='noopener noreferrer';link.className='button button-dark';card.append(link);}
+        grid.append(card);
+      });
+    }).catch(()=>{grid.replaceChildren();const empty=el('article','Software listings are temporarily unavailable. Please try again later.');empty.className='software-home-empty';grid.append(empty);});
+  })();
+  </script>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase.js?v=ba583d0"></script><script src="auth.js?v=payment-recovery-feedback-20261017"></script><script src="app.js?v=payment-recovery-feedback-20261017"></script>
 </body>
 </html>
