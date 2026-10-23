@@ -243,7 +243,7 @@
         const price=el('div',new Intl.NumberFormat('en-IN',{style:'currency',currency:item.currency||'INR',maximumFractionDigits:2}).format(Number(item.price_paise||0)/100));price.className='software-price';card.append(price);
         const target=https(item.contact_url)||https(item.product_url);
         if(target){const link=el('a',item.contact_url?'Seller contact / details ↗':'Product details ↗');link.href=target;link.target='_blank';link.rel='noopener noreferrer';link.className='button button-dark';card.append(link);}
-        const buy=el('a','Request to purchase ↗');buy.href='/forum.html?purchase='+encodeURIComponent(item.title||'Software')+'&price='+encodeURIComponent(price.textContent)+'#request-software';buy.className='button button-dark software-purchase-request';card.append(buy);
+        const buy=el('a','Request payment link ↗');buy.href='/forum.html?purchase='+encodeURIComponent(item.title||'Software')+'&price='+encodeURIComponent(price.textContent)+'#request-software';buy.className='button button-dark software-purchase-request';card.append(buy);
         grid.append(card);
       });
     }).catch(()=>{grid.replaceChildren();const empty=el('article','Software listings are temporarily unavailable. Please try again later.');empty.className='software-home-empty';grid.append(empty);});
