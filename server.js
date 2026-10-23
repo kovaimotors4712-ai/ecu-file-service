@@ -1799,7 +1799,7 @@ function softwareProductPayload(body, adminId, partial = false) {
 async function handlePublicSoftwareProducts(request,response){
   if(request.method!=='GET'){jsonResponse(response,405,{error:'Method Not Allowed'});return true;}
   if(!supabaseServiceRoleKey){jsonResponse(response,200,{items:[]});return true;}
-  const result=await supabaseRequest(serviceToken(),'rest/v1/software_products?select=id,title,description,version,price_paise,currency,image_url,product_url,contact_url,sort_order,created_at&is_published=eq.true&order=created_at.desc&limit=100',{timeoutMs:12000});
+  const result=await supabaseRequest(serviceToken(),'rest/v1/software_products?select=id,title,description,version,price_paise,price_visible,currency,image_url,product_url,contact_url,sort_order,created_at&is_published=eq.true&order=created_at.desc&limit=100',{timeoutMs:12000});
   if(!result.ok){console.warn('[software-products] Public query failed',{status:result.status});jsonResponse(response,502,{error:'Software listings could not be loaded.'});return true;}
   jsonResponse(response,200,{items:await result.json()});return true;
 }
