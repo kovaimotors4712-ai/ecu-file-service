@@ -169,6 +169,24 @@
   </footer>
   <script src="/supabase.js"></script>
   <script src="/auth.js"></script>
-  <script src="/forum.js?v=20261023-live-desk"></script>
+  <script>
+(function(){
+ try{
+  const params=new URLSearchParams(window.location.search);
+  const product=(params.get('purchase')||'').trim().slice(0,120);
+  const price=(params.get('price')||'').trim().slice(0,40);
+  if(!product)return;
+  const form=document.querySelector('.forum-request-form[data-request-type="software_requirement"]');
+  if(!form)return;
+  const title=form.querySelector('[name="title"]');
+  const body=form.querySelector('[name="body"]');
+  if(title&&!title.value)title.value='Purchase enquiry: '+product;
+  if(body&&!body.value)body.value='I would like to purchase or enquire about this software.\nSoftware: '+product+(price?'\nListed price: '+price:'')+'\nPlease confirm availability, compatibility, licence terms and payment/delivery steps.';
+  const heading=document.getElementById('request-software');
+  if(heading)heading.setAttribute('data-purchase-enquiry','true');
+ }catch(_){}
+})();
+</script>
+<script src="/forum.js?v=20261023-live-desk"></script>
 </body>
 </html>
