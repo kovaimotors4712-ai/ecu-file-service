@@ -176,7 +176,7 @@
 
     const statuses=['New','File Review','Processing','Possible','Not Possible','Completed','Cancelled','Payment Pending'];
 
-    list.innerHTML=filtered.map(function(order){
+    function renderOrderCard(order){
       const services=(order.selected_services||[]).join(', ');
       const files=order.order_files||[];
       const originalFile=files.find(function(f){return f.kind==='original';});
@@ -229,6 +229,23 @@
           '<p class="admin-message" role="status"></p>'+
         '</div>'+
         '</article>';
+    }
+
+    const customerGroups=new Map();
+    filtered.forEach(function(order){
+      const key=String(order.customer_id||order.contact_email||order.contact_phone||order.id);
+      if(!customerGroups.has(key))customerGroups.set(key,{key:key,orders:[]});
+      customerGroups.get(key).orders.push(order);
+    });
+    list.innerHTML=Array.from(customerGroups.values()).map(function(group){
+      const first=group.orders[0];
+      const pending=group.orders.filter(function(order){return ['New','File Review','Processing','Payment Pending'].includes(order.status)||order.payment_status==='PENDING';}).length;
+      const name=first.contact_name||'Customer';
+      const contact=[first.contact_phone,first.contact_email].filter(Boolean).join(' · ');
+      return '<details class="admin-customer-folder">'+
+        '<summary><span class="admin-customer-folder-main"><b>'+escape(name)+'</b><small>'+escape(contact||'Contact details not available')+'</small></span>'+
+        '<span class="admin-customer-folder-count">'+group.orders.length+' order'+(group.orders.length===1?'':'s')+(pending?' · '+pending+' pending':'')+'</span></summary>'+
+        '<div class="admin-customer-orders">'+group.orders.map(renderOrderCard).join('')+'</div></details>';
     }).join('');
     loadAdminAirbagPhotoPreviews();
   }
