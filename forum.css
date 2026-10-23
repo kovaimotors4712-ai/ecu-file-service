@@ -28,3 +28,32 @@
 @media(max-width:620px){.forum-chat-actions{align-items:stretch;flex-direction:column}.forum-chat-actions .button{width:100%}.forum-chat-list{max-height:360px;padding:9px}.forum-chat-message{padding:11px}.forum-chat-message-head{flex-direction:column;gap:3px}}
 
 .forum-ad-panel{border-color:#dce5c8;background:#fbfdf5}.forum-ad-panel h3{font:750 18px/1.35 var(--display);margin:12px 0 8px;overflow-wrap:anywhere}.forum-ad-panel p:not(.forum-kicker){font-size:12px;line-height:1.75;color:#4f5e52;overflow-wrap:anywhere}.forum-ad-panel img{display:block;width:100%;height:auto;max-height:220px;object-fit:cover;margin:12px 0}.forum-ad-panel a:not(.guide-reference){display:inline-block;font-size:12px;font-weight:750;margin:8px 0}.forum-ad-panel .guide-reference{display:inline-block;margin-top:10px}
+
+/* Live desk refresh: wide, dense, desktop-first layout with responsive mobile fallback. */
+.forum-main{max-width:1600px;padding:22px clamp(14px,2.2vw,34px) 60px}.forum-hero{padding:clamp(26px,3.8vw,52px);margin-bottom:14px}
+.forum-account,.forum-profile,.forum-moderation-panel{margin-bottom:12px}.live-chat-panel{margin-bottom:14px;padding:clamp(16px,2vw,28px)!important}
+.forum-chat-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px}
+.forum-chat-list{max-height:min(66vh,760px);min-height:360px;gap:8px;padding:12px;margin:10px 0 14px;scroll-behavior:smooth}
+.forum-chat-message{display:grid;grid-template-columns:minmax(130px,190px) minmax(0,1fr) auto;align-items:start;gap:12px;padding:11px 13px;border-radius:7px}
+.forum-chat-message-head{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;overflow-wrap:anywhere}
+.forum-chat-message p{margin:0;min-width:0;font-size:13px;line-height:1.6}
+.forum-chat-message .chat-reply-button{align-self:center;border:1px solid #dce4d8;background:#f8faf4;color:#30452f;padding:7px 10px;border-radius:5px;font-size:11px;font-weight:750;cursor:pointer;white-space:nowrap}
+.forum-chat-message .chat-reply-button:hover{background:#eaf2d6}.forum-chat-message .chat-reply-reference{grid-column:2/4;margin-top:-2px;padding:7px 10px;border-left:3px solid #a5bc5a;background:#f5f8ec;color:#536348;font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.forum-chat-message .chat-reply-reference strong{color:#263a28}.forum-chat-message-head time{font-size:10px;line-height:1.45}.forum-chat-message.assistant{display:block}
+.forum-chat-reply-context{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;margin:10px 0;background:#f2f6e7;border-left:3px solid #9ab63b;color:#30452f;font-size:12px}
+.forum-chat-reply-context button{border:0;background:transparent;color:#5b6d2c;text-decoration:underline;font-weight:700;cursor:pointer}
+.forum-chat-form{padding-top:12px}.forum-chat-form textarea{min-height:86px}
+.forum-requests-panel{margin:14px 0 20px;padding:clamp(16px,2vw,28px)!important}.forum-request-form{display:grid;grid-template-columns:minmax(190px,.7fr) minmax(240px,1fr);gap:12px;margin-top:16px}
+.forum-request-form label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:750}.forum-request-form label:nth-child(3){grid-column:1/-1}
+.forum-request-form input,.forum-request-form select,.forum-request-form textarea{width:100%;border:1px solid #d8e0d4;background:#fbfcf8;color:#19231e;padding:12px;font:14px/1.6 var(--sans);border-radius:4px}
+.forum-request-form textarea{resize:vertical;min-height:90px}.forum-request-form button{justify-self:start}
+.forum-request-list-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:20px;padding-top:14px;border-top:1px solid #e4e9e0}
+.forum-request-list-heading h3{font:750 18px/1.3 var(--display);margin:0}.forum-request-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.forum-request-card{min-width:0;border:1px solid #e0e6db;border-radius:6px;padding:14px;background:#fff}.forum-request-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.forum-request-card h4{font-size:14px;margin:10px 0 7px;overflow-wrap:anywhere}.forum-request-card p{font-size:12px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;margin:7px 0}
+.forum-request-card .request-admin-reply{padding:10px;background:#f4f7ec;border-left:3px solid #a5bc5a}.forum-request-admin-controls{display:grid;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid #e4e9e0}
+.forum-request-admin-controls textarea{width:100%;min-height:72px;padding:9px;border:1px solid #d8e0d4;font:13px/1.5 var(--sans)}.forum-request-admin-controls select{padding:8px;border:1px solid #d8e0d4;background:#fff}.forum-request-admin-controls button{justify-self:start}
+@media(max-width:760px){.forum-main{padding:14px 10px 40px}.forum-chat-list{max-height:58vh;min-height:280px;padding:7px}
+.forum-chat-message{grid-template-columns:minmax(0,1fr) auto;gap:7px;padding:10px}.forum-chat-message-head{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:space-between}
+.forum-chat-message p{grid-column:1/-1}.forum-chat-message .chat-reply-button{grid-column:2;grid-row:2}.forum-chat-message .chat-reply-reference{grid-column:1/-1;margin-top:0}
+.forum-request-form,.forum-request-list{grid-template-columns:minmax(0,1fr)}.forum-request-form label:nth-child(3){grid-column:auto}.forum-request-form button{width:100%}.forum-request-card-head{align-items:flex-start}}
