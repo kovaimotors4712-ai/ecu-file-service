@@ -69,13 +69,25 @@
       <section class="panel live-chat-panel" id="live-chat" aria-labelledby="live-chat-heading">
         <div class="section-heading"><div><p class="forum-kicker"><span></span> LIVE WORKSHOP CHAT</p><h2 id="live-chat-heading">Community live desk</h2></div><span class="state-pill"><span class="live-pulse"></span> Refreshes automatically</span></div>
         <p class="muted">Chat with signed-in community members. The Community Assistant is explicitly labelled when it responds; example messages are not presented as real members.</p>
+        <div class="forum-chat-toolbar"><span class="state-pill">Recent community messages</span><span class="muted">Reply directly to a member's message.</span></div>
         <div id="forum-chat-list" class="forum-chat-list" aria-live="polite"><p class="muted">Loading recent messages…</p></div>
+        <div id="forum-chat-reply-context" class="forum-chat-reply-context" hidden></div>
         <form id="forum-chat-form" class="forum-chat-form">
           <label for="forum-chat-input">Message to the workshop community<textarea id="forum-chat-input" rows="2" maxlength="1200" placeholder="Ask a concise diagnostic question. Never share VINs, passwords or customer data." required></textarea></label>
           <div class="forum-chat-actions"><small id="forum-chat-status" class="muted">Sign in to post. Public messages are visible to visitors.</small><button type="submit" class="button button-lime" id="forum-chat-send" disabled>Send message ↗</button></div>
         </form>
       </section>
-    <section class="forum-workspace">
+<section class="panel forum-requests-panel" id="forum-requests-panel" aria-labelledby="forum-requests-heading">
+<div class="section-heading"><div><p class="forum-kicker"><span></span> DIRECT TO ECU SOLUTION</p><h2 id="forum-requests-heading">Customer requests & suggestions</h2></div><span class="state-pill">Private to you + admin</span></div>
+<p class="muted">Send a service requirement, feature idea, complaint or suggestion directly to the admin. These requests are visible only to you and authorized admins/moderators.</p>
+<form id="forum-request-form" class="forum-request-form">
+<label>Request type<select id="forum-request-type" required><option value="service_requirement">Service requirement</option><option value="feature_request">Website / forum feature</option><option value="suggestion">Suggestion</option><option value="issue">Problem / complaint</option><option value="other">Other</option></select></label>
+<label>Subject<input id="forum-request-title" minlength="4" maxlength="120" required placeholder="Briefly describe what you need"></label>
+<label>Details<textarea id="forum-request-body" minlength="10" maxlength="4000" rows="3" required placeholder="Explain the requirement. Do not include passwords, payment secrets or customer-identifying data."></textarea></label>
+<button type="submit" class="button button-lime" id="forum-request-send" disabled>Send private request ↗</button></form>
+<p id="forum-request-message" class="status-message" aria-live="polite">Sign in to send a private request.</p>
+<div class="forum-request-list-heading"><h3>Request history</h3><button type="button" class="button button-outline" id="forum-request-refresh">Refresh</button></div>
+<div id="forum-request-list" class="forum-request-list" aria-live="polite"><p class="muted">Sign in to view requests.</p></div></section>\n    <section class="forum-workspace">
       <aside class="forum-sidebar">
         <div class="panel">
           <p class="forum-kicker"><span></span> COMMUNITY RULES</p>
@@ -156,6 +168,6 @@
   </footer>
   <script src="/supabase.js"></script>
   <script src="/auth.js"></script>
-  <script src="/forum.js?v=20261022-forum-sidebar-ads"></script>
+  <script src="/forum.js?v=20261023-live-desk"></script>
 </body>
 </html>
