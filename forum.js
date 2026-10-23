@@ -248,11 +248,13 @@
     $('#forum-sign-out').hidden = !signedIn;
     $('#forum-profile-panel').hidden = !signedIn;
     $('#forum-new-topic-toggle').disabled = !signedIn;
+    $('#forum-request-send').disabled = !signedIn;
     $('#forum-reply-form').hidden = !signedIn || !activeTopic || activeTopic.is_locked;
     if (signedIn) {
       try {
         await loadProfile();
         setMessage($('#forum-auth-message'), 'Signed in. Your email and private ECU orders are not shown publicly.', 'success');
+        loadCustomerRequests();
       } catch (_) {
         profile = null;
         setMessage($('#forum-profile-message'), 'Profile could not be loaded. Try refreshing or signing in again.', 'error');
@@ -261,6 +263,8 @@
       profile = null;
       setMessage($('#forum-auth-message'), 'Sign in or create an account to post and reply.');
       setMessage($('#forum-profile-message'), '');
+      $('#forum-request-send').disabled = true;
+      $('#forum-request-list').textContent = 'Sign in to view requests.';
     }
   }
 
@@ -538,37 +542,40 @@
   const chatSend = $('#forum-chat-send');
   const chatStatus = $('#forum-chat-status');
   let chatRefreshBusy = false;
-  function renderChatMessage(row, displayName) {
-    const article = document.createElement('article');
-    article.className = 'forum-chat-message';
+  let chatMessagesById = {};
+  let selectedChatReply = null;
+  let chatProfilesCache = {};
+  function renderChatMessage(row, displayName, profiles) {
+    const article = document.createElement('article'); article.className = 'forum-chat-message'; article.setAttribute('data-chat-message-id', row.id);
     const head = document.createElement('div'); head.className = 'forum-chat-message-head';
     const who = document.createElement('strong'); who.textContent = displayName || 'Community member';
     const time = document.createElement('time'); time.dateTime = row.created_at || ''; time.textContent = formatDate(row.created_at);
-    const body = document.createElement('p'); body.textContent = row.body || '';
-    head.append(who, time); article.append(head, body); return article;
+    const body = document.createElement('p'); body.textContent = row.body || ''; head.append(who,time); article.append(head,body);
+    if (row.reply_to_message_id) { const parent=chatMessagesById[row.reply_to_message_id]; const reference=document.createElement('div'); reference.className='chat-reply-reference';
+      if(parent){const label=document.createElement('strong');label.textContent='Replying to '+displayNameFor(parent.author_id,profiles)+': ';const preview=document.createElement('span');preview.textContent=String(parent.body||'').slice(0,220)+(String(parent.body||'').length>220?'…':'');reference.append(label,preview);}
+      else reference.textContent='Reply to an earlier community message'; article.append(reference);}
+    if(user){const reply=document.createElement('button');reply.type='button';reply.className='chat-reply-button';reply.setAttribute('data-reply-chat-id',row.id);reply.textContent='Reply ↩';article.append(reply);}
+    return article;
   }
   async function loadChatMessages() {
     if (!api || !chatList || chatRefreshBusy) return;
     chatRefreshBusy = true;
     try {
-      const rows = await api.rest('forum_chat_messages?select=id,author_id,body,created_at&order=created_at.desc&limit=60');
+      const rows = await api.rest('forum_chat_messages?select=id,author_id,body,created_at,reply_to_message_id&order=created_at.desc&limit=100');
       const messages = Array.isArray(rows) ? rows.slice().reverse() : [];
-      const ids = messages.map(function (row) { return row.author_id; });
-      const profiles = await profilesFor(ids);
+      chatMessagesById = {}; messages.forEach(function(row){chatMessagesById[row.id]=row;});
+      const missing=Array.from(new Set(messages.map(function(row){return row.reply_to_message_id;}).filter(function(id){return id&&!chatMessagesById[id]&&validUuid(id);}));
+      if(missing.length){try{const parents=await api.rest('forum_chat_messages?select=id,author_id,body,created_at&id=in.('+missing.join(',')+')');(Array.isArray(parents)?parents:[]).forEach(function(row){chatMessagesById[row.id]=row;});}catch(_){}}
+      const ids=messages.map(function(row){return row.author_id;}).concat(Object.values(chatMessagesById).map(function(row){return row.author_id;}));
+      const profiles=await profilesFor(ids); chatProfilesCache=profiles;
+      const nearBottom=chatList.scrollHeight-chatList.scrollTop-chatList.clientHeight<100;
       chatList.replaceChildren();
-      if (!messages.length) {
-        const empty = document.createElement('div'); empty.className = 'forum-chat-message empty';
-        empty.textContent = 'No live messages yet. Start the first real conversation by signing in and posting a question.'; chatList.append(empty);
-      } else {
-        messages.forEach(function (row) { chatList.append(renderChatMessage(row, displayNameFor(row.author_id, profiles))); });
-        chatList.scrollTop = chatList.scrollHeight;
-      }
-      if (chatStatus) chatStatus.textContent = user ? 'Signed in as a community member. Messages are public.' : 'Sign in to post. Public messages are visible to visitors.';
-      if (chatSend) chatSend.disabled = !user;
-    } catch (_) {
-      chatList.replaceChildren(); const empty = document.createElement('div'); empty.className = 'forum-chat-message empty';
-      empty.textContent = 'Live chat is temporarily unavailable. You can still search and read workshop topics below.'; chatList.append(empty);
-    } finally { chatRefreshBusy = false; }
+      if(!messages.length){const empty=document.createElement('div');empty.className='forum-chat-message empty';empty.textContent='No live messages yet. Sign in and start the first real conversation.';chatList.append(empty);}
+      else {messages.forEach(function(row){chatList.append(renderChatMessage(row,displayNameFor(row.author_id,profiles),profiles));});if(nearBottom)chatList.scrollTop=chatList.scrollHeight;}
+      if(chatStatus)chatStatus.textContent=user?'Signed in. Use Reply to mention the member you are answering.':'Sign in to post. Public messages are visible to visitors.';
+      if(chatSend)chatSend.disabled=!user;
+    } catch (_) {chatList.replaceChildren();const empty=document.createElement('div');empty.className='forum-chat-message empty';empty.textContent='Live chat is temporarily unavailable. You can still search and read workshop topics below.';chatList.append(empty);}
+    finally {chatRefreshBusy=false;}
   }
   function assistantReply(message) {
     const q = message.toLowerCase();
@@ -577,6 +584,7 @@
     if (/airbag|srs|crash/i.test(q)) return 'Community Assistant (automated): SRS is a safety-critical system. Follow the manufacturer procedure and applicable law; verify the module and fault data before any repair. Do not bypass safety restraints.';
     return 'Community Assistant (automated): To help other technicians respond, add vehicle/year/engine, ECU or module number, exact fault/symptom, measurements and steps already tried. This automated note is not a human member or a verified repair answer.';
   }
+  if(chatList)chatList.addEventListener('click',function(event){const button=event.target.closest('[data-reply-chat-id]');if(!button)return;const row=chatMessagesById[button.getAttribute('data-reply-chat-id')];if(!row)return;selectedChatReply=row;const context=$('#forum-chat-reply-context');context.replaceChildren();const label=document.createElement('span');label.textContent='Replying to '+displayNameFor(row.author_id,chatProfilesCache)+': '+String(row.body||'').slice(0,140);const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Cancel reply';cancel.addEventListener('click',function(){selectedChatReply=null;context.hidden=true;});context.append(label,cancel);context.hidden=false;chatInput.focus();chatInput.placeholder='Write a reply to this member…';});
   if (chatForm) chatForm.addEventListener('submit', async function (event) {
     event.preventDefault();
     if (!api || !user) { if (chatStatus) chatStatus.textContent = 'Please sign in above to post to the public chat.'; return; }
@@ -584,8 +592,8 @@
     if (!body || body.length > 1200) { if (chatStatus) chatStatus.textContent = 'Messages must be 1–1,200 characters.'; return; }
     chatSend.disabled = true;
     try {
-      await api.rest('forum_chat_messages', { method: 'POST', body: { author_id: user.id, body: body }, prefer: 'return=minimal' });
-      chatInput.value = ''; if (chatStatus) chatStatus.textContent = 'Message posted.';
+      await api.rest('forum_chat_messages', { method: 'POST', body: { author_id: user.id, body: body, reply_to_message_id: selectedChatReply ? selectedChatReply.id : null }, prefer: 'return=minimal' });
+      chatInput.value = ''; selectedChatReply = null; $('#forum-chat-reply-context').hidden = true; chatInput.placeholder = 'Ask a concise diagnostic question. Never share VINs, passwords or customer data.'; if (chatStatus) chatStatus.textContent = 'Message posted.';
       await loadChatMessages();
       // A transparent, clearly labelled automated prompt is shown locally only; it never impersonates a user or writes fake chat history.
       const assistant = document.createElement('article'); assistant.className = 'forum-chat-message assistant';
@@ -599,6 +607,25 @@
   loadChatMessages();
   window.setInterval(loadChatMessages, 12000);
 
+
+  // Private customer-to-admin request inbox; row-level security limits customers to their own records.
+  const requestForm=$('#forum-request-form'), requestList=$('#forum-request-list'), requestMessage=$('#forum-request-message');
+  function requestTypeLabel(v){return({service_requirement:'Service requirement',feature_request:'Website / forum feature',suggestion:'Suggestion',issue:'Problem / complaint',other:'Other'})[v]||'Request';}
+  async function loadCustomerRequests(){
+    if(!api||!user||!requestList)return;requestList.replaceChildren();const loading=document.createElement('p');loading.className='muted';loading.textContent='Loading request history…';requestList.append(loading);
+    try{const rows=await api.rest('forum_customer_requests?select=id,user_id,request_type,title,body,status,admin_reply,created_at,updated_at&order=created_at.desc&limit=100');requestList.replaceChildren();
+      if(!Array.isArray(rows)||!rows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='No requests yet. Submit the form above to contact the admin privately.';requestList.append(empty);return;}
+      const moderator=['admin','moderator'].includes(String(user.app_metadata&&user.app_metadata.role||'').toLowerCase());
+      rows.forEach(function(row){const card=document.createElement('article');card.className='forum-request-card';const head=document.createElement('div');head.className='forum-request-card-head';const type=document.createElement('span');type.className='topic-tag';type.textContent=requestTypeLabel(row.request_type);const status=document.createElement('span');status.className='state-pill';status.textContent=String(row.status||'open').replace(/_/g,' ');head.append(type,status);
+        const title=document.createElement('h4');title.textContent=row.title||'Customer request';const body=document.createElement('p');body.textContent=row.body||'';const date=document.createElement('p');date.className='muted';date.textContent='Submitted '+formatDate(row.created_at);card.append(head,title,body,date);
+        if(row.admin_reply){const reply=document.createElement('p');reply.className='request-admin-reply';reply.textContent='Admin reply: '+row.admin_reply;card.append(reply);}
+        if(moderator){const controls=document.createElement('div');controls.className='forum-request-admin-controls';const replyInput=document.createElement('textarea');replyInput.maxLength=4000;replyInput.placeholder='Write a private reply to the customer';replyInput.value=row.admin_reply||'';const select=document.createElement('select');['open','in_review','waiting_for_customer','resolved','closed'].forEach(function(v){const o=document.createElement('option');o.value=v;o.textContent=v.replace(/_/g,' ');select.append(o);});select.value=row.status||'open';const save=document.createElement('button');save.type='button';save.className='button button-lime';save.textContent='Save admin reply';save.addEventListener('click',async function(){save.disabled=true;try{await api.rest('forum_customer_requests?id=eq.'+encodeURIComponent(row.id),{method:'PATCH',body:{admin_reply:replyInput.value.trim(),status:select.value,updated_at:new Date().toISOString()},prefer:'return=minimal'});setMessage(requestMessage,'Private admin reply saved.','success');await loadCustomerRequests();}catch(_){setMessage(requestMessage,'Could not save reply. Verify moderator permissions and migration.','error');}finally{save.disabled=false;}});controls.append(replyInput,select,save);card.append(controls);}
+        requestList.append(card);
+      });
+    }catch(_){requestList.replaceChildren();const error=document.createElement('p');error.className='status-message error';error.textContent='Request history is not available yet. The private-request database migration may need to be applied.';requestList.append(error);}
+  }
+  if(requestForm)requestForm.addEventListener('submit',async function(event){event.preventDefault();if(!user)return setMessage(requestMessage,'Sign in to send a private request.','error');const type=$('#forum-request-type').value,title=$('#forum-request-title').value.trim(),body=$('#forum-request-body').value.trim();if(title.length<4||body.length<10||body.length>4000)return setMessage(requestMessage,'Add a short subject and at least 10 characters of detail.','error');const button=$('#forum-request-send');button.disabled=true;try{await api.rest('forum_customer_requests',{method:'POST',body:{user_id:user.id,request_type:type,title:title,body:body},prefer:'return=minimal'});requestForm.reset();setMessage(requestMessage,'Private request sent to ECU SOLUTION admin.','success');await loadCustomerRequests();}catch(_){setMessage(requestMessage,'Could not send the request. Please check sign-in or try again shortly.','error');}finally{button.disabled=!user;}});
+  $('#forum-request-refresh').addEventListener('click',loadCustomerRequests);
 
   // Display only active, admin-published sidebar promotions from the existing site-content system.
   (function loadForumSidebarPromotion() {
