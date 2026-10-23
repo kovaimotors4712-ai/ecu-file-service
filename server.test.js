@@ -1863,3 +1863,23 @@ test('customer software-request insert policy blocks customer-supplied quotes, d
   assert.match(migration, /software_status = 'requested'/i);
   assert.match(migration, /software_status = 'not_applicable'/i);
 });
+
+
+test('homepage forum preview, collapsible customer orders, and protected announcement deletion stay wired', () => {
+  const homepage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  const customer = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+
+  assert.match(homepage, /id="homepage-forum-topics"/);
+  assert.match(homepage, /window\.EfsiSupabase/);
+  assert.match(homepage, /setInterval\(refresh,15000\)/);
+  assert.doesNotMatch(homepage, /<iframe[^>]+src=["']\/forum\.html/i);
+  assert.match(customer, /<details class="customer-order-card customer-order-collapsible"/);
+  assert.match(customer, /<summary class="customer-order-top">/);
+  assert.match(admin, /data-delete-content-id=/);
+  assert.match(admin, /Permanently delete this content\? This cannot be undone\./);
+  assert.match(admin, /method:'DELETE',body:JSON\.stringify\(\{id:item\.id\}\)/);
+  assert.match(serverSource, /async function handleAdminSiteContent\(request, response\) \{\s*const admin = await requireAdmin\(request\)/);
+  assert.match(serverSource, /if \(request\.method === 'DELETE'\)[\s\S]*?site_announcements\?id=eq\./);
+});
