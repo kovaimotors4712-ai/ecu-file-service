@@ -121,10 +121,11 @@
     const pendingPanel = document.querySelector('#pending-checkouts');
     const notificationPanel = document.querySelector('#customer-notifications');
     if (ordersPanel) ordersPanel.hidden = !email;
+    const privateRequestsPanel=document.querySelector('#customer-private-requests');if(privateRequestsPanel)privateRequestsPanel.hidden=!email;
     if (pendingPanel) pendingPanel.hidden = !email;
     if (notificationPanel) notificationPanel.hidden = !email;
     if (email && dialog?.open) {
-      loadCustomerOrders(); loadPendingCheckouts(); loadCustomerNotifications(); subscribeToOrders();
+      loadCustomerOrders(); loadPendingCheckouts(); loadCustomerNotifications(); loadCustomerPrivateRequests(); subscribeToOrders();
       api.auth.getUser().then(user => {
         if (user?.id === session.user.id) {
           saveSession({
@@ -140,6 +141,35 @@
         }
       }).catch(console.error);
     }
+  }
+
+
+  async function loadCustomerPrivateRequests() {
+    const panel=document.querySelector('#customer-private-requests');
+    const list=document.querySelector('#customer-private-request-list');
+    const customerId=session?.user?.id;
+    if(!panel||!list||!customerId)return;
+    list.replaceChildren();
+    const loading=document.createElement('p');loading.className='muted';loading.textContent='Loading your private requests…';list.append(loading);
+    try{
+      const rows=await rest('forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,created_at,updated_at&order=created_at.desc&limit=50');
+      list.replaceChildren();
+      if(!Array.isArray(rows)||!rows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='No private requests yet. Use Request payment link on a software listing or send a request through the Forum.';list.append(empty);return;}
+      const labels={software_requirement:'Software / payment-link request',wiring_diagram:'Wiring request',suggestion:'Suggestion',service_requirement:'Service request',feature_request:'Website feature',issue:'Support request',other:'Other request'};
+      rows.forEach(item=>{
+        const card=document.createElement('article');card.className='customer-private-request-card';
+        const head=document.createElement('div');head.className='customer-orders-head';
+        const tag=document.createElement('strong');tag.textContent=labels[item.request_type]||'Private request';
+        const status=document.createElement('span');status.className='notification-count';status.textContent=String(item.status||'open').replace(/_/g,' ');
+        head.append(tag,status);
+        const title=document.createElement('h4');title.textContent=item.title||'Customer request';
+        const body=document.createElement('p');body.textContent=item.body||'';
+        const date=document.createElement('small');date.textContent='Submitted '+new Date(item.created_at).toLocaleString();
+        card.append(head,title,body,date);
+        if(item.customer_auto_reply){const reply=document.createElement('div');reply.className='customer-private-request-reply';const label=document.createElement('strong');label.textContent='AUTOMATIC CONFIRMATION';const text=document.createElement('p');text.textContent=item.customer_auto_reply;reply.append(label,text);card.append(reply);}if(item.admin_reply){const reply=document.createElement('div');reply.className='customer-private-request-reply';const label=document.createElement('strong');label.textContent='ECU SOLUTION · MESSAGE';const text=document.createElement('p');text.textContent=item.admin_reply;reply.append(label,text);card.append(reply);}
+        list.append(card);
+      });
+    }catch(error){list.replaceChildren();const p=document.createElement('p');p.className='admin-message admin-error';p.textContent='Your private requests could not be loaded. '+(error.message||'Please retry.');list.append(p);}
   }
 
   async function loadCustomerOrders() {
@@ -207,6 +237,11 @@
       await loadCustomerNotifications();
     } catch {}
   }
+  // Customer-private-request cards share the account's existing visual language.
+  const privateRequestStyle=document.createElement('style');
+  privateRequestStyle.textContent='.customer-private-request-card{padding:13px;margin:8px 0;border:1px solid #dfe6da;background:#fff;color:#17201e}.customer-private-request-card h4{font-size:14px;margin:8px 0 5px}.customer-private-request-card p{font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;margin:5px 0;color:#45524a}.customer-private-request-card small{font-size:10px;color:#667269}.customer-private-request-reply{margin-top:10px;padding:10px;background:#edf4dd;border-left:3px solid #8aa83b;color:#17201e}.customer-private-request-reply strong{font-size:10px;letter-spacing:.06em}.customer-private-request-reply p{color:#17201e}';
+  document.head.appendChild(privateRequestStyle);
+
   function withStatusTimeout(promise, milliseconds, timeoutMessage) {
     let timer;
     return Promise.race([
@@ -271,6 +306,7 @@
   function showPasswordReset(text = '') { authTabs.hidden = true; form.hidden = true; resetForm.hidden = false; document.querySelector('.auth-reset').hidden = true; accountTitle.textContent = 'Set a new password'; accountIntro.textContent = 'Choose a new password for your customer account.'; message.textContent = text; if (!dialog.open) dialog.showModal(); document.querySelector('#auth-new-password').focus(); }
 
   document.querySelector('#account-trigger').addEventListener('click', () => { dialog.showModal(); if (session?.user?.id) { loadCustomerOrders(); loadPendingCheckouts(); subscribeToOrders(); } });
+  document.querySelector('#refresh-private-requests')?.addEventListener('click',loadCustomerPrivateRequests);
   document.querySelector('#customer-notification-list')?.addEventListener('click', async event => {
     const item = event.target.closest('.notification-item');
     if (!item) return;

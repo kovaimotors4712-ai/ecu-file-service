@@ -676,7 +676,7 @@
       adminRequestRows.forEach(function(row){
         const card=document.createElement('article');card.className='admin-order-card admin-request-card';
         const type=document.createElement('span');type.className='form-kicker';type.textContent=({suggestion:'SUGGESTION / GENERAL',service_requirement:'SERVICE REQUIREMENT',feature_request:'WEBSITE FEATURE',software_requirement:'SOFTWARE REQUIREMENT',wiring_diagram:'WIRING DIAGRAM',issue:'CUSTOMER ISSUE',other:'OTHER'})[row.request_type]||'CUSTOMER REQUEST';
-        const heading=document.createElement('h3');heading.textContent=row.title||'Customer request';
+        const heading=document.createElement('h3');heading.textContent=row.title||'Customer request';if(['open','in_review'].includes(String(row.status||'open'))){const badge=document.createElement('span');badge.className='admin-folder-badge';badge.textContent='ACTION REQUIRED';badge.setAttribute('aria-label','Request needs admin review');card.append(badge);}
         const meta=document.createElement('p');meta.textContent='Request '+String(row.id||'').slice(0,8)+' · '+new Date(row.created_at).toLocaleString('en-IN')+' · '+String(row.status||'open').replace(/_/g,' ');
         const body=document.createElement('p');body.className='admin-request-body';body.textContent=row.body||'';
         const reply=document.createElement('textarea');reply.maxLength=4000;reply.rows=3;reply.className='admin-request-reply';reply.placeholder='Private reply to customer';reply.value=row.admin_reply||'';
