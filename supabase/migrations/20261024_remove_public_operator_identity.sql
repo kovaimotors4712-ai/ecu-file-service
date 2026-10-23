@@ -1,0 +1,2 @@
+-- Intentionally pending: populate only after reviewing the live constraint and trigger definitions.
+-- Do not apply until reviewed against the current production schema.
