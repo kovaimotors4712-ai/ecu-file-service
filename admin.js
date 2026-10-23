@@ -112,9 +112,11 @@
       if (statActive) statActive.textContent = orders.filter(function(o){return ['File Review','Processing'].includes(o.status);}).length;
       renderOrders();
       statusMessage.textContent='';
+      updateAdminFolderBadges();
     }catch(error){
       statusMessage.textContent=error.message;
       statusMessage.classList.add('admin-error');
+      updateAdminFolderBadges();
     }
   }
 
@@ -174,7 +176,7 @@
 
     const statuses=['New','File Review','Processing','Possible','Not Possible','Completed','Cancelled','Payment Pending'];
 
-    list.innerHTML=filtered.map(function(order){
+    function renderOrderCard(order){
       const services=(order.selected_services||[]).join(', ');
       const files=order.order_files||[];
       const originalFile=files.find(function(f){return f.kind==='original';});
@@ -227,6 +229,23 @@
           '<p class="admin-message" role="status"></p>'+
         '</div>'+
         '</article>';
+    }
+
+    const customerGroups=new Map();
+    filtered.forEach(function(order){
+      const key=String(order.customer_id||order.contact_email||order.contact_phone||order.id);
+      if(!customerGroups.has(key))customerGroups.set(key,{key:key,orders:[]});
+      customerGroups.get(key).orders.push(order);
+    });
+    list.innerHTML=Array.from(customerGroups.values()).map(function(group){
+      const first=group.orders[0];
+      const pending=group.orders.filter(function(order){return ['New','File Review','Processing','Payment Pending'].includes(order.status)||order.payment_status==='PENDING';}).length;
+      const name=first.contact_name||'Customer';
+      const contact=[first.contact_phone,first.contact_email].filter(Boolean).join(' · ');
+      return '<details class="admin-customer-folder">'+
+        '<summary><span class="admin-customer-folder-main"><b>'+escape(name)+'</b><small>'+escape(contact||'Contact details not available')+'</small></span>'+
+        '<span class="admin-customer-folder-count">'+group.orders.length+' order'+(group.orders.length===1?'':'s')+(pending?' · '+pending+' pending':'')+'</span></summary>'+
+        '<div class="admin-customer-orders">'+group.orders.map(renderOrderCard).join('')+'</div></details>';
     }).join('');
     loadAdminAirbagPhotoPreviews();
   }
@@ -487,9 +506,10 @@
   const contentQuoteField=siteContentForm?.elements.namedItem('advertising_quote_id');
   function updateAdQuoteRequirement(){
     if(!contentQuoteField)return;
-    const required=contentKindField?.value==='ad'&&contentPublishedField?.checked;
-    contentQuoteField.required=Boolean(required);
-    contentQuoteField.setCustomValidity(required&&!contentQuoteField.value?'Select a paid quote before publishing an advertisement.':'');
+    // Directly managed advertisements may be published after admin review without an online quote.
+    // If a paid quote is linked, the database trigger still verifies payment and the schedule.
+    contentQuoteField.required=false;
+    contentQuoteField.setCustomValidity('');
   }
   contentKindField?.addEventListener('change',updateAdQuoteRequirement);
   contentPublishedField?.addEventListener('change',updateAdQuoteRequirement);
@@ -571,6 +591,104 @@
     finally { button.disabled=false; }
   });
 
+  const softwareProductForm=document.querySelector('#software-product-form');
+  const softwareProductList=document.querySelector('#software-product-list');
+  const softwareProductMessage=document.querySelector('#software-product-message');
+  function resetSoftwareProductForm(){if(!softwareProductForm)return;softwareProductForm.reset();softwareProductForm.elements.namedItem('id').value='';softwareProductForm.elements.namedItem('sort_order').value='100';softwareProductForm.querySelector('button[type="submit"]').textContent='Save software listing →';document.querySelector('#software-product-cancel').hidden=true;}
+  async function loadSoftwareProducts(){
+    if(!softwareProductList)return;
+    try{
+      const result=await adminApi('/api/admin/software-products');
+      softwareProductList.innerHTML=(result.items||[]).map(item=>'<article class="admin-order-card" style="padding:14px;margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><span class="form-kicker">'+escape(item.is_published?'PUBLISHED':'DRAFT / HIDDEN')+' · '+escape(item.version||'No version')+'</span><h3>'+escape(item.title)+'</h3><p>'+escape(item.description||'')+'</p><strong>'+escape((Number(item.price_paise||0)/100).toLocaleString('en-IN',{style:'currency',currency:item.currency||'INR'}))+'</strong></div><div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap"><button type="button" class="button button-ghost" data-edit-software="'+escape(item.id)+'">Edit</button><button type="button" class="button button-ghost" data-publish-software="'+escape(item.id)+'" data-published="'+String(Boolean(item.is_published))+'">'+(item.is_published?'Hide':'Publish')+'</button></div></div></article>').join('')||'<p>No software listings yet. Add the first listing above.</p>';
+      updateAdminFolderBadges();
+      softwareProductList.querySelectorAll('[data-edit-software]').forEach(button=>button.addEventListener('click',()=>{const item=(result.items||[]).find(x=>x.id===button.dataset.editSoftware);if(!item)return;const set=(name,value)=>{const f=softwareProductForm.elements.namedItem(name);if(f)f.value=value??'';};set('id',item.id);set('title',item.title);set('version',item.version);set('price',(Number(item.price_paise||0)/100).toFixed(2));set('sort_order',item.sort_order);set('description',item.description);set('image_url',item.image_url);set('product_url',item.product_url);set('contact_url',item.contact_url);softwareProductForm.elements.namedItem('is_published').checked=Boolean(item.is_published);softwareProductForm.querySelector('button[type="submit"]').textContent='Update software listing →';document.querySelector('#software-product-cancel').hidden=false;softwareProductMessage.textContent='Editing '+item.title;softwareProductForm.scrollIntoView({behavior:'smooth',block:'start'});}));
+      softwareProductList.querySelectorAll('[data-publish-software]').forEach(button=>button.addEventListener('click',async()=>{button.disabled=true;try{await adminApi('/api/admin/software-products',{method:'PATCH',body:JSON.stringify({id:button.dataset.publishSoftware,is_published:button.dataset.published!=='true'})});await loadSoftwareProducts();softwareProductMessage.textContent='Software listing visibility updated.';}catch(error){softwareProductMessage.textContent=error.message;softwareProductMessage.classList.add('admin-error');}finally{button.disabled=false;}}));
+    }catch(error){softwareProductList.textContent=error.message;}
+  }
+  document.querySelector('#software-product-cancel')?.addEventListener('click',resetSoftwareProductForm);
+  softwareProductForm?.addEventListener('submit',async event=>{
+    event.preventDefault();const button=softwareProductForm.querySelector('button[type="submit"]');button.disabled=true;softwareProductMessage.classList.remove('admin-error');softwareProductMessage.textContent='Saving software listing…';
+    try{
+      const data=new FormData(softwareProductForm),priceText=String(data.get('price')||'').trim();
+      if(!/^\d+(?:\.\d{1,2})?$/.test(priceText))throw new Error('Enter a valid price with up to two decimal places.');
+      const parts=priceText.split('.'),pricePaise=Number(parts[0])*100+Number((parts[1]||'').padEnd(2,'0'));
+      if(!Number.isSafeInteger(pricePaise)||pricePaise<0)throw new Error('Enter a valid non-negative price.');
+      const id=String(data.get('id')||'').trim(),payload={title:data.get('title'),version:data.get('version'),description:data.get('description'),price_paise:pricePaise,sort_order:Number(data.get('sort_order')||100),image_url:data.get('image_url'),product_url:data.get('product_url'),contact_url:data.get('contact_url'),is_published:data.get('is_published')==='on'};
+      if(id)payload.id=id;
+      await adminApi('/api/admin/software-products',{method:id?'PATCH':'POST',body:JSON.stringify(payload)});
+      resetSoftwareProductForm();softwareProductMessage.textContent='Software listing saved.';await loadSoftwareProducts();
+    }catch(error){softwareProductMessage.textContent=error.message;softwareProductMessage.classList.add('admin-error');}
+    finally{button.disabled=false;}
+  });
+
+
+  let adminRequestRows = [];
+  function setFolderBadge(key, count) {
+    const value=Math.max(0,Number(count)||0);
+    document.querySelectorAll('[data-admin-folder-badge="'+key+'"]').forEach(function(b){b.textContent=value>99?'99+':String(value);b.hidden=value===0;});
+  }
+  function updateAdminFolderBadges() {
+    const pendingOrders=orders.filter(function(o){return ['New','File Review','Processing','Payment Pending'].includes(o.status)||o.payment_status==='PENDING';}).length;
+    const openRequests=adminRequestRows.filter(function(r){return ['open','in_review','waiting_for_customer'].includes(r.status||'open');}).length;
+    const adItems=document.querySelectorAll('#advertising-inquiry-list .admin-order-card').length;
+    const softwareItems=document.querySelectorAll('#software-product-list .admin-order-card').length;
+    setFolderBadge('orders',pendingOrders);setFolderBadge('advertising',adItems);setFolderBadge('software',softwareItems);setFolderBadge('requirements',openRequests);setFolderBadge('notifications',pendingOrders+adItems+openRequests);
+    const list=document.querySelector('#admin-notifications-list');if(!list)return;list.replaceChildren();
+    [['orders','Customer orders awaiting work',pendingOrders],['advertising','Advertising enquiries to review',adItems],['requirements','Open customer requirements',openRequests]].forEach(function(entry){
+      const row=document.createElement('button');row.type='button';row.className='admin-notification-row';const label=document.createElement('span');label.textContent=entry[1];const count=document.createElement('strong');count.textContent=String(entry[2]);row.append(label,count);
+      row.addEventListener('click',function(){const target=document.querySelector('[data-admin-folder="'+entry[0]+'"]');if(target){target.open=true;target.scrollIntoView({behavior:'smooth',block:'start'});}});list.append(row);
+    });
+    if(!pendingOrders&&!adItems&&!openRequests){const empty=document.createElement('p');empty.className='muted';empty.textContent='No pending items are currently counted. Refresh each folder to check again.';list.append(empty);}
+  }
+  function setupAdminFolders() {
+    const dashboard=document.querySelector('#admin-dashboard');if(!dashboard||dashboard.dataset.folderized==='true')return;
+    const title=dashboard.querySelector('.admin-title');if(!title)return;dashboard.dataset.folderized='true';
+    const nav=document.createElement('nav');nav.className='admin-folder-nav';nav.setAttribute('aria-label','Admin workspace folders');
+    const grid=document.createElement('div');grid.className='admin-folder-grid';
+    const requests=document.createElement('section');requests.className='pricing-settings admin-customer-requests';
+    requests.innerHTML='<div><span class="form-kicker">CUSTOMER INBOX</span><h2>Customer requirements</h2><p>Private requests from customers. Only authorized administrators can review and reply.</p></div><p id="admin-customer-requests-message" class="admin-message" role="status">Loading customer requirements…</p><div id="admin-customer-requests-list" class="admin-order-list"></div>';
+    const notifications=document.createElement('section');notifications.className='admin-notifications-panel';
+    notifications.innerHTML='<span class="form-kicker">WORK QUEUE</span><h2>Notifications & pending work</h2><p>Counts summarize current pending queues. Open a folder to review the actual records.</p><div id="admin-notifications-list" class="admin-notifications-list"></div>';
+    const defs=[{key:'orders',title:'Customer Orders',nodes:[]},{key:'advertising',title:'Announcements & Advertising',nodes:[]},{key:'software',title:'Software Store',nodes:[]},{key:'requirements',title:'Customer Requirements',nodes:[requests]},{key:'settings',title:'Pricing & Website Settings',nodes:[]},{key:'notifications',title:'Notifications',nodes:[notifications]}];
+    const pick=function(selector){return dashboard.querySelector(selector);};
+    defs.find(x=>x.key==='orders').nodes=[pick('.admin-dashboard-controls'),...Array.from(dashboard.querySelectorAll('.admin-analytics-section')),pick('#orders-message'),pick('#order-list')].filter(Boolean);
+    defs.find(x=>x.key==='advertising').nodes=[pick('[aria-labelledby="site-content-title"]')].filter(Boolean);
+    defs.find(x=>x.key==='software').nodes=[pick('[aria-labelledby="software-products-title"]')].filter(Boolean);
+    defs.find(x=>x.key==='settings').nodes=[pick('[aria-labelledby="pricing-settings-title"]'),pick('[aria-labelledby="public-contact-title"]')].filter(Boolean);
+    defs.forEach(function(def){
+      const details=document.createElement('details');details.className='admin-folder';details.dataset.adminFolder=def.key;details.open=def.key==='orders';
+      const summary=document.createElement('summary');const label=document.createElement('span');label.className='admin-folder-title';label.textContent=def.title;
+      const badge=document.createElement('span');badge.className='admin-folder-badge';badge.dataset.adminFolderBadge=def.key;badge.hidden=true;badge.textContent='0';summary.append(label,badge);details.append(summary);
+      const content=document.createElement('div');content.className='admin-folder-content';details.append(content);def.nodes.forEach(function(node){content.append(node);});grid.append(details);
+      const shortcut=document.createElement('button');shortcut.type='button';shortcut.className='admin-folder-shortcut';shortcut.dataset.adminFolderOpen=def.key;
+      const shortcutLabel=document.createElement('span');shortcutLabel.textContent=def.title;const shortcutBadge=document.createElement('span');shortcutBadge.className='admin-folder-badge';shortcutBadge.dataset.adminFolderBadge=def.key;shortcutBadge.hidden=true;shortcutBadge.textContent='0';shortcut.append(shortcutLabel,shortcutBadge);
+      shortcut.addEventListener('click',function(){details.open=true;details.scrollIntoView({behavior:'smooth',block:'start'});});nav.append(shortcut);
+    });
+    title.after(nav,grid);updateAdminFolderBadges();
+  }
+  async function loadAdminCustomerRequests() {
+    const list=document.querySelector('#admin-customer-requests-list'),status=document.querySelector('#admin-customer-requests-message');if(!list||!status)return;
+    status.classList.remove('admin-error');status.textContent='Loading customer requirements…';
+    try{
+      const rows=await backend.rest('forum_customer_requests?select=id,user_id,request_type,title,body,status,admin_reply,created_at,updated_at&order=created_at.asc&limit=200');
+      adminRequestRows=Array.isArray(rows)?rows:[];list.replaceChildren();
+      if(!adminRequestRows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='No customer requirements have been submitted yet.';list.append(empty);}
+      adminRequestRows.forEach(function(row){
+        const card=document.createElement('article');card.className='admin-order-card admin-request-card';
+        const type=document.createElement('span');type.className='form-kicker';type.textContent=({suggestion:'SUGGESTION / GENERAL',service_requirement:'SERVICE REQUIREMENT',feature_request:'WEBSITE FEATURE',software_requirement:'SOFTWARE REQUIREMENT',wiring_diagram:'WIRING DIAGRAM',issue:'CUSTOMER ISSUE',other:'OTHER'})[row.request_type]||'CUSTOMER REQUEST';
+        const heading=document.createElement('h3');heading.textContent=row.title||'Customer request';
+        const meta=document.createElement('p');meta.textContent='Request '+String(row.id||'').slice(0,8)+' · '+new Date(row.created_at).toLocaleString('en-IN')+' · '+String(row.status||'open').replace(/_/g,' ');
+        const body=document.createElement('p');body.className='admin-request-body';body.textContent=row.body||'';
+        const reply=document.createElement('textarea');reply.maxLength=4000;reply.rows=3;reply.className='admin-request-reply';reply.placeholder='Private reply to customer';reply.value=row.admin_reply||'';
+        const statusSelect=document.createElement('select');statusSelect.className='admin-request-status';['open','in_review','waiting_for_customer','resolved','closed'].forEach(function(value){const option=document.createElement('option');option.value=value;option.textContent=value.replace(/_/g,' ');statusSelect.append(option);});statusSelect.value=row.status||'open';
+        const save=document.createElement('button');save.type='button';save.className='button button-dark';save.textContent='Save reply & status';
+        save.addEventListener('click',async function(){save.disabled=true;status.textContent='Saving private reply…';status.classList.remove('admin-error');try{await backend.rest('forum_customer_requests?id=eq.'+encodeURIComponent(row.id),{method:'PATCH',body:{admin_reply:reply.value.trim(),status:statusSelect.value,updated_at:new Date().toISOString()},prefer:'return=minimal'});status.textContent='Private reply saved.';await loadAdminCustomerRequests();}catch(error){status.textContent=error.message||'Could not save the reply.';status.classList.add('admin-error');}finally{save.disabled=false;}});
+        card.append(type,heading,meta,body,reply,statusSelect,save);list.append(card);
+      });
+      updateAdminFolderBadges();
+    }catch(error){adminRequestRows=[];list.replaceChildren();const empty=document.createElement('p');empty.className='admin-message admin-error';empty.textContent='Customer requests could not load. Apply the forum live desk migration after reviewing it, then refresh.';list.append(empty);status.textContent=error.message||'Request inbox unavailable.';status.classList.add('admin-error');updateAdminFolderBadges();}
+  }
+
   async function enterAdmin(){
     const session = backend.getSession();
     if (!session?.user) { setSignedOut(); return; }
@@ -582,11 +700,14 @@
     deniedPanel.hidden = true;
     dashboard.hidden = false;
     document.querySelector('#admin-signout').hidden = false;
+    setupAdminFolders();
     await loadPricing();
     await loadOrders();
     await loadAdvertisingInquiries();
     await loadAdvertisingQuotes();
     await loadSiteContent();
+    await loadSoftwareProducts();
+    await loadAdminCustomerRequests();
     await loadPublicContactSettings();
     subscribeRealtime();
   }

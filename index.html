@@ -102,6 +102,9 @@
       <aside class="order-aside"><div class="summary-top"><span>REQUEST SUMMARY</span><span class="summary-live"><i></i> LIVE</span></div><div class="summary-category"><span class="summary-symbol">▦</span><div><small>SYSTEM</small><b class="sum-category">ECU</b></div></div><div class="summary-divider"></div><div class="summary-item"><small>VEHICLE</small><b class="sum-vehicle">Add vehicle details</b></div><div class="summary-item"><small>MODULE</small><b class="sum-module">Not specified</b></div><div class="summary-item"><small>FILE SERVICES</small><div class="sum-services"><span class="sum-empty">Choose services to see them here</span></div></div><div class="summary-item"><small>FILE VERIFICATION</small><b class="sum-verification">Not selected</b></div><div class="summary-divider"></div><div class="summary-item"><small>ORIGINAL FILE</small><b class="sum-file">No file attached</b></div><div class="summary-total"><span>QUOTE</span><b>After review <span>↗</span></b></div><p class="summary-foot">The File Verification fee is shown separately; other service pricing is confirmed after review.</p><div class="aside-contact"><span class="aside-avatar">E</span><span><small>NEED A HAND?</small><b>Our team can help</b></span></div></aside></div>
     </section>
 
+<section class="section software-home-section" id="software-store" aria-labelledby="software-store-title">
+<div class="section-heading"><div><span class="section-eyebrow">SOFTWARE & WORKSHOP TOOLS</span><h2 id="software-store-title">Software Store</h2><p>Browse software listings published by ECU SOLUTION. Product details and prices are maintained by the admin.</p></div><a class="button button-ghost" href="/store.html">View all listings ↗</a></div>
+<div id="homepage-software-grid" class="software-home-grid" aria-live="polite"><article class="software-home-empty">Loading software listings…</article></div></section>
 <section class="home-community-section" id="workshop-community">
       <div class="home-community-copy"><span class="quick-kicker">WORKSHOP COMMUNITY</span><h2>Live workshop desk.<br><span>Search the knowledge.</span></h2><p>Join real discussions, ask questions and search past topics by DTC, ECU family, vehicle or symptom. New community? Be the first to start a useful discussion.</p><div class="home-community-actions"><a class="button button-lime" href="/forum.html#live-chat">Open live chat <span>↗</span></a><a class="button button-ghost" href="/forum.html#topics-heading">Search forum history <span>⌕</span></a></div><small>Member counts and conversations are real; no fake member activity is displayed.</small></div>
       <div class="home-community-panel"><div class="community-panel-head"><span class="live-pulse"></span><strong>COMMUNITY DESK</strong><span>PUBLIC TOPICS</span></div><div class="community-sample"><b>01</b><div><strong>Search previous workshop cases</strong><p>Filter by DTC, ECU, vehicle and solved status.</p></div></div><div class="community-sample"><b>02</b><div><strong>Ask the community</strong><p>Post a real question and receive replies from members.</p></div></div><div class="community-sample"><b>03</b><div><strong>Community Assistant</strong><p>Clearly labelled automated guidance, never impersonating a technician.</p></div></div><a class="community-all-link" href="/forum.html">Go to workshop community <span>↗</span></a></div>
@@ -166,6 +169,47 @@
     }
   })();
   </script>
+
+  <style>
+    .software-home-section{padding-top:clamp(42px,6vw,76px);padding-bottom:clamp(42px,6vw,76px);background:#f3f6ee}
+    .software-home-section .section-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:24px}
+    .software-home-section .section-heading h2{font:700 clamp(30px,4vw,44px)/1.1 var(--display);letter-spacing:-.04em;margin:10px 0}
+    .software-home-section .section-heading p{max-width:620px;color:#66716a;line-height:1.75;font-size:13px;margin:0}
+    .section-eyebrow{font:10px var(--mono);letter-spacing:.14em;color:#758b2c}
+    .software-home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:16px}
+    .software-home-card{min-width:0;background:#fff;border:1px solid #dfe6d8;padding:18px;display:flex;flex-direction:column;gap:10px}
+    .software-home-card img{width:100%;height:150px;object-fit:contain;background:#f7f9f4}
+    .software-home-card h3{font:700 19px/1.3 var(--display);margin:0;overflow-wrap:anywhere}
+    .software-home-card p{font-size:12px;line-height:1.7;color:#66716a;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+    .software-home-card .software-price{font-size:22px;font-weight:800;color:#253b29;margin-top:auto}
+    .software-home-card .software-version{font:10px var(--mono);letter-spacing:.06em;color:#758b2c}
+    .software-home-card a{align-self:flex-start;margin-top:6px}
+    .software-home-empty{background:#fff;border:1px dashed #cfd9c8;padding:24px;color:#66716a;font-size:13px;line-height:1.8}
+  </style>
+  <script>
+  (function(){
+    const grid=document.getElementById('homepage-software-grid');if(!grid)return;
+    const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
+    const https=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch(_){return '';}};
+    fetch('/api/software-products',{headers:{Accept:'application/json'}}).then(r=>r.ok?r.json():Promise.reject()).then(data=>{
+      const items=Array.isArray(data.items)?data.items:[];
+      grid.replaceChildren();
+      if(!items.length){const empty=el('article','Software listings are being prepared. Please check back soon or contact ECU SOLUTION to ask about a specific tool.');empty.className='software-home-empty';grid.append(empty);return;}
+      items.slice(0,6).forEach(item=>{
+        const card=el('article');card.className='software-home-card';
+        const image=https(item.image_url);if(image){const img=el('img');img.src=image;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';card.append(img);}
+        const version=el('span',item.version?'VERSION '+item.version:'SOFTWARE LISTING');version.className='software-version';card.append(version);
+        card.append(el('h3',item.title||'Software'));
+        if(item.description)card.append(el('p',item.description));
+        const price=el('div',new Intl.NumberFormat('en-IN',{style:'currency',currency:item.currency||'INR',maximumFractionDigits:2}).format(Number(item.price_paise||0)/100));price.className='software-price';card.append(price);
+        const target=https(item.contact_url)||https(item.product_url);
+        if(target){const link=el('a',item.contact_url?'Enquire to purchase ↗':'Product details ↗');link.href=target;link.target='_blank';link.rel='noopener noreferrer';link.className='button button-dark';card.append(link);}
+        grid.append(card);
+      });
+    }).catch(()=>{grid.replaceChildren();const empty=el('article','Software listings are temporarily unavailable. Please try again later.');empty.className='software-home-empty';grid.append(empty);});
+  })();
+  </script>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase.js?v=ba583d0"></script><script src="auth.js?v=payment-recovery-feedback-20261017"></script><script src="app.js?v=payment-recovery-feedback-20261017"></script>
 </body>
 </html>
