@@ -586,7 +586,7 @@
   }
   document.querySelector('#software-product-cancel')?.addEventListener('click',resetSoftwareProductForm);
   softwareProductForm?.addEventListener('submit',async event=>{
-    event.preventDefault();const button=softwareProductForm.querySelector('button[type="submit]');button.disabled=true;softwareProductMessage.classList.remove('admin-error');softwareProductMessage.textContent='Saving software listing…';
+    event.preventDefault();const button=softwareProductForm.querySelector('button[type="submit"]');button.disabled=true;softwareProductMessage.classList.remove('admin-error');softwareProductMessage.textContent='Saving software listing…';
     try{
       const data=new FormData(softwareProductForm),priceText=String(data.get('price')||'').trim();
       if(!/^\d+(?:\.\d{1,2})?$/.test(priceText))throw new Error('Enter a valid price with up to two decimal places.');
