@@ -57,3 +57,17 @@
 .forum-chat-message{grid-template-columns:minmax(0,1fr) auto;gap:7px;padding:10px}.forum-chat-message-head{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:space-between}
 .forum-chat-message p{grid-column:1/-1}.forum-chat-message .chat-reply-button{grid-column:2;grid-row:2}.forum-chat-message .chat-reply-reference{grid-column:1/-1;margin-top:0}
 .forum-request-form,.forum-request-list{grid-template-columns:minmax(0,1fr)}.forum-request-form label:nth-child(3){grid-column:auto}.forum-request-form button{width:100%}.forum-request-card-head{align-items:flex-start}}
+
+/* Three distinct private request forms for general suggestions, software, and wiring diagrams. */
+.forum-request-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}
+.forum-request-type-card{min-width:0;border:1px solid #dfe6db;border-radius:7px;padding:16px;background:#fff;display:flex;flex-direction:column;gap:10px}
+.forum-request-type-card h3{font:750 18px/1.3 var(--display);margin:0;overflow-wrap:anywhere}
+.forum-request-type-card>p{font-size:12px;line-height:1.65;color:#66716a;margin:0;min-height:40px}
+.request-card-number{font:10px var(--mono);letter-spacing:.12em;color:#829b2e}
+.forum-request-type-card .forum-request-form{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.forum-request-type-card .forum-request-form label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:750}
+.forum-request-type-card .forum-request-form input,.forum-request-type-card .forum-request-form textarea{width:100%;box-sizing:border-box;border:1px solid #d8e0d4;background:#fbfcf8;color:#19231e;padding:10px;font:13px/1.6 var(--sans);border-radius:4px}
+.forum-request-type-card .forum-request-form textarea{resize:vertical;min-height:100px}
+.forum-request-type-card .forum-request-form button{align-self:flex-start;margin-top:auto}
+@media(max-width:980px){.forum-request-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.forum-request-cards{grid-template-columns:1fr}.forum-request-type-card>p{min-height:0}.forum-request-type-card .forum-request-form button{width:100%}}
