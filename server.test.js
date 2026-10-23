@@ -1707,7 +1707,7 @@ test('advertising quote/payment schema is isolated, constrained, and server-role
 });
 
 
-test('advertising quote flow keeps tokens out of URLs and verifies Razorpay payments server-side', () => {
+test('optional legacy advertising quote flow keeps tokens out of URLs and verifies Razorpay payments server-side', () => {
   const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   const quotePage = fs.readFileSync(path.join(__dirname, 'advertising-quote.html'), 'utf8');
   const adminPage = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
@@ -1715,6 +1715,7 @@ test('advertising quote flow keeps tokens out of URLs and verifies Razorpay paym
   const finalizer = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180100_finalize_advertising_payment.sql'), 'utf8');
   const publicationGuard = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180300_paid_ad_publication_guard.sql'), 'utf8');
   const lifecycleGuard = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261020180400_advertising_lifecycle_guard.sql'), 'utf8');
+  const optionalAdPublication = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261023_forum_live_desk.sql'), 'utf8');
   assert.match(serverSource, /url\.pathname === '\/api\/admin\/advertising\/quotes'/);
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/quote'/);
   assert.match(serverSource, /url\.pathname === '\/api\/advertising\/payment\/create-order'/);
@@ -1724,12 +1725,13 @@ test('advertising quote flow keeps tokens out of URLs and verifies Razorpay paym
   assert.match(serverSource, /rpc\/efsi_finalize_advertising_payment/);
   assert.match(serverSource, /status:'creating'/);
   assert.match(serverSource, /STALE_ORDER_CREATION/);
-  assert.match(serverSource, /A paid advertising quote is required before publishing an advertisement/);
+  assert.match(serverSource, /url\.pathname === '\/api\/admin\/site-content'/);
+  assert.doesNotMatch(serverSource, /A paid advertising quote is required before publishing an advertisement/);
   assert.match(quotePage, /history\.replaceState/);
   assert.ok(quotePage.includes("api('/api/advertising/quote'"));
   assert.ok(quotePage.includes("api('/api/advertising/payment/reconcile'"));
-  assert.match(adminPage, /advertising-quote-form/);
-  assert.match(adminSource, /data-issue-quote/);
+  assert.match(adminPage, /site-content-form/)
+  assert.match(adminSource, /site-content-form/)
   assert.match(finalizer, /for update/i);
   assert.match(finalizer, /status = 'verified'/i);
   assert.match(finalizer, /status = 'paid'/i);
