@@ -86,11 +86,11 @@
 
 
 <section class="section software-home-section" id="software-store" aria-labelledby="software-store-title">
-<div class="section-heading"><div><span class="section-eyebrow">SOFTWARE & WORKSHOP TOOLS</span><h2 id="software-store-title">Software Store</h2><p>Browse software listings published by ECU SOLUTION. Product details and prices are maintained by the admin.</p></div><a class="button button-ghost" href="/store.html">View all listings ↗</a></div>
+<div class="section-heading"><div><span class="section-eyebrow">SOFTWARE & WORKSHOP TOOLS</span><h2 id="software-store-title">Software Store</h2><p>Browse software listings published by the site team. Product details and prices are maintained by the admin.</p></div><a class="button button-ghost" href="/store.html">View all listings ↗</a></div>
 <div id="homepage-software-grid" class="software-home-grid" aria-live="polite"><article class="software-home-empty">Loading software listings…</article></div></section>
 
     <section class="quick-service-strip quick-request-strip" aria-label="Customer requirements">
-      <div class="quick-service-heading"><span class="quick-kicker">DIRECT TO ECU SOLUTION</span><h2>Requirements &amp; support</h2><p>Send your needs directly to the admin. Private requests require sign-in.</p></div>
+      <div class="quick-service-heading"><span class="quick-kicker">PRIVATE REQUESTS TO OUR TEAM</span><h2>Requirements &amp; support</h2><p>Send your needs directly to the admin. Private requests require sign-in.</p></div>
       <a class="quick-service-card quick-request-card" href="/forum.html#request-suggestion"><span class="quick-service-icon">01 · CUSTOMER REQUESTS</span><strong>Requirements &amp; suggestions</strong><span>Website feedback, service requirements, complaints or ideas.</span><b>Send a suggestion <span aria-hidden="true">↗</span></b></a>
       <a class="quick-service-card quick-request-card" href="/forum.html#request-wiring"><span class="quick-service-icon">02 · WIRING SUPPORT</span><strong>Wiring diagram requirements</strong><span>Request wiring diagrams, connector pinouts or vehicle/ECU wiring details.</span><b>Request wiring details <span aria-hidden="true">↗</span></b></a>
       <a class="quick-service-card quick-request-card" href="/forum.html#request-software"><span class="quick-service-icon">03 · SOFTWARE REQUESTS</span><strong>Software requirements</strong><span>Request a software tool, version, utility or ECU coverage for the catalogue.</span><b>Request software <span aria-hidden="true">↗</span></b></a>
@@ -109,7 +109,7 @@
     </section>
 
 <section class="section homepage-forum-section" id="workshop-forum-preview" aria-labelledby="homepage-forum-title">
-  <div class="section-heading"><div><span class="section-eyebrow">WORKSHOP COMMUNITY</span><h2 id="homepage-forum-title">Workshop Forum</h2><p>Recent workshop discussions, live desk messages and private requests to ECU SOLUTION.</p></div><a class="button button-dark" href="/forum.html">Open full forum ↗</a></div>
+  <div class="section-heading"><div><span class="section-eyebrow">WORKSHOP COMMUNITY</span><h2 id="homepage-forum-title">Workshop Forum</h2><p>Recent workshop discussions, live desk messages and private requests to the site team.</p></div><a class="button button-dark" href="/forum.html">Open full forum ↗</a></div>
   <div class="homepage-forum-frame"><iframe src="/forum.html" title="ECU File Service India Workshop Forum" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
 </section><section class="home-community-section" id="workshop-community">
       <div class="home-community-copy"><span class="quick-kicker">WORKSHOP COMMUNITY</span><h2>Live workshop desk.<br><span>Search the knowledge.</span></h2><p>Join real discussions, ask questions and search past topics by DTC, ECU family, vehicle or symptom. New community? Be the first to start a useful discussion.</p><div class="home-community-actions"><a class="button button-lime" href="/forum.html#live-chat">Open live chat <span>↗</span></a><a class="button button-ghost" href="/forum.html#topics-heading">Search forum history <span>⌕</span></a></div><small>Member counts and conversations are real; no fake member activity is displayed.</small></div>
@@ -252,7 +252,7 @@
     fetch('/api/software-products',{headers:{Accept:'application/json'}}).then(r=>r.ok?r.json():Promise.reject()).then(data=>{
       const items=Array.isArray(data.items)?data.items:[];
       grid.replaceChildren();
-      if(!items.length){const empty=el('article','Software listings are being prepared. Please check back soon or contact ECU SOLUTION to ask about a specific tool.');empty.className='software-home-empty';grid.append(empty);return;}
+      if(!items.length){const empty=el('article','Software listings are being prepared. Please check back soon or contact the site team to ask about a specific tool.');empty.className='software-home-empty';grid.append(empty);return;}
       items.slice(0,6).forEach(item=>{
         const card=el('article');card.className='software-home-card';
         const image=https(item.image_url);if(image){const img=el('img');img.src=image;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';card.append(img);}
