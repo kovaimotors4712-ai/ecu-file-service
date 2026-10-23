@@ -143,3 +143,86 @@
 #site-content-list button.button-ghost:focus-visible{outline:3px solid #829a32;outline-offset:2px}
 .admin-section-help{margin:8px 0 18px;color:#344239;font-size:13px;line-height:1.7;max-width:900px}
 @media(max-width:560px){#site-content-list .admin-order-card>div>div:last-child{width:100%;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px!important}#site-content-list button.button-ghost{width:100%;padding:9px 5px!important;font-size:12px;overflow-wrap:anywhere}}
+
+/* Final mobile admin contrast override: native selects and muted/disabled controls must remain readable. */
+.admin-page button,
+.admin-page input,
+.admin-page select,
+.admin-page textarea,
+.admin-page option,
+#admin-customer-requests button,
+#admin-customer-requests input,
+#admin-customer-requests select,
+#admin-customer-requests textarea,
+#site-content-form button,
+#site-content-form input,
+#site-content-form select,
+#site-content-form textarea,
+#site-content-list button,
+.admin-software-request-fields button,
+.admin-software-request-fields input,
+.admin-software-request-fields select,
+.admin-software-request-fields textarea {
+  font-family: inherit;
+}
+.admin-page select,
+.admin-page select option,
+#admin-customer-requests select,
+#admin-customer-requests select option,
+.admin-software-request-fields select,
+.admin-software-request-fields select option,
+#site-content-form select,
+#site-content-form select option {
+  color:#111a19 !important;
+  -webkit-text-fill-color:#111a19 !important;
+  background-color:#fff !important;
+  opacity:1 !important;
+  font-weight:700 !important;
+}
+.admin-page input,
+.admin-page textarea,
+#admin-customer-requests input,
+#admin-customer-requests textarea,
+.admin-software-request-fields input,
+.admin-software-request-fields textarea,
+#site-content-form input,
+#site-content-form textarea {
+  color:#111a19 !important;
+  -webkit-text-fill-color:#111a19 !important;
+  background-color:#fff !important;
+  font-weight:600 !important;
+  opacity:1 !important;
+}
+.admin-page .button-ghost,
+#admin-customer-requests .button-ghost,
+#site-content-form .button-ghost,
+#site-content-list .button-ghost,
+.admin-software-request-fields .button-ghost {
+  color:#111a19 !important;
+  -webkit-text-fill-color:#111a19 !important;
+  background:#fff !important;
+  border:2px solid #39473d !important;
+  font-weight:800 !important;
+  text-shadow:none !important;
+  opacity:1 !important;
+  filter:none !important;
+}
+.admin-page button:disabled,
+#admin-customer-requests button:disabled,
+#site-content-form button:disabled,
+#site-content-list button:disabled,
+.admin-software-request-fields button:disabled {
+  color:#26332b !important;
+  -webkit-text-fill-color:#26332b !important;
+  opacity:1 !important;
+  filter:none !important;
+}
+.admin-page input::placeholder,
+.admin-page textarea::placeholder,
+.admin-software-request-fields input::placeholder,
+#site-content-form input::placeholder,
+#site-content-form textarea::placeholder {
+  color:#59645d !important;
+  -webkit-text-fill-color:#59645d !important;
+  opacity:1 !important;
+}
