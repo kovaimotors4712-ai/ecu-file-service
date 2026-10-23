@@ -564,7 +564,7 @@
       const rows = await api.rest('forum_chat_messages?select=id,author_id,body,created_at,reply_to_message_id&order=created_at.desc&limit=100');
       const messages = Array.isArray(rows) ? rows.slice().reverse() : [];
       chatMessagesById = {}; messages.forEach(function(row){chatMessagesById[row.id]=row;});
-      const missing=Array.from(new Set(messages.map(function(row){return row.reply_to_message_id;}).filter(function(id){return id&&!chatMessagesById[id]&&validUuid(id);}));
+      const missing=Array.from(new Set(messages.map(function(row){return row.reply_to_message_id;}).filter(function(id){return id&&!chatMessagesById[id]&&validUuid(id);})));
       if(missing.length){try{const parents=await api.rest('forum_chat_messages?select=id,author_id,body,created_at&id=in.('+missing.join(',')+')');(Array.isArray(parents)?parents:[]).forEach(function(row){chatMessagesById[row.id]=row;});}catch(_){}}
       const ids=messages.map(function(row){return row.author_id;}).concat(Object.values(chatMessagesById).map(function(row){return row.author_id;}));
       const profiles=await profilesFor(ids); chatProfilesCache=profiles;
