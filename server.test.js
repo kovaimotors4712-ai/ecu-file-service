@@ -1900,3 +1900,17 @@ test('software requests expose an explicit pay and verified-download workflow', 
   assert.match(customer, /Download software ↗/);
   assert.match(grants, /grant delete on table public\.site_announcements to service_role/i);
 });
+
+
+test('software requests can create a server-side Razorpay payment link with admin auth', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const adminSource = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const customerSource = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  assert.match(serverSource, /handleAdminCreateSoftwarePaymentLink/);
+  assert.match(serverSource, /\/api\/admin\/software-requests\/payment-link/);
+  assert.match(serverSource, /notes:\{ request_id:requestId, software_product_id:String\(row\.software_product_id\), type:'software_purchase' \}/);
+  assert.match(serverSource, /software_status:'awaiting_payment', status:'waiting_for_customer'/);
+  assert.match(adminSource, /Generate Razorpay payment link & send Pay now/);
+  assert.match(adminSource, /adminApi\('\/api\/admin\/software-requests\/payment-link'/);
+  assert.match(customerSource, /Pay now ↗/);
+});
