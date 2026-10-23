@@ -602,7 +602,8 @@
     }catch(error){softwareProductMessage.textContent=error.message;softwareProductMessage.classList.add('admin-error');}
     finally{button.disabled=false;}
   });
-\n
+
+
   let adminRequestRows = [];
   function setFolderBadge(key, count) {
     const value=Math.max(0,Number(count)||0);
