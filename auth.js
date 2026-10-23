@@ -317,7 +317,7 @@
       if (requests) { requests.hidden = false; requests.scrollIntoView({block:'start',behavior:'smooth'}); }
     } else {
       const intro = document.querySelector('.account-intro');
-      if (intro) intro.textContent = 'Sign in to view your software requests, payment links and private replies from ECU SOLUTION.';
+      if (intro) intro.textContent = 'Sign in to view your software requests, payment links and private replies from the site team.';
     }
   }
   window.addEventListener('hashchange', openCustomerMessagesFromHash);
