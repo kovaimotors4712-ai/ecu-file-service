@@ -152,7 +152,7 @@
     list.replaceChildren();
     const loading=document.createElement('p');loading.className='muted';loading.textContent='Loading your private requests…';list.append(loading);
     try{
-      const rows=await rest('forum_customer_requests?select=id,request_type,title,body,status,admin_reply,created_at,updated_at&order=created_at.desc&limit=50');
+      const rows=await rest('forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,created_at,updated_at&order=created_at.desc&limit=50');
       list.replaceChildren();
       if(!Array.isArray(rows)||!rows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='No private requests yet. Use Request payment link on a software listing or send a request through the Forum.';list.append(empty);return;}
       const labels={software_requirement:'Software / payment-link request',wiring_diagram:'Wiring request',suggestion:'Suggestion',service_requirement:'Service request',feature_request:'Website feature',issue:'Support request',other:'Other request'};
@@ -166,7 +166,7 @@
         const body=document.createElement('p');body.textContent=item.body||'';
         const date=document.createElement('small');date.textContent='Submitted '+new Date(item.created_at).toLocaleString();
         card.append(head,title,body,date);
-        if(item.admin_reply){const reply=document.createElement('div');reply.className='customer-private-request-reply';const label=document.createElement('strong');label.textContent='ECU SOLUTION · MESSAGE';const text=document.createElement('p');text.textContent=item.admin_reply;reply.append(label,text);card.append(reply);}
+        if(item.customer_auto_reply){const reply=document.createElement('div');reply.className='customer-private-request-reply';const label=document.createElement('strong');label.textContent='AUTOMATIC CONFIRMATION';const text=document.createElement('p');text.textContent=item.customer_auto_reply;reply.append(label,text);card.append(reply);}if(item.admin_reply){const reply=document.createElement('div');reply.className='customer-private-request-reply';const label=document.createElement('strong');label.textContent='ECU SOLUTION · MESSAGE';const text=document.createElement('p');text.textContent=item.admin_reply;reply.append(label,text);card.append(reply);}
         list.append(card);
       });
     }catch(error){list.replaceChildren();const p=document.createElement('p');p.className='admin-message admin-error';p.textContent='Your private requests could not be loaded. '+(error.message||'Please retry.');list.append(p);}
