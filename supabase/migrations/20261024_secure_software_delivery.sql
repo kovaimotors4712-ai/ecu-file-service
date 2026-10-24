@@ -11,7 +11,7 @@ alter table public.forum_customer_requests
     software_delivery_path is null
     or (
       software_delivery_path like 'software-deliveries/%'
-      and software_delivery_path not like '%..%'
+      and position(chr(92) in software_delivery_path)=0
       and software_delivery_path not like '%\%'
     )
   );
