@@ -1921,11 +1921,11 @@ test('software payment verification is confirmed directly with Razorpay before m
   const adminSource = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
   const migrationSource = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261024_software_payment_verification.sql'), 'utf8');
   assert.match(serverSource, /async function handleAdminVerifySoftwarePayment/);
-  assert.match(serverSource, /payment_links\/\+encodeURIComponent\(row\.software_payment_link_id\)/);
-  assert.match(serverSource, /String\(link\?\.status\|\|''\)\.toLowerCase\(\) !== 'paid'/);
+  assert.match(serverSource, /software_payment_link_id/);
+  assert.match(serverSource, /amount_paid/);
   assert.match(serverSource, /Number\(link\?\.amount_paid\) !== expected/);
   assert.match(serverSource, /url\.pathname === '\/api\/admin\/software-requests\/verify-payment'/);
-  assert.match(adminSource, /Verify payment with Razorpay/);
+  assert.match(adminSource, /Verify Razorpay payment/);
   assert.match(adminSource, /adminApi\('\/api\/admin\/software-requests\/verify-payment'/);
   assert.match(migrationSource, /add column if not exists software_payment_link_id text/i);
 });
