@@ -231,7 +231,7 @@
               statuses.map(function(st){return '<option value="'+st+'" '+(order.status===st?'selected':'')+'>'+st+'</option>';}).join('')+
             '</select>'+
             '<button class="button button-ghost" type="button" onclick="window.openAdminMessages(\''+escape(order.id)+'\')">Customer Support Messages</button>'+
-            '<button class="button button-ghost admin-order-archive-action" type="button" data-order-id="'+escape(order.id)+'" data-archived="'+(order.admin_archived_at?'true':'false')+'">'+(order.admin_archived_at?'Restore order':'Archive order')+'</button>'+
+            '<button class="button button-ghost admin-order-archive-action" type="button" data-order-id="'+escape(order.id)+'" data-archived="'+(order.admin_archived_at?'true':'false')+'">'+(order.admin_archived_at?'Restore order':'Delete from active list')+'</button>'+
           '</div>'+
           '<p class="admin-message" role="status"></p>'+
         '</div>'+
@@ -280,8 +280,9 @@
       const orderId=archiveButton.getAttribute('data-order-id');
       const wasArchived=archiveButton.getAttribute('data-archived')==='true';
       if(!orderId)return;
+      if(!wasArchived&&!window.confirm('Remove this order from the active admin list? Payment, customer, and private file records will be retained and the order can be restored.'))return;
       archiveButton.disabled=true;
-      try{await backend.rest('rpc/efsi_admin_archive_order',{method:'POST',body:{p_order_id:orderId,p_archived:!wasArchived}});await loadOrders();document.querySelector('#orders-message').textContent=wasArchived?'Order restored to active list.':'Order archived. Payment and file records are retained.';}
+      try{await backend.rest('rpc/efsi_admin_archive_order',{method:'POST',body:{p_order_id:orderId,p_archived:!wasArchived}});await loadOrders();document.querySelector('#orders-message').textContent=wasArchived?'Order restored to active list.':'Order removed from active list. Payment and file records are retained.';}
       catch(error){document.querySelector('#orders-message').textContent='Archive update failed: '+(error.message||'Please retry.');document.querySelector('#orders-message').classList.add('admin-error');archiveButton.disabled=false;}
       return;
     }
