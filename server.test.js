@@ -1956,6 +1956,24 @@ test('software payment verification checks Razorpay paid status and exact amount
 });
 
 
+test('customer private requests have a guarded delete action and readable account controls', () => {
+  const customer = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, 'styles.css'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261024_customer_request_delete.sql'), 'utf8');
+  assert.match(customer, /forum_delete_own_customer_request/);
+  assert.match(customer, /Delete request/);
+  assert.match(customer, /Hide from history/);
+  assert.match(css, /#customer-private-request-list \.customer-request-delete[\s\S]*?background:#8b1e1e !important/);
+  assert.match(css, /#customer-private-request-history-toggle[\s\S]*?color:#17201e !important/);
+  assert.match(html, /styles\.css\?v=20261024-customer-actions/);
+  assert.match(html, /auth\.js\?v=20261024-customer-actions/);
+  assert.match(migration, /r\.user_id = auth\.uid\(\)/);
+  assert.match(migration, /software_payment_link_id is not null/);
+  assert.match(migration, /Use Hide from history instead/);
+});
+
+
 test('private software delivery requires customer ownership and a delivered file', () => {
   const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   const adminSource = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
