@@ -1891,13 +1891,13 @@ test('software requests expose an explicit pay and verified-download workflow', 
   const grants = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261024_grant_site_announcement_delete_service_role.sql'), 'utf8');
   assert.match(admin, /Add the payment link before this status/);
   assert.match(admin, /Mark the request Paid only after verifying payment/);
-  assert.match(admin, /Add the secure software download\/delivery link before marking Delivered/);
+  assert.match(admin, /Upload a private software file before marking Delivered/);
   assert.match(admin, /patch\.status=softwareStatus\.value==='awaiting_payment'\?'waiting_for_customer'/);
   assert.match(customer, /Payment required/);
   assert.match(customer, /Payment verified/);
   assert.match(customer, /Download available/);
   assert.match(customer, /Pay now ↗/);
-  assert.match(customer, /Download software ↗/);
+  assert.match(customer, /Download your file/);
   assert.match(grants, /grant delete on table public\.site_announcements to service_role/i);
 });
 
