@@ -145,7 +145,7 @@
     list.replaceChildren();
     const loading=document.createElement('p');loading.className='muted';loading.textContent='Loading your private requests…';list.append(loading);
     try{
-      const rows=await rest(`forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_url,software_delivery_path,software_delivery_name,created_at,updated_at,customer_hidden_at&customer_hidden_at=${showHiddenPrivateRequests?'not.is.null':'is.null'}&order=created_at.desc&limit=50`);
+      const rows=await rest(`forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_url,software_delivery_path,software_delivery_name,created_at,updated_at,customer_hidden_at&customer_hidden_at=${showHiddenPrivateRequests?'not.is.null':'is.null'}&status=neq.cancelled&order=created_at.desc&limit=50`);
       list.replaceChildren();
       if(!Array.isArray(rows)||!rows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent=showHiddenPrivateRequests?'No hidden private requests.':'No private requests yet. Use Request payment link on a software listing or send a request through the Forum.';list.append(empty);return;}
       const labels={software_requirement:'Software / payment-link request',wiring_diagram:'Wiring request',suggestion:'Suggestion',service_requirement:'Service request',feature_request:'Website feature',issue:'Support request',other:'Other request'};
