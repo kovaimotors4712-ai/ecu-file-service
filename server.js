@@ -1523,7 +1523,7 @@ async function handleCustomerSoftwareDownload(request, response) {
     if (!loaded.ok) { jsonResponse(response, 502, { error: 'Could not verify software delivery. Please retry.' }); return true; }
     const row = (await loaded.json())?.[0];
     if (!row || row.user_id !== customer.id || row.request_type !== 'software_requirement' || !row.software_product_id) { jsonResponse(response, 404, { error: 'Software delivery not found.' }); return true; }
-    if (!['paid','delivered'].includes(String(row.software_status || '').toLowerCase()) || !row.software_delivery_path) { jsonResponse(response, 403, { error: 'Payment verification and software delivery must be completed before download.' }); return true; }
+    if (String(row.software_status || '').toLowerCase() !== 'delivered' || !row.software_delivery_path) { jsonResponse(response, 403, { error: 'Payment verification and software delivery must be completed before download.' }); return true; }
     const objectPath = String(row.software_delivery_path);
     if (!objectPath.startsWith('software-deliveries/'+requestId+'/') || objectPath.includes('..') || objectPath.startsWith('/') || objectPath.includes(String.fromCharCode(92))) { jsonResponse(response, 409, { error: 'The saved software delivery path is invalid.' }); return true; }
     const signed = await supabaseRequest(serviceToken(), 'storage/v1/object/sign/private-ecu-files/'+objectPath.split('/').map(encodeURIComponent).join('/'), { method:'POST', body:{ expiresIn:60 }, timeoutMs:12000 });
