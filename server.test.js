@@ -1916,6 +1916,17 @@ test('software requests can create a server-side Razorpay payment link with admi
 });
 
 
+test('admin can delete advertiser enquiries only when no quote/payment history exists', () => {
+  const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  assert.match(server, /if \(request\.method === 'DELETE'\) \{[\s\S]*?advertising_quotes\?inquiry_id=eq\./);
+  assert.match(server, /This enquiry has quote or payment history/);
+  assert.match(admin, /Delete enquiry/);
+  assert.match(admin, /data-delete-inquiry-id/);
+  assert.match(admin, /Permanently delete this advertiser enquiry/);
+});
+
+
 test('software payment verification is confirmed directly with Razorpay before marking Paid', () => {
   const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   const adminSource = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
