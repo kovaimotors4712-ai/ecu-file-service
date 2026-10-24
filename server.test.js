@@ -1916,6 +1916,21 @@ test('software requests can create a server-side Razorpay payment link with admi
 });
 
 
+test('software payment verification is confirmed directly with Razorpay before marking Paid', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const adminSource = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const migrationSource = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261024_software_payment_verification.sql'), 'utf8');
+  assert.match(serverSource, /async function handleAdminVerifySoftwarePayment/);
+  assert.match(serverSource, /payment_links\/\+encodeURIComponent\(row\.software_payment_link_id\)/);
+  assert.match(serverSource, /String\(link\?\.status\|\|''\)\.toLowerCase\(\)!=='paid'/);
+  assert.match(serverSource, /Number\(link\?\.amount_paid\)<expected/);
+  assert.match(serverSource, /url\.pathname === '\/api\/admin\/software-requests\/verify-payment'/);
+  assert.match(adminSource, /Verify payment with Razorpay/);
+  assert.match(adminSource, /adminApi\('\/api\/admin\/software-requests\/verify-payment'/);
+  assert.match(migrationSource, /add column if not exists software_payment_link_id text/i);
+});
+
+
 test('admin controls enforce readable contrast and cache-busted current assets', () => {
   const adminCss = fs.readFileSync(path.join(__dirname, 'admin.css'), 'utf8');
   const adminHtml = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
