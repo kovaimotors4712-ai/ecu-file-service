@@ -1480,6 +1480,36 @@ async function handleAdminCreateSoftwarePaymentLink(request, response) {
   return true;
 }
 
+
+async function handleCustomerSoftwareDownload(request, response) {
+  if (request.method !== 'POST') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
+  try {
+    const customer = await requireCustomer(request);
+    if (!customer) { jsonResponse(response, 401, { error: 'Please sign in to download your software.' }); return true; }
+    const body = await readJson(request);
+    const requestId = String(body?.requestId || '');
+    if (!/^[0-9a-f-]{36}$/i.test(requestId)) { jsonResponse(response, 400, { error: 'Invalid software request reference.' }); return true; }
+    if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error: 'Secure software delivery is temporarily unavailable.' }); return true; }
+    const loaded = await supabaseRequest(serviceToken(), 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,user_id,request_type,software_product_id,software_status,software_delivery_path,software_delivery_name&limit=1', { timeoutMs: 12000 });
+    if (!loaded.ok) { jsonResponse(response, 502, { error: 'Could not verify software delivery. Please retry.' }); return true; }
+    const row = (await loaded.json())?.[0];
+    if (!row || row.user_id !== customer.id || row.request_type !== 'software_requirement' || !row.software_product_id) { jsonResponse(response, 404, { error: 'Software delivery not found.' }); return true; }
+    if (!['paid','delivered'].includes(String(row.software_status || '').toLowerCase()) || !row.software_delivery_path) { jsonResponse(response, 403, { error: 'Payment verification and software delivery must be completed before download.' }); return true; }
+    const objectPath = String(row.software_delivery_path);
+    if (!objectPath.startsWith('software-deliveries/'+requestId+'/') || objectPath.includes('..') || objectPath.startsWith('/') || objectPath.includes(String.fromCharCode(92))) { jsonResponse(response, 409, { error: 'The saved software delivery path is invalid.' }); return true; }
+    const signed = await supabaseRequest(serviceToken(), 'storage/v1/object/sign/private-ecu-files/'+objectPath.split('/').map(encodeURIComponent).join('/'), { method:'POST', body:{ expiresIn:60 }, timeoutMs:12000 });
+    if (!signed.ok) { jsonResponse(response, 502, { error: 'The private software file could not be prepared for download.' }); return true; }
+    const data = await signed.json();
+    const signedPath = String(data?.signedURL || data?.signedUrl || '');
+    if (!signedPath.startsWith('/object/sign/') && !signedPath.startsWith('http')) { jsonResponse(response, 502, { error: 'Storage returned an invalid secure download link.' }); return true; }
+    const downloadUrl = signedPath.startsWith('http') ? signedPath : supabaseUrl+'/storage/v1'+(signedPath.startsWith('/')?signedPath:'/'+signedPath);
+    let parsed; try { parsed = new URL(downloadUrl); } catch { parsed = null; }
+    if (!parsed || parsed.origin !== new URL(supabaseUrl).origin || !parsed.pathname.includes('/object/sign/')) { jsonResponse(response, 502, { error: 'Storage returned an unsafe download link.' }); return true; }
+    jsonResponse(response, 200, { downloadUrl, fileName: String(row.software_delivery_name || 'software-file.bin').slice(0,255) });
+  } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Secure software download failed.' }); }
+  return true;
+}
+
 async function handleAdminSiteContent(request, response) {
   const admin = await requireAdmin(request);
   if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
@@ -1879,6 +1909,7 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/site-settings') return handlePublicSiteSettings(request, response);
   if (url.pathname === '/api/admin/site-settings') return handleAdminSiteSettings(request, response);
   if (url.pathname === '/api/admin/software-requests/payment-link') return handleAdminCreateSoftwarePaymentLink(request, response);
+  if (url.pathname === '/api/customer/software-download') return handleCustomerSoftwareDownload(request, response);
   if (url.pathname === '/api/admin/site-content') return handleAdminSiteContent(request, response);
   if (url.pathname === '/api/admin/advertising/inquiries') return handleAdminAdvertisingInquiries(request, response);
   if (url.pathname === '/api/pricing') return handlePricing(request, response);
