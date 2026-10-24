@@ -1621,6 +1621,22 @@ async function handleAdminAdvertisingInquiries(request, response) {
     if (!result.ok) { jsonResponse(response, 502, { error:'Advertising enquiries could not be loaded.' }); return true; }
     jsonResponse(response, 200, { items:await result.json() }); return true;
   }
+  if (request.method === 'DELETE') {
+    const body = await readJson(request, 2048);
+    const id = String(body.id || '');
+    if (!/^[0-9a-f-]{36}$/i.test(id)) { jsonResponse(response, 400, { error:'Invalid enquiry reference.' }); return true; }
+    const existing = await supabaseRequest(token, 'rest/v1/advertising_inquiries?id=eq.'+encodeURIComponent(id)+'&select=id,status&limit=1', { timeoutMs:12000 });
+    if (!existing.ok) { jsonResponse(response, 502, { error:'Enquiry could not be checked before deletion.' }); return true; }
+    const inquiry = (await existing.json())?.[0];
+    if (!inquiry) { jsonResponse(response, 404, { error:'Enquiry not found.' }); return true; }
+    const quotes = await supabaseRequest(token, 'rest/v1/advertising_quotes?inquiry_id=eq.'+encodeURIComponent(id)+'&select=id&limit=1', { timeoutMs:12000 });
+    if (!quotes.ok) { jsonResponse(response, 502, { error:'Quote/payment history could not be checked; enquiry was not deleted.' }); return true; }
+    if ((await quotes.json()).length) { jsonResponse(response, 409, { error:'This enquiry has quote or payment history. Set its status to Closed instead; financial records are retained.' }); return true; }
+    const removed = await supabaseRequest(token, 'rest/v1/advertising_inquiries?id=eq.'+encodeURIComponent(id)+'&select=id', { method:'DELETE', prefer:'return=representation', timeoutMs:12000 });
+    if (!removed.ok) { jsonResponse(response, 502, { error:'Enquiry could not be deleted.' }); return true; }
+    if (!(await removed.json())?.length) { jsonResponse(response, 404, { error:'Enquiry not found.' }); return true; }
+    jsonResponse(response, 200, { deleted:true }); return true;
+  }
   if (request.method === 'PATCH') {
     const body = await readJson(request, 4096);
     if (!/^[0-9a-f-]{36}$/i.test(String(body.id || '')) || !['new','contacted','approved','declined','closed'].includes(body.status)) { jsonResponse(response, 400, { error:'Invalid enquiry reference or status.' }); return true; }
