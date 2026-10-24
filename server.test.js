@@ -1925,3 +1925,22 @@ test('admin controls enforce readable contrast and cache-busted current assets',
   assert.match(adminHtml, /admin\.css\?v=20261024-final-contrast/);
   assert.match(adminHtml, /admin\.js\?v=20261024-final-contrast/);
 });
+
+
+test('private software delivery requires customer ownership and a delivered file', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const adminSource = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const customerSource = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  const migrationSource = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261024_secure_software_delivery.sql'), 'utf8');
+  assert.match(serverSource, /async function handleCustomerSoftwareDownload/);
+  assert.match(serverSource, /row\.user_id !== customer\.id/);
+  assert.match(serverSource, /!\['paid','delivered'\]\.includes\(String\(row\.software_status/);
+  assert.match(serverSource, /storage\/v1\/object\/sign\/private-ecu-files/);
+  assert.match(serverSource, /url\.pathname === '\/api\/customer\/software-download'/);
+  assert.match(adminSource, /Upload private software file/);
+  assert.match(adminSource, /software_delivery_path:objectPath/);
+  assert.match(customerSource, /api\/customer\/software-download/);
+  assert.match(customerSource, /Download your file/);
+  assert.match(migrationSource, /software_delivery_path text/);
+  assert.match(migrationSource, /software_delivery_name text/);
+});
