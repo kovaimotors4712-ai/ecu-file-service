@@ -167,3 +167,43 @@ body{line-height:1.55}h1,h2,h3,p,label,button,a{overflow-wrap:break-word}button,
 .tools-panel .tool-list a:hover b{color:var(--lime)}
 .tools-panel .tool-list a b{font:700 12px var(--display)}
 @media(max-width:620px){.tools-panel .tool-list a{grid-template-columns:25px minmax(0,1fr) 18px}.tools-panel .tool-list a .tool-type{display:none}}
+
+
+/* Customer account action contrast: visible on light cards and mobile screens. */
+#customer-private-request-list .button,
+#customer-private-request-list button,
+#customer-order-list .customer-order-hide,
+#customer-order-history-toggle,
+#customer-private-request-history-toggle {
+  color:#17201e !important;
+  background:#ffffff !important;
+  border:2px solid #34403c !important;
+  opacity:1 !important;
+  text-shadow:none !important;
+  font-weight:800 !important;
+  min-height:44px;
+  padding:10px 14px;
+  border-radius:8px;
+  cursor:pointer;
+}
+#customer-private-request-list button:disabled,
+#customer-order-list button:disabled,
+#customer-order-history-toggle:disabled,
+#customer-private-request-history-toggle:disabled {
+  color:#34403c !important;
+  background:#f0f2ed !important;
+  opacity:1 !important;
+}
+#customer-private-request-list .customer-request-delete {
+  color:#ffffff !important;
+  background:#8b1e1e !important;
+  border:2px solid #681414 !important;
+  font-weight:900 !important;
+}
+#customer-private-request-list .customer-request-delete:focus-visible,
+#customer-private-request-list button:focus-visible,
+#customer-order-history-toggle:focus-visible,
+#customer-private-request-history-toggle:focus-visible {
+  outline:3px solid #3459c7;
+  outline-offset:3px;
+}
