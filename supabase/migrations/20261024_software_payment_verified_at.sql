@@ -1,0 +1,1 @@
+alter table public.forum_customer_requests add column if not exists software_payment_verified_at timestamptz;
