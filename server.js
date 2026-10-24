@@ -1496,7 +1496,7 @@ async function handleAdminVerifySoftwarePayment(request, response) {
     if (!row || !row.software_product_id) { jsonResponse(response, 404, { error: 'Software purchase request not found.' }); return true; }
     if (!row.software_payment_link_id || !/^plink_[A-Za-z0-9]+$/.test(String(row.software_payment_link_id))) { jsonResponse(response, 409, { error: 'Create a new Razorpay payment link before verifying payment.' }); return true; }
     if (!(Number(row.quoted_price_paise) > 0)) { jsonResponse(response, 409, { error: 'A valid quoted amount is required.' }); return true; }
-    if (['paid','delivered'].includes(String(row.software_status||'').toLowerCase())) { jsonResponse(response, 200, { verified:true, alreadyVerified:true, status:row.software_status }); return true; }
+    if (String(row.software_status||'').toLowerCase()==='delivered') { jsonResponse(response, 200, { verified:true, alreadyVerified:true, status:row.software_status }); return true; }
     const link = await razorpayApi('payment_links/'+encodeURIComponent(row.software_payment_link_id));
     const expected = Number(row.quoted_price_paise);
     if (String(link?.status||'').toLowerCase() !== 'paid' || Number(link?.amount) !== expected || Number(link?.amount_paid) !== expected) {
