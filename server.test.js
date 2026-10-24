@@ -1927,6 +1927,20 @@ test('admin controls enforce readable contrast and cache-busted current assets',
 });
 
 
+test('software payment verification checks Razorpay paid status and exact amount', () => {
+  const source = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  assert.match(source, /async function handleAdminVerifySoftwarePayment/);
+  assert.match(source, /razorpayApi\('payment_links\/'\+encodeURIComponent\(row\.software_payment_link_id\)\)/);
+  assert.match(source, /String\(link\?\.status\|\|''\)\.toLowerCase\(\) !== 'paid'/);
+  assert.match(source, /Number\(link\?\.amount_paid\) !== expected/);
+  assert.match(source, /software_status:'paid', status:'in_review'/);
+  assert.match(source, /\/api\/admin\/software-requests\/verify-payment/);
+  assert.match(admin, /Verify Razorpay payment/);
+  assert.match(admin, /Use Verify Razorpay payment to confirm the actual payment/);
+});
+
+
 test('private software delivery requires customer ownership and a delivered file', () => {
   const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   const adminSource = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
