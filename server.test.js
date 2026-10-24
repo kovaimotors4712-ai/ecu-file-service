@@ -1949,7 +1949,7 @@ test('private software delivery requires customer ownership and a delivered file
   const migrationSource = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261024_secure_software_delivery.sql'), 'utf8');
   assert.match(serverSource, /async function handleCustomerSoftwareDownload/);
   assert.match(serverSource, /row\.user_id !== customer\.id/);
-  assert.match(serverSource, /!\['paid','delivered'\]\.includes\(String\(row\.software_status/);
+  assert.match(serverSource, /String\(row\.software_status \|\| ''\)\.toLowerCase\(\) !== 'delivered'/);
   assert.match(serverSource, /storage\/v1\/object\/sign\/private-ecu-files/);
   assert.match(serverSource, /url\.pathname === '\/api\/customer\/software-download'/);
   assert.match(adminSource, /Upload private software file/);
