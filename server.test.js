@@ -1974,6 +1974,17 @@ test('customer private requests have a guarded delete action and readable accoun
 });
 
 
+test('cancelled customer requests leave active lists and remain archived for admins', () => {
+  const customer = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  assert.match(customer, /status=neq\.cancelled/);
+  assert.match(customer, /forum_cancel_own_customer_request/);
+  assert.match(admin, /admin_archived_at=\$\{archiveFilter\}/);
+  assert.match(admin, /Show archived requests/);
+  assert.match(admin, /efsi_admin_archive_customer_request/);
+});
+
+
 test('private software delivery requires customer ownership and a delivered file', () => {
   const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   const adminSource = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
