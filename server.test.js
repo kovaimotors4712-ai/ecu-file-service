@@ -1938,6 +1938,8 @@ test('software requests can create a server-side Razorpay payment link with admi
   assert.match(adminSource, /Generate Razorpay payment link & send Pay now/);
   assert.match(adminSource, /adminApi\('\/api\/admin\/software-requests\/payment-link'/);
   assert.match(customerSource, /Pay now ↗/);
+  assert.doesNotMatch(customerSource, /Quoted price:/);
+  assert.match(serverSource, /Your software quote is ready\. Use the secure Razorpay Pay now link in My Account/);
 });
 
 
