@@ -675,6 +675,14 @@ test('serves robots.txt and sitemap.xml with correct headers and content', async
   assert.match(robots.payload, /Sitemap: https:\/\/ecufileservice\.in\/sitemap\.xml/);
   assert.match(sitemap.payload, /<loc>https:\/\/ecufileservice\.in\/<\/loc>/);
   assert.match(sitemap.payload, /<loc>https:\/\/ecufileservice\.in\/guides\.html<\/loc>/);
+  assert.match(sitemap.payload, /<loc>https:\/\/ecufileservice\.in\/privacy\.html<\/loc>/);
+  assert.match(sitemap.payload, /<loc>https:\/\/ecufileservice\.in\/contact\.html<\/loc>/);
+  const privacy = await call('/privacy.html');
+  const contact = await call('/contact.html');
+  assert.equal(privacy.response.status, 200);
+  assert.equal(contact.response.status, 200);
+  assert.match(privacy.payload, /Privacy Policy/);
+  assert.match(contact.payload, /Contact &amp; Support/);
 });
 
 test('allows the custom domain CORS origin and rejects an unrelated origin', async () => {
