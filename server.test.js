@@ -1972,7 +1972,7 @@ test('admin controls enforce readable contrast and cache-busted current assets',
   assert.match(adminCss, /#site-content-list \.button-ghost[\s\S]*?opacity:1 !important/);
   assert.match(adminCss, /button:disabled[\s\S]*?opacity:1 !important/);
   assert.match(adminHtml, /admin\.css\?v=20261024-payment-verification/);
-  assert.match(adminHtml, /admin\.js\?v=20261025-admin-delete-requests/);
+  assert.match(adminHtml, /admin\.js\?v=20261025-software-status-cleanup/);
 });
 
 
