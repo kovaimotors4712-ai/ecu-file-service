@@ -556,6 +556,13 @@
 
 
   // Public live workshop chat: real authenticated messages only; no fabricated members.
+  // Enforce the requested first-section order after the page is parsed.
+  const forumMain = document.querySelector('main.forum-main');
+  const liveChatFirst = document.getElementById('live-chat');
+  if (forumMain && liveChatFirst && forumMain.firstElementChild !== liveChatFirst) {
+    forumMain.insertBefore(liveChatFirst, forumMain.firstElementChild);
+  }
+
   const chatSearchInput = $('#forum-chat-search');
   const chatSearchResults = $('#forum-chat-search-results');
   let chatSearchTimer = null;
