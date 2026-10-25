@@ -546,7 +546,11 @@
 
 
   // Public live workshop chat: real authenticated messages only; no fabricated members.
-  const chatList = $('#forum-chat-list');
+  const chatSearchInput = $('#forum-chat-search');
+  const chatSearchResults = $('#forum-chat-search-results');
+  let chatSearchTimer = null;
+  let chatSearchRequest = 0;
+    const chatList = $('#forum-chat-list');
   const chatForm = $('#forum-chat-form');
   const chatInput = $('#forum-chat-input');
   const chatSend = $('#forum-chat-send');
@@ -616,6 +620,68 @@
     if (/airbag|srs|crash/i.test(q)) return 'Community Assistant (automated): SRS is a safety-critical system. Follow the manufacturer procedure and applicable law; verify the module and fault data before any repair. Do not bypass safety restraints.';
     return 'Community Assistant (automated): To help other technicians respond, add vehicle/year/engine, ECU or module number, exact fault/symptom, measurements and steps already tried. This automated note is not a human member or a verified repair answer.';
   }
+  async function searchLiveChat() {
+    if (!chatSearchInput || !chatSearchResults || !api) return;
+    const query = String(chatSearchInput.value || '').trim();
+    const requestId = ++chatSearchRequest;
+    if (query.length < 2) {
+      chatSearchResults.hidden = true;
+      chatSearchResults.replaceChildren();
+      return;
+    }
+    chatSearchResults.hidden = false;
+    chatSearchResults.replaceChildren();
+    const loading = document.createElement('p');
+    loading.className = 'muted';
+    loading.textContent = 'Searching saved live chat messages…';
+    chatSearchResults.append(loading);
+    try {
+      const safeQuery = query.replace(/[%,()]/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 80);
+      const rows = await api.rest('forum_chat_messages?select=id,author_id,body,created_at&body=ilike.*' + encodeURIComponent(safeQuery) + '*&order=created_at.desc&limit=100');
+      if (requestId !== chatSearchRequest) return;
+      chatSearchResults.replaceChildren();
+      if (!Array.isArray(rows) || !rows.length) {
+        const empty = document.createElement('p');
+        empty.className = 'muted';
+        empty.textContent = 'No matching live chat messages found. Try a shorter keyword, ECU number or DTC.';
+        chatSearchResults.append(empty);
+        return;
+      }
+      const profiles = await profilesFor(rows.map(function(row) { return row.author_id; }));
+      rows.forEach(function(row) {
+        const card = document.createElement('article');
+        card.className = 'forum-chat-message';
+        const head = document.createElement('div');
+        head.className = 'forum-chat-message-head';
+        const author = document.createElement('strong');
+        author.textContent = displayNameFor(row.author_id, profiles);
+        const date = document.createElement('span');
+        date.className = 'muted';
+        date.textContent = formatDate(row.created_at);
+        const body = document.createElement('p');
+        body.textContent = row.body || '';
+        head.append(author, date);
+        card.append(head, body);
+        chatSearchResults.append(card);
+      });
+      const count = document.createElement('p');
+      count.className = 'muted';
+      count.textContent = 'Showing ' + rows.length + ' matching messages (maximum 100).';
+      chatSearchResults.prepend(count);
+    } catch (_) {
+      if (requestId !== chatSearchRequest) return;
+      chatSearchResults.replaceChildren();
+      const error = document.createElement('p');
+      error.className = 'status-message error';
+      error.textContent = 'Live chat search is temporarily unavailable. Try again shortly.';
+      chatSearchResults.append(error);
+    }
+  }
+  if (chatSearchInput) chatSearchInput.addEventListener('input', function() {
+    if (chatSearchTimer) window.clearTimeout(chatSearchTimer);
+    chatSearchTimer = window.setTimeout(searchLiveChat, 300);
+  });
+
   if(chatList)chatList.addEventListener('click',function(event){const button=event.target.closest('[data-reply-chat-id]');if(!button)return;const row=chatMessagesById[button.getAttribute('data-reply-chat-id')];if(!row)return;selectedChatReply=row;const context=$('#forum-chat-reply-context');context.replaceChildren();const label=document.createElement('span');label.textContent='Replying to '+displayNameFor(row.author_id,chatProfilesCache)+': '+String(row.body||'').slice(0,140);const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Cancel reply';cancel.addEventListener('click',function(){selectedChatReply=null;context.hidden=true;});context.append(label,cancel);context.hidden=false;chatInput.focus();chatInput.placeholder='Write a reply to this member…';});
   if (chatForm) chatForm.addEventListener('submit', async function (event) {
     event.preventDefault();
