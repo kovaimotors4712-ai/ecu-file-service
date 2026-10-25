@@ -1512,6 +1512,44 @@ async function handleAdminVerifySoftwarePayment(request, response) {
 }
 
 
+
+async function handleRequirementMessages(request, response, adminMode) {
+  if (request.method !== 'POST') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
+  try {
+    const actor = adminMode ? await requireAdmin(request) : await requireCustomer(request);
+    if (!actor) { jsonResponse(response, adminMode ? 403 : 401, { error:adminMode ? 'Administrator role is required.' : 'Please sign in to view this requirement thread.' }); return true; }
+    if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'Requirement messages are temporarily unavailable.' }); return true; }
+    const body = await readJson(request, 4096);
+    const requestId = String(body?.requestId || '');
+    if (!/^[0-9a-f-]{36}$/i.test(requestId)) { jsonResponse(response, 400, { error:'Invalid requirement reference.' }); return true; }
+    const token = serviceToken();
+    const loaded = await supabaseRequest(token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,user_id,request_type,status,title&limit=1', { timeoutMs:12000 });
+    if (!loaded.ok) { jsonResponse(response, 502, { error:'Requirement could not be checked.' }); return true; }
+    const row = (await loaded.json())?.[0];
+    if (!row || (!adminMode && row.user_id !== actor.id)) { jsonResponse(response, 404, { error:'Requirement thread not found.' }); return true; }
+    const action = String(body?.action || 'list');
+    if (action === 'list') {
+      const result = await supabaseRequest(token, 'rest/v1/forum_customer_request_messages?request_id=eq.'+encodeURIComponent(requestId)+'&select=id,request_id,sender_role,sender_id,message,created_at&order=created_at.asc&limit=100', { timeoutMs:12000 });
+      if (!result.ok) { jsonResponse(response, 502, { error:'Requirement messages could not be loaded.' }); return true; }
+      jsonResponse(response, 200, { items:await result.json() }); return true;
+    }
+    if (action !== 'send') { jsonResponse(response, 400, { error:'Unsupported message action.' }); return true; }
+    if (!adminMode && String(row.status||'').toLowerCase()==='closed') { jsonResponse(response, 409, { error:'This request is closed. Contact support if you need to reopen it.' }); return true; }
+    const message = String(body?.message || '').trim();
+    if (!message || message.length > 2000) { jsonResponse(response, 400, { error:'Message must contain 1 to 2000 characters.' }); return true; }
+    const saved = await supabaseRequest(token, 'rest/v1/forum_customer_request_messages?select=id,request_id,sender_role,sender_id,message,created_at', { method:'POST', prefer:'return=representation', body:{ request_id:requestId, sender_role:adminMode?'admin':'customer', sender_id:actor.id, message }, timeoutMs:12000 });
+    if (!saved.ok) { jsonResponse(response, 502, { error:'Message could not be sent. Please retry.' }); return true; }
+    const item = (await saved.json())?.[0] || null;
+    if (adminMode) {
+      const latest = await supabaseRequest(token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId), { method:'PATCH', prefer:'return=minimal', body:{ admin_reply:message, updated_at:new Date().toISOString() }, timeoutMs:12000 });
+      jsonResponse(response, 200, { item, latestReplySaved:latest.ok });
+      return true;
+    }
+    jsonResponse(response, 200, { item });
+  } catch(error) { jsonResponse(response,error.statusCode||400,{error:error.message||'Requirement message failed.'}); }
+  return true;
+}
+
 async function handleAdminDeleteCustomerRequest(request, response) {
   if (request.method !== 'POST') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
   try {
@@ -1981,6 +2019,8 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/site-settings') return handlePublicSiteSettings(request, response);
   if (url.pathname === '/api/admin/site-settings') return handleAdminSiteSettings(request, response);
   if (url.pathname === '/api/admin/customer-requests/delete') return handleAdminDeleteCustomerRequest(request, response);
+  if (url.pathname === '/api/admin/requirements/messages') return handleRequirementMessages(request, response, true);
+  if (url.pathname === '/api/customer/requirements/messages') return handleRequirementMessages(request, response, false);
   if (url.pathname === '/api/admin/requirements/payment-link' || url.pathname === '/api/admin/software-requests/payment-link') return handleAdminCreateSoftwarePaymentLink(request, response);
   if (url.pathname === '/api/admin/requirements/verify-payment' || url.pathname === '/api/admin/software-requests/verify-payment') return handleAdminVerifySoftwarePayment(request, response);
   if (url.pathname === '/api/customer/software-download') return handleCustomerSoftwareDownload(request, response);
