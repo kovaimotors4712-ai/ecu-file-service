@@ -9,6 +9,7 @@
   let ordersRequest = 0;
   let showHiddenOrders = false;
   let showHiddenPrivateRequests = false;
+  let refreshingRequirementPayments = false;
   let ordersChannel = null;
   let filesChannel = null;
   let realtimeClient = null;
@@ -146,7 +147,18 @@
     const loading=document.createElement('p');loading.className='muted';loading.textContent='Loading your requirements…';list.append(loading);
     try{
       const historyFilter=showHiddenPrivateRequests?'&customer_hidden_at=not.is.null':'&customer_hidden_at=is.null&status=neq.closed';
-      const rows=await rest('forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_url,software_delivery_path,software_delivery_name,created_at,updated_at,customer_hidden_at'+historyFilter+'&order=created_at.desc&limit=50');
+      const rows=await rest('forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_payment_link_id,software_delivery_url,software_delivery_path,software_delivery_name,created_at,updated_at,customer_hidden_at'+historyFilter+'&order=created_at.desc&limit=50');
+      if(!showHiddenPrivateRequests&&!refreshingRequirementPayments&&Array.isArray(rows)){
+        const pending=rows.filter(item=>item.software_status==='awaiting_payment'&&item.software_payment_link_id).slice(0,10);
+        if(pending.length){
+          refreshingRequirementPayments=true;let verifiedAny=false;
+          try{
+            const token=await accessToken();
+            await Promise.all(pending.map(async item=>{try{const response=await fetch('/api/customer/requirements/refresh-payment',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify({requestId:item.id})});const result=await response.json().catch(()=>({}));if(response.ok&&result.verified&&!result.alreadyVerified)verifiedAny=true;}catch{}}));
+          }finally{refreshingRequirementPayments=false;}
+          if(verifiedAny){await loadCustomerPrivateRequests();return;}
+        }
+      }
       list.replaceChildren();
       if(!Array.isArray(rows)||!rows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent=showHiddenPrivateRequests?'No hidden requirements.':'No requirements yet. Send your request and the team will review it.';list.append(empty);return;}
       const labels={software_requirement:'Software requirement',wiring_diagram:'Wiring diagram requirement',suggestion:'Suggestion',service_requirement:'Service requirement',feature_request:'Website feature',issue:'Support request',other:'Other requirement'};
@@ -244,6 +256,8 @@
       });
     }catch(error){list.replaceChildren();const p=document.createElement('p');p.className='admin-message admin-error';p.textContent='Your requirements could not be loaded. '+(error.message||'Please retry.');list.append(p);}
   }
+
+if(!window.__efsiRequirementPaymentFocusBound){window.__efsiRequirementPaymentFocusBound=true;window.addEventListener('focus',function(){if(session?.user)loadCustomerPrivateRequests();});}
 
 async function loadCustomerOrders() {
     const panel = document.querySelector('#customer-orders');
