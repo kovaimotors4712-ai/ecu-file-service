@@ -111,7 +111,10 @@
     }
     setMessage(topicsMessage, 'Loading topics…');
     try {
-      const rows = await api.rest('forum_topics?select=id,category_id,author_id,title,body,is_pinned,is_locked,accepted_reply_id,created_at&order=is_pinned.desc,created_at.desc&limit=100');
+      const searchTerm = String(searchInput && searchInput.value || '').trim();
+      const rows = searchTerm.length >= 2
+        ? await api.rest('rpc/forum_search_topics', { method: 'POST', body: { p_query: searchTerm, p_limit: 100 } })
+        : await api.rest('forum_topics?select=id,category_id,author_id,title,body,is_pinned,is_locked,accepted_reply_id,created_at&order=is_pinned.desc,created_at.desc&limit=100');
       topics = Array.isArray(rows) ? rows : [];
       topics.forEach(function (topic) { topic.reply_count = 0; });
       const topicIds = topics.filter(function (topic) { return validUuid(topic.id); }).map(function (topic) { return topic.id; });
@@ -466,7 +469,14 @@
   });
   categoryFilter.addEventListener('change', renderTopics);
   if (statusFilter) statusFilter.addEventListener('change', renderTopics);
-  searchInput.addEventListener('input', renderTopics);
+  let searchReloadHandle = null;
+  searchInput.addEventListener('input', function () {
+    if (searchReloadHandle) window.clearTimeout(searchReloadHandle);
+    searchReloadHandle = window.setTimeout(function () {
+      if (String(searchInput.value || '').trim().length >= 2) loadTopics();
+      else loadTopics();
+    }, 250);
+  });
 
   $('#forum-back-topics').addEventListener('click', function () {
     activeTopic = null;
@@ -635,7 +645,7 @@
       } catch (_) { /* Chat must still work if auto-topic promotion is rate-limited or unavailable. */ }
       chatInput.value = ''; selectedChatReply = null; $('#forum-chat-reply-context').hidden = true; chatInput.placeholder = 'Ask a concise diagnostic question. Never share VINs, passwords or customer data.'; if (chatStatus) chatStatus.textContent = autoTopicSaved ? 'Message posted and saved automatically to Workshop Topics.' : 'Message posted.';
       await loadChatMessages();
-      if (autoTopicSaved) await loadTopics();
+      if (autoTopicSaved) { await loadCategories(); await loadTopics(); }
       // A transparent, clearly labelled automated prompt is shown locally only; it never impersonates a user or writes fake chat history.
       const assistant = document.createElement('article'); assistant.className = 'forum-chat-message assistant';
       const head = document.createElement('div'); head.className = 'forum-chat-message-head';
