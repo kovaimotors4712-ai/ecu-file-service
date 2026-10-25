@@ -54,7 +54,23 @@
   <header class="site-header forum-header">
     <a class="brand" href="/" aria-label="ECU File Service India home"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 10h26v20H7z"/><path d="M12 15h5v10h-5zm11 0h5m-5 5h5m-5 5h5M3 15h4m-4 5h4m-4 5h4m26-10h4m-4 5h4m-4 5h4"/></svg></span><span class="brand-name">ECU File Service India <b>WORKSHOP COMMUNITY</b></span></a>
     <nav class="desktop-nav" aria-label="Main navigation"><a href="/">File services</a><a href="/ecu-file-services.html">ECU services</a><a href="/guides.html">Guides</a></nav>
-    <a class="forum-home-link" href="/">Back to service</a>
+    <div class="forum-header-actions">    <a class="forum-home-link" href="/">Back to service</a>    <section class="forum-account panel" id="forum-account-panel" aria-labelledby="account-heading">
+      <div class="section-heading">
+        <div><p class="forum-kicker"><span></span> YOUR ACCOUNT</p><h2 id="account-heading">Sign in to join the chat</h2></div>
+        <span id="account-state" class="state-pill">Not signed in</span>
+      </div>
+      <p class="muted">The forum uses your existing ECU File Service India account. Your email and customer files are not displayed publicly.</p>
+      <form id="forum-auth-form" class="forum-auth-form">
+        <label>Email address<input id="forum-auth-email" type="email" autocomplete="email" required maxlength="254"></label>
+        <label>Password<input id="forum-auth-password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></label>
+        <div class="auth-actions">
+          <button type="submit" class="button button-lime" id="forum-sign-in">Sign in</button>
+          <button type="button" class="button button-outline" id="forum-sign-up">Create account</button>
+          <button type="button" class="button button-outline" id="forum-sign-out" hidden>Sign out</button>
+        </div>
+      </form>
+      <p id="forum-auth-message" class="status-message" aria-live="polite"></p>
+    </section></div>
   </header>
 
   <section class="panel live-chat-panel" id="live-chat" aria-labelledby="live-chat-heading">
@@ -151,23 +167,7 @@
       <div class="forum-hero-meta"><span>Public reading</span><span>Sign-in required to post</span><span>Moderated discussions</span></div>
     </section>
 
-    <section class="forum-account panel" id="forum-account-panel" aria-labelledby="account-heading">
-      <div class="section-heading">
-        <div><p class="forum-kicker"><span></span> YOUR ACCOUNT</p><h2 id="account-heading">Sign in to join the chat</h2></div>
-        <span id="account-state" class="state-pill">Not signed in</span>
-      </div>
-      <p class="muted">The forum uses your existing ECU File Service India account. Your email and customer files are not displayed publicly.</p>
-      <form id="forum-auth-form" class="forum-auth-form">
-        <label>Email address<input id="forum-auth-email" type="email" autocomplete="email" required maxlength="254"></label>
-        <label>Password<input id="forum-auth-password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></label>
-        <div class="auth-actions">
-          <button type="submit" class="button button-lime" id="forum-sign-in">Sign in</button>
-          <button type="button" class="button button-outline" id="forum-sign-up">Create account</button>
-          <button type="button" class="button button-outline" id="forum-sign-out" hidden>Sign out</button>
-        </div>
-      </form>
-      <p id="forum-auth-message" class="status-message" aria-live="polite"></p>
-    </section>
+
 
     <section class="forum-profile panel" id="forum-username-panel" hidden aria-labelledby="username-heading">
       <div class="section-heading"><div><p class="forum-kicker"><span></span> MEMBER USERNAME</p><h2 id="username-heading">Set your username</h2></div></div>
