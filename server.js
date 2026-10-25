@@ -1914,6 +1914,7 @@ function softwareProductPayload(body, adminId, partial = false) {
   if (!partial || body.description !== undefined) out.description = cleanSiteText(body.description, 4000);
   if (!partial || body.version !== undefined) out.version = cleanSiteText(body.version, 80);
   if (!partial || body.price_paise !== undefined) { const amount=Number(body.price_paise); if(!Number.isSafeInteger(amount)||amount<0||amount>100000000000) throw Object.assign(new Error('Enter a valid price in INR.'),{statusCode:400}); out.price_paise=amount; }
+  if(!partial || body.price_visible!==undefined)out.price_visible=body.price_visible===true;
   for(const field of ['image_url','product_url','contact_url']) if(!partial||body[field]!==undefined){const value=cleanSiteText(body[field],1000);if(!validHttpsUrl(value))throw Object.assign(new Error(field+' must use HTTPS.'),{statusCode:400});out[field]=value||null;}
   if(!partial||body.sort_order!==undefined){const order=Number(body.sort_order??100);if(!Number.isInteger(order)||order<0||order>100000)throw Object.assign(new Error('Enter a valid listing order.'),{statusCode:400});out.sort_order=order;}
   if(!partial||body.is_published!==undefined)out.is_published=body.is_published===true;
