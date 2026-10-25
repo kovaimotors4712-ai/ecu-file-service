@@ -28,6 +28,10 @@
     window.addEventListener('pageshow', resetForumScroll);
     window.addEventListener('load', resetForumScroll);
     window.addEventListener('hashchange', resetForumScroll);
+    // Some Android browser tabs restore their previous scroll after load handlers run.
+    [250, 700, 1400].forEach(function (delay) {
+      window.setTimeout(resetForumScroll, delay);
+    });
   })();
   </script>
   <meta name="theme-color" content="#101a19">
@@ -38,8 +42,8 @@
   <meta property="og:url" content="https://ecufileservice.in/forum.html">
   <meta property="og:type" content="website">
   <title>Automotive Workshop Community | ECU File Service India</title>
-  <link rel="stylesheet" href="/styles.css?v=20261025-top-fix2">
-  <link rel="stylesheet" href="/forum.css?v=20261025-top-fix2">
+  <link rel="stylesheet" href="/styles.css?v=20261025-top-fix3">
+  <link rel="stylesheet" href="/forum.css?v=20261025-top-fix3">
 </head>
 <body class="forum-page">
   <div class="announcement"><span class="status-dot"></span> COMMUNITY BETA · MODERATED WORKSHOP DISCUSSIONS <span class="announcement-right">SAFETY FIRST</span></div>
