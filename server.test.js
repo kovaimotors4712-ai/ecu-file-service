@@ -1938,6 +1938,9 @@ test('all paid customer requirements use zero-fee intake and second-stage quote/
   const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
   const customer = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
   assert.match(server, /async function handleAdminCreateSoftwarePaymentLink/);
+  assert.match(server, /async function handleCustomerRefreshRequirementPayment/);
+  assert.match(admin, /scheduleRequirementPaymentPoll/);
+  assert.match(customer, /api\/customer\/requirements\/refresh-payment/);
   assert.match(server, /\['suggestion','feature_request'\]/);
   assert.match(server, /type:row\.request_type==='software_requirement'\?'software_purchase':'customer_requirement'/);
   assert.match(server, /async function handleAdminDeleteCustomerRequest/);
