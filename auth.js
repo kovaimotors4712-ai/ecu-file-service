@@ -143,31 +143,84 @@
     if(!historyToggle){historyToggle=document.createElement('button');historyToggle.id='customer-private-request-history-toggle';historyToggle.type='button';historyToggle.className='button button-ghost';list.parentElement.insertBefore(historyToggle,list);historyToggle.addEventListener('click',function(){showHiddenPrivateRequests=!showHiddenPrivateRequests;loadCustomerPrivateRequests();});}
     historyToggle.textContent=showHiddenPrivateRequests?'Show active requests':'Show hidden requests';
     list.replaceChildren();
-    const loading=document.createElement('p');loading.className='muted';loading.textContent='Loading your private requests…';list.append(loading);
+    const loading=document.createElement('p');loading.className='muted';loading.textContent='Loading your requirements…';list.append(loading);
     try{
-      const rows=await rest(`forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_url,software_delivery_path,software_delivery_name,created_at,updated_at,customer_hidden_at&customer_hidden_at=${showHiddenPrivateRequests?'not.is.null':'is.null'}&status=neq.closed&order=created_at.desc&limit=50`);
+      const historyFilter=showHiddenPrivateRequests?'&customer_hidden_at=not.is.null':'&customer_hidden_at=is.null&status=neq.closed';
+      const rows=await rest('forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_url,software_delivery_path,software_delivery_name,created_at,updated_at,customer_hidden_at'+historyFilter+'&order=created_at.desc&limit=50');
       list.replaceChildren();
-      if(!Array.isArray(rows)||!rows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent=showHiddenPrivateRequests?'No hidden private requests.':'No private requests yet. Use Request payment link on a software listing or send a request through the Forum.';list.append(empty);return;}
-      const labels={software_requirement:'Software / payment-link request',wiring_diagram:'Wiring request',suggestion:'Suggestion',service_requirement:'Service request',feature_request:'Website feature',issue:'Support request',other:'Other request'};
+      if(!Array.isArray(rows)||!rows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent=showHiddenPrivateRequests?'No hidden requirements.':'No requirements yet. Send your request and the team will review it.';list.append(empty);return;}
+      const labels={software_requirement:'Software requirement',wiring_diagram:'Wiring diagram requirement',suggestion:'Suggestion',service_requirement:'Service requirement',feature_request:'Website feature',issue:'Support request',other:'Other requirement'};
+      const workflowLabels={requested:'Request received',in_review:'Under review',quoted:'Quote prepared',awaiting_payment:'Payment pending',paid:'Payment verified',delivered:'Result ready',cancelled:'Cancelled'};
       rows.forEach(item=>{
-        const card=document.createElement('article');card.className='customer-private-request-card';
-        const head=document.createElement('div');head.className='customer-orders-head';
-        const tag=document.createElement('strong');tag.textContent=labels[item.request_type]||'Private request';
-        const status=document.createElement('span');status.className='notification-count';status.textContent=String(item.status||'open').replace(/_/g,' ');
-        head.append(tag,status);
-        const title=document.createElement('h4');title.textContent=item.title||'Customer request';
-        const body=document.createElement('p');body.textContent=item.body||'';
-        const date=document.createElement('small');date.textContent='Submitted '+new Date(item.created_at).toLocaleString();
-        card.append(head,title,body,date);
-        if(item.customer_auto_reply){const reply=document.createElement('div');reply.className='customer-private-request-reply';const label=document.createElement('strong');label.textContent='AUTOMATIC CONFIRMATION';const text=document.createElement('p');text.textContent=item.customer_auto_reply;reply.append(label,text);card.append(reply);}if(item.admin_reply){const reply=document.createElement('div');reply.className='customer-private-request-reply';const label=document.createElement('strong');label.textContent='TEAM MESSAGE';const text=document.createElement('p');text.textContent=item.admin_reply;reply.append(label,text);card.append(reply);}if(item.software_product_id){const wf=document.createElement('div');wf.className='customer-private-request-reply';const workflowLabels={requested:'Request received',in_review:'Under review',quoted:'Price quote prepared',awaiting_payment:'Payment required',paid:'Payment verified',delivered:'Download available',cancelled:'Request cancelled'};const st=document.createElement('strong');st.textContent='SOFTWARE ORDER · '+(workflowLabels[item.software_status]||'Request received').toUpperCase();wf.append(st);if(item.quoted_price_paise!=null){const q=document.createElement('p');q.textContent='Quoted price: '+new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(Number(item.quoted_price_paise)/100);wf.append(q);}if(item.software_status==='awaiting_payment'&&item.software_payment_link){const pay=document.createElement('a');pay.href=item.software_payment_link;pay.target='_blank';pay.rel='noopener noreferrer';pay.className='button button-dark';pay.textContent='Pay now ↗';wf.append(pay);}else if(item.software_status==='awaiting_payment'){const note=document.createElement('p');note.textContent='Your price is being prepared. The secure payment link will appear here when it is ready.';wf.append(note);}if(item.software_status==='paid'){const note=document.createElement('p');note.textContent='Payment has been verified. Your secure download link will appear here when delivery is ready.';wf.append(note);}if(item.software_status==='delivered'&&item.software_delivery_path){const dl=document.createElement('button');dl.type='button';dl.className='button button-dark';dl.textContent='Download your file';dl.addEventListener('click',async function(){dl.disabled=true;try{if(item.software_delivery_path){const response=await fetch('/api/customer/software-download',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+await accessToken()},body:JSON.stringify({requestId:item.id})});const result=await response.json().catch(()=>({}));if(!response.ok||!result.downloadUrl)throw new Error(result.error||'Secure download could not be prepared.');const link=document.createElement('a');link.href=result.downloadUrl;link.download=result.fileName||'software-file.bin';link.rel='noopener noreferrer';document.body.append(link);link.click();link.remove();}else if(item.software_delivery_url){const link=document.createElement('a');link.href=item.software_delivery_url;link.target='_blank';link.rel='noopener noreferrer';link.click();}}catch(error){const note=document.createElement('p');note.textContent=error.message||'Download failed. Please retry.';note.className='admin-message admin-error';wf.append(note);}finally{dl.disabled=false;}});wf.append(dl);}card.append(wf);}
-        const cancelRequest=document.createElement('button');cancelRequest.type='button';cancelRequest.className='customer-request-delete';cancelRequest.textContent='Cancel request';cancelRequest.setAttribute('aria-label','Cancel this request');cancelRequest.addEventListener('click',async function(){if(!window.confirm('Cancel this request? It will remain in your history marked Cancelled. Requests with an issued payment link or payment/delivery started need support review.'))return;cancelRequest.disabled=true;try{await rest('rpc/forum_cancel_own_customer_request',{method:'POST',body:{p_request_id:item.id}});await loadCustomerPrivateRequests();}catch(error){cancelRequest.disabled=false;const notice=document.createElement('p');notice.className='admin-message admin-error';notice.textContent=error.message||'Request could not be cancelled. Contact support if a payment link was already issued.';card.append(notice);}});card.append(cancelRequest);
-        const hideRequest=document.createElement('button');hideRequest.type='button';hideRequest.className='button button-ghost';hideRequest.textContent=item.customer_hidden_at?'Restore to history':'Hide from history';hideRequest.addEventListener('click',async function(){hideRequest.disabled=true;try{await rest('rpc/forum_hide_customer_request',{method:'POST',body:{p_request_id:item.id,p_hidden:!item.customer_hidden_at}});await loadCustomerPrivateRequests();}catch(error){hideRequest.disabled=false;const notice=document.createElement('p');notice.className='admin-message admin-error';notice.textContent='History update failed: '+(error.message||'Please retry.');card.append(notice);}});card.append(hideRequest);
-        list.append(card);
+        const isRequirement=!['suggestion','feature_request'].includes(String(item.request_type||''));
+        const current=String(item.software_status||'');
+        const card=document.createElement('details');card.className='customer-order-card customer-order-collapsible customer-private-request-card';card.open=true;
+        const head=document.createElement('summary');head.className='customer-order-top';
+        const headTitle=document.createElement('b');headTitle.textContent='Request: '+String(item.id||'').slice(0,8)+' · '+(item.title||labels[item.request_type]||'Customer requirement');
+        const headStatus=document.createElement('span');headStatus.textContent=(workflowLabels[current]||String(item.status||'open').replace(/_/g,' '))+' ＋';
+        head.append(headTitle,headStatus);
+        const content=document.createElement('div');content.className='customer-order-body';
+        const kind=document.createElement('p');kind.innerHTML='<strong>Type:</strong> '+(labels[item.request_type]||'Customer requirement');
+        const requestBody=document.createElement('p');requestBody.innerHTML='<strong>Request details:</strong> '+escapeHtml(item.body||'');
+        const submitted=document.createElement('p');submitted.innerHTML='<strong>Submitted:</strong> '+escapeHtml(new Date(item.created_at).toLocaleString('en-IN'));
+        content.append(kind,requestBody,submitted);
+        if(isRequirement){
+          const steps=['Request received','Review','Quote sent','Payment','Delivery'];
+          const stepIndex=({requested:0,in_review:1,quoted:2,awaiting_payment:2,paid:3,delivered:4,cancelled:0})[current]??(item.status==='waiting_for_customer'?2:item.status==='resolved'?4:0);
+          const timeline=document.createElement('div');timeline.className='order-timeline customer-requirement-timeline';
+          steps.forEach((step,index)=>{const node=document.createElement('span');node.textContent=step;if(index<=stepIndex)node.classList.add('active');timeline.append(node);});
+          content.append(timeline);
+          const payBox=document.createElement('div');payBox.className='customer-requirement-payment';
+          const hasQuote=Number(item.quoted_price_paise)>0;
+          const paid=['paid','delivered'].includes(current);
+          const paymentHead=document.createElement('p');paymentHead.className='customer-requirement-payment-heading';
+          if(hasQuote){
+            paymentHead.innerHTML='<strong>Second-Stage Payment:</strong> '+escapeHtml(new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(Number(item.quoted_price_paise)/100))+' ('+(paid?'<span class="payment-paid">Paid</span>':'<span class="payment-pending">Pending</span>')+')';
+          }else{
+            paymentHead.innerHTML='<strong>Requirement review:</strong> ₹0 upfront';
+          }
+          payBox.append(paymentHead);
+          if(current==='awaiting_payment'&&item.software_payment_link){
+            const pay=document.createElement('a');pay.href=item.software_payment_link;pay.target='_blank';pay.rel='noopener noreferrer';pay.className='button button-dark customer-requirement-pay';pay.textContent='Pay Now';payBox.append(pay);
+          }else if(!hasQuote){
+            const noQuote=document.createElement('p');noQuote.textContent='No verification fee is charged for this requirement. We will review your request and confirm the price before asking for payment.';noQuote.className='customer-requirement-note';payBox.append(noQuote);
+          }else if(current==='quoted'){
+            const note=document.createElement('p');note.textContent='Your quote is prepared. The secure Razorpay payment link will appear here after the team issues it.';note.className='customer-requirement-note';payBox.append(note);
+          }else if(current==='paid'){
+            const note=document.createElement('p');note.textContent='Payment verified. Your result or next update will appear here.';note.className='customer-requirement-note';payBox.append(note);
+          }else if(current==='delivered'){
+            const note=document.createElement('p');note.textContent='Your requirement result is ready.';note.className='customer-requirement-note';payBox.append(note);
+          }
+          content.append(payBox);
+          if(current==='delivered'&&item.software_delivery_path){
+            const dl=document.createElement('button');dl.type='button';dl.className='button button-dark customer-requirement-download';dl.textContent='Result Ready · Download';
+            dl.addEventListener('click',async function(){dl.disabled=true;try{const response=await fetch('/api/customer/software-download',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+await accessToken()},body:JSON.stringify({requestId:item.id})});const result=await response.json().catch(()=>({}));if(!response.ok||!result.downloadUrl)throw new Error(result.error||'Secure result could not be prepared.');const link=document.createElement('a');link.href=result.downloadUrl;link.download=result.fileName||'requirement-result.bin';link.rel='noopener noreferrer';document.body.append(link);link.click();link.remove();}catch(error){const note=document.createElement('p');note.className='admin-message admin-error';note.textContent=error.message||'Download failed. Please retry.';content.append(note);}finally{dl.disabled=false;}});
+            content.append(dl);
+          }else if(current==='delivered'&&item.software_delivery_url){
+            const resultLink=document.createElement('a');resultLink.href=item.software_delivery_url;resultLink.target='_blank';resultLink.rel='noopener noreferrer';resultLink.className='button button-dark customer-requirement-download';resultLink.textContent='Open result ↗';content.append(resultLink);
+          }
+        }else{
+          const plainStatus=document.createElement('p');plainStatus.innerHTML='<strong>Status:</strong> '+escapeHtml(String(item.status||'open').replace(/_/g,' '));content.append(plainStatus);
+        }
+        const messages=document.createElement('div');messages.className='customer-private-request-messages';messages.hidden=true;
+        const autoReply=document.createElement('div');autoReply.className='customer-private-request-reply';
+        const autoTitle=document.createElement('strong');autoTitle.textContent='AUTOMATIC CONFIRMATION';
+        const autoText=document.createElement('p');autoText.textContent=item.customer_auto_reply||'Your request has been received. The team will review it and reply here.';
+        autoReply.append(autoTitle,autoText);messages.append(autoReply);
+        if(item.admin_reply){const teamReply=document.createElement('div');teamReply.className='customer-private-request-reply';const teamTitle=document.createElement('strong');teamTitle.textContent='TEAM MESSAGE';const teamText=document.createElement('p');teamText.textContent=item.admin_reply;teamReply.append(teamTitle,teamText);messages.append(teamReply);}
+        content.append(messages);
+        const actions=document.createElement('div');actions.className='customer-order-actions customer-requirement-actions';
+        const messageButton=document.createElement('button');messageButton.type='button';messageButton.className='customer-messages-open';messageButton.textContent='Messages';messageButton.setAttribute('aria-expanded','false');messageButton.addEventListener('click',function(){messages.hidden=!messages.hidden;messageButton.textContent=messages.hidden?'Messages':'Hide messages';messageButton.setAttribute('aria-expanded',String(!messages.hidden));});
+        actions.append(messageButton);
+        const canCancel=!item.software_payment_link&&!['paid','delivered','cancelled'].includes(current);
+        if(canCancel){const cancelRequest=document.createElement('button');cancelRequest.type='button';cancelRequest.className='customer-request-delete';cancelRequest.textContent='Cancel request';cancelRequest.addEventListener('click',async function(event){event.preventDefault();event.stopPropagation();if(!window.confirm('Cancel this request? It will be removed from your active list. If a payment link has already been issued, contact support before paying.'))return;cancelRequest.disabled=true;try{await rest('rpc/forum_cancel_own_customer_request',{method:'POST',body:{p_request_id:item.id}});await loadCustomerPrivateRequests();}catch(error){cancelRequest.disabled=false;const notice=document.createElement('p');notice.className='admin-message admin-error';notice.textContent=error.message||'Request could not be cancelled. Please retry.';content.append(notice);}});actions.append(cancelRequest);}
+        const hideRequest=document.createElement('button');hideRequest.type='button';hideRequest.className='button button-ghost';hideRequest.textContent=item.customer_hidden_at?'Restore to history':'Hide from history';hideRequest.addEventListener('click',async function(event){event.preventDefault();event.stopPropagation();hideRequest.disabled=true;try{await rest('rpc/forum_hide_customer_request',{method:'POST',body:{p_request_id:item.id,p_hidden:!item.customer_hidden_at}});await loadCustomerPrivateRequests();}catch(error){hideRequest.disabled=false;const notice=document.createElement('p');notice.className='admin-message admin-error';notice.textContent='History update failed: '+(error.message||'Please retry.');content.append(notice);}});actions.append(hideRequest);
+        content.append(actions);card.append(head,content);list.append(card);
       });
-    }catch(error){list.replaceChildren();const p=document.createElement('p');p.className='admin-message admin-error';p.textContent='Your private requests could not be loaded. '+(error.message||'Please retry.');list.append(p);}
+    }catch(error){list.replaceChildren();const p=document.createElement('p');p.className='admin-message admin-error';p.textContent='Your requirements could not be loaded. '+(error.message||'Please retry.');list.append(p);}
   }
 
-  async function loadCustomerOrders() {
+async function loadCustomerOrders() {
     const panel = document.querySelector('#customer-orders');
     const list = panel?.querySelector('.customer-order-list');
     const customerId = session?.user?.id;
