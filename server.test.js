@@ -1606,9 +1606,9 @@ test('payment finalization and notification failures are visible in safe operati
 test('updated customer and admin scripts use cache-busted recovery assets', () => {
   const indexSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   const adminSource = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
-  assert.match(indexSource, /auth\.js\?v=20261023-customer-archive/);
-  assert.match(indexSource, /app\.js\?v=20261023-customer-archive/);
-  assert.match(adminSource, /auth\.js\?v=20261023-customer-archive/);
+  assert.match(indexSource, /auth\.js\?v=20261025-homepage-order/);
+  assert.match(indexSource, /app\.js\?v=20261025-homepage-order/);
+  assert.match(adminSource, /auth\.js\?v=20261025-admin-actions/);
 });
 
 test('saved checkout shows immediate payment-check feedback and bounded recovery timeouts', () => {
@@ -1621,7 +1621,7 @@ test('saved checkout shows immediate payment-check feedback and bounded recovery
   assert.match(authSource, /Loading the saved checkout timed out/);
   assert.match(authSource, /No new payment was started/);
   const indexSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-  assert.match(indexSource, /auth\.js\?v=20261023-customer-archive/);
+  assert.match(indexSource, /auth\.js\?v=20261025-homepage-order/);
 });
 test('second-stage trigger permits normal first-stage paid-order inserts with default pending state', () => {
   const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261017_fix_second_stage_insert_guard.sql'), 'utf8');
@@ -1960,8 +1960,8 @@ test('admin controls enforce readable contrast and cache-busted current assets',
   assert.match(adminCss, /\.admin-page select option[\s\S]*?color:#111a19 !important/);
   assert.match(adminCss, /#site-content-list \.button-ghost[\s\S]*?opacity:1 !important/);
   assert.match(adminCss, /button:disabled[\s\S]*?opacity:1 !important/);
-  assert.match(adminHtml, /admin\.css\?v=20261024-final-contrast/);
-  assert.match(adminHtml, /admin\.js\?v=20261024-final-contrast/);
+  assert.match(adminHtml, /admin\.css\?v=20261024-payment-verification/);
+  assert.match(adminHtml, /admin\.js\?v=20261025-admin-actions/);
 });
 
 
@@ -1988,8 +1988,8 @@ test('customer private requests have hide-from-history controls and readable acc
   assert.match(customer, /Hide from history/);
   assert.match(css, /#customer-private-request-list \.customer-request-delete[\s\S]*?background:#8b1e1e !important/);
   assert.match(css, /#customer-private-request-history-toggle[\s\S]*?color:#17201e !important/);
-  assert.match(html, /styles\.css\?v=20261024-customer-actions/);
-  assert.match(html, /auth\.js\?v=20261024-customer-actions/);
+  assert.match(html, /styles\.css\?v=20261025-homepage-order/);
+  assert.match(html, /auth\.js\?v=20261025-homepage-order/);
   assert.match(migration, /r\.user_id = auth\.uid\(\)/);
 });
 
