@@ -48,15 +48,14 @@
       <p id="forum-auth-message" class="status-message" aria-live="polite"></p>
     </section>
 
-    <section class="forum-profile panel" id="forum-profile-panel" hidden aria-labelledby="profile-heading">
-      <div class="section-heading"><div><p class="forum-kicker"><span></span> PUBLIC PROFILE</p><h2 id="profile-heading">Choose your display name</h2></div></div>
-      <p class="muted">Only your display name and short bio are public. Do not include phone numbers, email addresses, VINs or customer identifiers.</p>
-      <form id="forum-profile-form" class="profile-form">
-        <label>Display name<input id="forum-display-name" minlength="2" maxlength="32" autocomplete="nickname" required></label>
-        <label>Short bio <span class="muted">(optional)</span><textarea id="forum-bio" maxlength="240" rows="2"></textarea></label>
-        <button type="submit" class="button button-lime">Save public profile</button>
+    <section class="forum-profile panel" id="forum-username-panel" hidden aria-labelledby="username-heading">
+      <div class="section-heading"><div><p class="forum-kicker"><span></span> MEMBER USERNAME</p><h2 id="username-heading">Set your username</h2></div></div>
+      <p class="muted" id="forum-username-help">All members must save a username before posting, replying or chatting.</p>
+      <form id="forum-username-form" class="profile-form">
+        <label>Username<input id="forum-display-name" minlength="2" maxlength="32" autocomplete="nickname" required></label>
+        <button type="submit" class="button button-lime">Save username</button>
       </form>
-      <p id="forum-profile-message" class="status-message" aria-live="polite"></p>
+      <p id="forum-username-message" class="status-message" aria-live="polite"></p>
     </section>
 
     <section class="panel forum-moderation-panel" id="forum-moderation-panel" hidden aria-labelledby="forum-moderation-heading">
@@ -190,6 +189,6 @@
  }catch(_){}
 })();
 </script>
-<script src="/forum.js?v=20261025-chat-search"></script>
+<script src="/forum.js?v=20261025-username-required"></script>
 </body>
 </html>
