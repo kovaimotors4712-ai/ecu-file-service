@@ -677,6 +677,9 @@ test('serves robots.txt and sitemap.xml with correct headers and content', async
   assert.match(sitemap.payload, /<loc>https:\/\/ecufileservice\.in\/guides\.html<\/loc>/);
   assert.match(sitemap.payload, /<loc>https:\/\/ecufileservice\.in\/privacy\.html<\/loc>/);
   assert.match(sitemap.payload, /<loc>https:\/\/ecufileservice\.in\/contact\.html<\/loc>/);
+  const homepage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  assert.match(homepage, /href="\/privacy\.html"[^>]*>Privacy Policy<\/a>/);
+  assert.match(homepage, /href="\/contact\.html"[^>]*>Contact &amp; Support<\/a>/);
   const privacy = await call('/privacy.html');
   const contact = await call('/contact.html');
   assert.equal(privacy.response.status, 200);
