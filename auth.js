@@ -146,10 +146,11 @@
     const loading=document.createElement('p');loading.className='muted';loading.textContent='Loading your private requests…';list.append(loading);
     try{
       const rows=await rest(`forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_url,software_delivery_path,software_delivery_name,created_at,updated_at,customer_hidden_at&customer_hidden_at=${showHiddenPrivateRequests?'not.is.null':'is.null'}&status=neq.closed&order=created_at.desc&limit=50`);
+      const visibleRows=Array.isArray(rows)?rows.filter(item=>item.request_type!=='software_requirement'):rows;
       list.replaceChildren();
-      if(!Array.isArray(rows)||!rows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent=showHiddenPrivateRequests?'No hidden private requests.':'No private requests yet. Use Request payment link on a software listing or send a request through the Forum.';list.append(empty);return;}
+      if(!Array.isArray(visibleRows)||!visibleRows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent=showHiddenPrivateRequests?'No hidden private requests.':'No private messages yet. Software requests appear under Your orders.';list.append(empty);return;}
       const labels={software_requirement:'Software / payment-link request',wiring_diagram:'Wiring request',suggestion:'Suggestion',service_requirement:'Service request',feature_request:'Website feature',issue:'Support request',other:'Other request'};
-      rows.forEach(item=>{
+      visibleRows.forEach(item=>{
         const card=document.createElement('article');card.className='customer-private-request-card customer-order-card';
         const head=document.createElement('div');head.className='customer-orders-head';
         const tag=document.createElement('strong');tag.textContent=labels[item.request_type]||'Private request';
@@ -175,44 +176,43 @@
     let historyToggle=document.querySelector('#customer-order-history-toggle');
     if(!historyToggle){historyToggle=document.createElement('button');historyToggle.id='customer-order-history-toggle';historyToggle.type='button';historyToggle.className='button button-ghost';list.parentElement.insertBefore(historyToggle,list);historyToggle.addEventListener('click',function(){showHiddenOrders=!showHiddenOrders;loadCustomerOrders();});}
     historyToggle.textContent=showHiddenOrders?'Show active orders':'Show hidden orders';
-    if(!panel.dataset.customerOrderArchiveBound){panel.dataset.customerOrderArchiveBound='true';panel.addEventListener('click',async function(event){const button=event.target.closest('.customer-order-hide');if(!button)return;const orderId=button.getAttribute('data-order-id');if(!orderId||!session?.user?.id)return;const wasHidden=button.getAttribute('data-hidden')==='true';button.disabled=true;try{await rest('rpc/efsi_customer_hide_order',{method:'POST',body:{p_order_id:orderId,p_hidden:!wasHidden}});await loadCustomerOrders();}catch(error){button.disabled=false;const notice=document.createElement('p');notice.className='admin-message admin-error';notice.textContent='History update failed: '+(error.message||'Please retry.');list.prepend(notice);}});}
+    if(!panel.dataset.customerOrderArchiveBound){panel.dataset.customerOrderArchiveBound='true';panel.addEventListener('click',async function(event){
+      const button=event.target.closest('.customer-order-hide');if(button){const orderId=button.getAttribute('data-order-id');if(!orderId||!session?.user?.id)return;const wasHidden=button.getAttribute('data-hidden')==='true';button.disabled=true;try{await rest('rpc/efsi_customer_hide_order',{method:'POST',body:{p_order_id:orderId,p_hidden:!wasHidden}});await loadCustomerOrders();}catch(error){button.disabled=false;const notice=document.createElement('p');notice.className='admin-message admin-error';notice.textContent='History update failed: '+(error.message||'Please retry.');list.prepend(notice);}return;}
+      const softwareHide=event.target.closest('.customer-software-hide');if(softwareHide){const requestId=softwareHide.getAttribute('data-request-id');if(!requestId)return;const wasHidden=softwareHide.getAttribute('data-hidden')==='true';softwareHide.disabled=true;try{await rest('rpc/forum_hide_customer_request',{method:'POST',body:{p_request_id:requestId,p_hidden:!wasHidden}});await loadCustomerOrders();}catch(error){softwareHide.disabled=false;const notice=document.createElement('p');notice.className='admin-message admin-error';notice.textContent='History update failed: '+(error.message||'Please retry.');list.prepend(notice);}return;}
+      const softwareDownload=event.target.closest('.customer-software-download');if(softwareDownload){const requestId=softwareDownload.getAttribute('data-request-id');if(!requestId)return;softwareDownload.disabled=true;try{const response=await fetch('/api/customer/software-download',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+await accessToken()},body:JSON.stringify({requestId})});const result=await response.json().catch(()=>({}));if(!response.ok||!result.downloadUrl)throw new Error(result.error||'Secure download could not be prepared.');const link=document.createElement('a');link.href=result.downloadUrl;link.download=result.fileName||'software-file.bin';link.rel='noopener noreferrer';document.body.append(link);link.click();link.remove();}catch(error){const notice=document.createElement('p');notice.className='admin-message admin-error';notice.textContent=error.message||'Download failed. Please retry.';softwareDownload.closest('.customer-order-body')?.append(notice);}finally{softwareDownload.disabled=false;}}
+    });}
     const requestId = ++ordersRequest;
     list.textContent = 'Loading your orders…';
     try {
-      const rows = await rest(`orders?select=id,status,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,selected_services,payment_status,payment_provider,provider_order_id,provider_payment_id,second_stage_amount,second_stage_status,second_stage_payment_link,created_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,created_at),customer_hidden_at&customer_id=eq.${encodeURIComponent(customerId)}&customer_hidden_at=${showHiddenOrders?'not.is.null':'is.null'}&order=created_at.desc&limit=50`);
+      const [rows, softwareRows] = await Promise.all([
+        rest(`orders?select=id,status,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,selected_services,payment_status,payment_provider,provider_order_id,provider_payment_id,second_stage_amount,second_stage_status,second_stage_payment_link,created_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,created_at),customer_hidden_at&customer_id=eq.${encodeURIComponent(customerId)}&customer_hidden_at=${showHiddenOrders?'not.is.null':'is.null'}&order=created_at.desc&limit=50`),
+        rest(`forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_path,software_delivery_name,created_at,updated_at,customer_hidden_at&request_type=eq.software_requirement&customer_hidden_at=${showHiddenOrders?'not.is.null':'is.null'}&status=neq.closed&order=created_at.desc&limit=50`).catch(()=>[])
+      ]);
       if (requestId !== ordersRequest || session?.user?.id !== customerId) return;
-      if (!Array.isArray(rows) || !rows.length) { list.textContent = showHiddenOrders?'No hidden orders.':'No orders yet. Your active and completed requests will appear here.'; return; }
-      list.innerHTML = rows.map(order => {
+      if ((!Array.isArray(rows)||!rows.length) && (!Array.isArray(softwareRows)||!softwareRows.length)) { list.textContent = showHiddenOrders?'No hidden orders.':'No orders yet. Your active and completed file and software requests will appear here.'; return; }
+      const fileCards = (Array.isArray(rows)?rows:[]).map(order => {
         const files = Array.isArray(order.order_files) ? order.order_files : [];
         const processed = files.filter(file => file.kind === 'processed' && String(file.object_path || '').startsWith(`${customerId}/${order.id}/processed/`));
         const vehicle = [order.vehicle_year, order.vehicle_brand, order.vehicle_model].filter(Boolean).join(' ');
         const statusSteps = ['Payment', 'File Received', 'File Review', 'Processing', 'Completed'];
         const currentStepIndex = statusSteps.indexOf(order.status) >= 0 ? statusSteps.indexOf(order.status) : 0;
         const timeline = `<div class="order-timeline">${statusSteps.map((step, index) => `<span class="${index <= currentStepIndex ? 'active' : ''}">${step}</span>`).join(' → ')}</div>`;
-        const secondStage = order.second_stage_amount > 0 ? `
-          <div style="margin-top:10px;padding:10px;background:#fff8ed;border:1px solid #fce3b8;border-radius:4px">
-            <p style="margin:0 0 5px;font-size:12px"><strong>Second-Stage Payment:</strong> ${formatINR(order.second_stage_amount)} (${order.second_stage_status === 'paid' ? '<span style="color:#586b24">Paid</span>' : '<span style="color:#a87a2a">Pending</span>'})</p>
-            ${(order.second_stage_status !== 'paid' && order.second_stage_payment_link) ? `<a href="${escapeHtml(order.second_stage_payment_link)}" target="_blank" rel="noopener noreferrer" class="button button-dark" style="font-size:10px;padding:5px 10px;text-decoration:none;display:inline-block">Pay Now</a>` : ''}
-          </div>` : '';
-        return `<details class="customer-order-card customer-order-collapsible" data-order-id="${escapeHtml(order.id)}">
-          <summary class="customer-order-top">
-            <b>Order: ${escapeHtml(order.id.slice(0, 8))} · ${escapeHtml(vehicle || order.category)}</b>
-            <span>${escapeHtml(order.status)} <span aria-hidden="true">＋</span></span>
-          </summary>
-          <div class="customer-order-body">
-            <p><strong>Vehicle:</strong> ${escapeHtml(vehicle || order.category)}</p>
-            <p><strong>Services:</strong> ${escapeHtml((order.selected_services || []).join(', '))}</p>
-            <p><strong>Created:</strong> ${new Date(order.created_at).toLocaleDateString()}</p>
-            ${timeline}
-            ${secondStage}
-          </div>
-          <div class="customer-order-actions">
-            ${processed.length > 0 ? `<button type="button" class="customer-file-download" data-order-id="${escapeHtml(order.id)}" data-object-path="${escapeHtml(processed[0].object_path)}" data-file-name="${escapeHtml(processed[0].original_name)}">Result Ready · Download</button>` : '<small>Processing...</small>'}
-            <button type="button" class="customer-messages-open" data-order-id="${escapeHtml(order.id)}">Messages</button>
-            <button type="button" class="customer-order-hide" data-order-id="${escapeHtml(order.id)}" data-hidden="${order.customer_hidden_at ? 'true' : 'false'}">${order.customer_hidden_at ? 'Restore to history' : 'Hide from history'}</button>
-          </div>
-        </details>`;
-      }).join('');
+        const secondStage = order.second_stage_amount > 0 ? `<div style="margin-top:10px;padding:10px;background:#fff8ed;border:1px solid #fce3b8;border-radius:4px"><p style="margin:0 0 5px;font-size:12px"><strong>Second-Stage Payment:</strong> ${formatINR(order.second_stage_amount)} (${order.second_stage_status === 'paid' ? '<span style="color:#586b24">Paid</span>' : '<span style="color:#a87a2a">Pending</span>'})</p>${(order.second_stage_status !== 'paid' && order.second_stage_payment_link) ? `<a href="${escapeHtml(order.second_stage_payment_link)}" target="_blank" rel="noopener noreferrer" class="button button-dark" style="font-size:10px;padding:5px 10px;text-decoration:none;display:inline-block">Pay Now</a>` : ''}</div>` : '';
+        return `<details class="customer-order-card customer-order-collapsible" data-order-id="${escapeHtml(order.id)}"><summary class="customer-order-top"><b>File Order: ${escapeHtml(order.id.slice(0, 8))} · ${escapeHtml(vehicle || order.category)}</b><span>${escapeHtml(order.status)} <span aria-hidden="true">＋</span></span></summary><div class="customer-order-body"><p><strong>Vehicle:</strong> ${escapeHtml(vehicle || order.category)}</p><p><strong>Services:</strong> ${escapeHtml((order.selected_services || []).join(', '))}</p><p><strong>Created:</strong> ${new Date(order.created_at).toLocaleDateString()}</p>${timeline}${secondStage}</div><div class="customer-order-actions">${processed.length > 0 ? `<button type="button" class="customer-file-download" data-order-id="${escapeHtml(order.id)}" data-object-path="${escapeHtml(processed[0].object_path)}" data-file-name="${escapeHtml(processed[0].original_name)}">Result Ready · Download</button>` : '<small>Processing...</small>'}<button type="button" class="customer-messages-open" data-order-id="${escapeHtml(order.id)}">Messages</button><button type="button" class="customer-order-hide" data-order-id="${escapeHtml(order.id)}" data-hidden="${order.customer_hidden_at ? 'true' : 'false'}">${order.customer_hidden_at ? 'Restore to history' : 'Hide from history'}</button></div></details>`;
+      });
+      const softwareCards = (Array.isArray(softwareRows)?softwareRows:[]).map(item=>{
+        const rawStatus=String(item.software_status||'requested').toLowerCase();
+        const labels={requested:'Request received',in_review:'Under review',quoted:'Price quote prepared',awaiting_payment:'Payment required',paid:'Payment verified',delivered:'Download available',cancelled:'Request cancelled'};
+        const messages={requested:'Your software request has been received. Our team will review it and provide a price.',in_review:'Your request is under review. The team will update the quote and next step here.',quoted:'Your quote is ready. The secure payment link will appear here when issued.',awaiting_payment:'Your quote is confirmed. Pay securely using the Razorpay link below.',paid:'Payment verified. Your software is being prepared.',delivered:'Your software is ready for secure download.',cancelled:'This software request has been cancelled.'};
+        const steps=['Request','Quote','Payment','Preparing','Download'];const stepMap={requested:0,in_review:1,quoted:1,awaiting_payment:2,paid:3,delivered:4,cancelled:-1};const current=stepMap[rawStatus]??0;
+        const timeline=`<div class="order-timeline software-order-timeline">${steps.map((step,index)=>`<span class="${index<=current?'active':''}">${step}</span>`).join(' → ')}</div>`;
+        const price=item.quoted_price_paise!=null?`<p><strong>Quoted price:</strong> ${formatINR(Number(item.quoted_price_paise)/100)}</p>`:'';
+        const payment=rawStatus==='awaiting_payment'&&item.software_payment_link?`<a class="button button-dark" href="${escapeHtml(item.software_payment_link)}" target="_blank" rel="noopener noreferrer">Pay Now ↗</a>`:'';
+        const download=rawStatus==='delivered'&&item.software_delivery_path?`<button type="button" class="customer-software-download" data-request-id="${escapeHtml(item.id)}">Download software</button>`:'';
+        const reply=item.admin_reply?`<div class="customer-private-request-reply"><strong>TEAM MESSAGE</strong><p>${escapeHtml(item.admin_reply)}</p></div>`:'';
+        return `<details class="customer-order-card customer-order-collapsible customer-software-order-card"><summary class="customer-order-top"><b>Software Request: ${escapeHtml(item.title||'Software')}</b><span>${escapeHtml(labels[rawStatus]||'Request received')} <span aria-hidden="true">＋</span></span></summary><div class="customer-order-body"><p><strong>Request:</strong> ${escapeHtml(item.title||'Software request')}</p><p>${escapeHtml(item.body||'')}</p><p><strong>Submitted:</strong> ${new Date(item.created_at).toLocaleDateString()}</p>${timeline}<p>${escapeHtml(messages[rawStatus]||messages.requested)}</p>${price}${reply}${payment}${download}${item.updated_at?`<small>Last updated ${new Date(item.updated_at).toLocaleString()}</small>`:''}</div><div class="customer-order-actions"><button type="button" class="customer-software-hide" data-request-id="${escapeHtml(item.id)}" data-hidden="${item.customer_hidden_at?'true':'false'}">${item.customer_hidden_at?'Restore to history':'Hide from history'}</button></div></details>`;
+      });
+      list.innerHTML = [...fileCards,...softwareCards].join('');
     } catch (error) { if (requestId === ordersRequest) list.textContent = `Your order history could not be loaded. ${error.message || 'Retry.'}`; }
   }
 
