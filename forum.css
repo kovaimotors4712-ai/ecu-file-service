@@ -536,3 +536,10 @@ body.forum-page .forum-first-chat #live-chat #forum-chat-search{min-height:48px;
  body.forum-page .forum-first-chat .forum-auth-form .auth-actions{grid-column:auto}
  body.forum-page .forum-first-chat .forum-auth-form .button{flex:1}
 }
+
+
+/* Ensure the live chat is literally the first content section after the header. */
+body.forum-page .forum-main.forum-first-chat .forum-hero{order:3}
+body.forum-page .forum-main.forum-first-chat #live-chat{order:1}
+body.forum-page .forum-main.forum-first-chat #forum-account-panel{order:2}
+body.forum-page .forum-main.forum-first-chat #forum-username-panel{order:2}
