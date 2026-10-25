@@ -207,3 +207,27 @@ body{line-height:1.55}h1,h2,h3,p,label,button,a{overflow-wrap:break-word}button,
   outline:3px solid #3459c7;
   outline-offset:3px;
 }
+
+
+/* Unified customer requirement cards share the ECU order/payment presentation. */
+.customer-private-request-card{margin:0 0 12px;border:1px solid var(--line);background:#fff}
+.customer-private-request-card .customer-order-top{gap:12px;align-items:flex-start}
+.customer-private-request-card .customer-order-top b{font-size:13px;line-height:1.55;overflow-wrap:anywhere}
+.customer-private-request-card .customer-order-top>span{flex:0 0 auto;max-width:40%;font-size:11px;color:#60752a;text-align:right;font-weight:800;text-transform:capitalize}
+.customer-private-request-card .customer-order-body>p{font-size:12px;line-height:1.75;overflow-wrap:anywhere}
+.customer-requirement-timeline{margin:12px 0 14px}
+.customer-requirement-payment{margin:10px 0 12px;padding:12px;background:#fff8ed;border:1px solid #fce3b8;border-radius:6px}
+.customer-requirement-payment-heading{margin:0 0 8px;font-size:13px;line-height:1.6;color:#17201e;overflow-wrap:anywhere}
+.customer-requirement-payment .payment-paid{color:#586b24;font-weight:800}
+.customer-requirement-payment .payment-pending{color:#98651c;font-weight:800}
+.customer-requirement-note{margin:7px 0 0;color:#52605a;font-size:12px;line-height:1.7}
+.customer-requirement-pay,.customer-requirement-download{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 15px;font-size:12px;font-weight:800;margin-top:4px}
+.customer-private-request-messages{margin:10px 0}
+.customer-private-request-messages[hidden]{display:none!important}
+.customer-requirement-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.customer-requirement-actions .button,.customer-requirement-actions button{min-height:42px}
+.admin-requirement-workflow{color:#17201e}
+.admin-requirement-workflow label{display:grid;gap:5px;color:#17201e;font-weight:750;font-size:12px}
+.admin-requirement-workflow input,.admin-requirement-workflow select{width:100%;min-height:42px;padding:9px 10px;background:#fff;color:#17201e;border:1px solid #65716b;border-radius:5px;font-size:14px}
+.admin-request-delete{border-color:#8b1e1e!important;color:#8b1e1e!important;font-weight:800!important}
+@media(max-width:600px){.customer-private-request-card .customer-order-top b{font-size:12px}.customer-private-request-card .customer-order-top>span{font-size:10px}.customer-requirement-actions{gap:6px}.customer-requirement-actions button{flex:1 1 auto}}
