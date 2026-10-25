@@ -464,7 +464,7 @@ body.forum-page #live-chat .forum-chat-message{
 }
 body.forum-page #live-chat .forum-chat-message:nth-child(4n+1){background:#203747!important}
 body.forum-page #live-chat .forum-chat-message:nth-child(4n+2){background:#263e4e!important}
-body.forum-page #live-chat .forum-chat-message:nth-child(4n+3){background:#3a3429!important}
+body.forum-page #live-chat .forum-chat-message:nth-child(4n+3){background:#203747!important}
 body.forum-page #live-chat .forum-chat-message:nth-child(4n){background:#1b303f!important}
 body.forum-page #live-chat .forum-chat-avatar{
   background:#36566c!important;color:#fff!important;border:1px solid #d1a64c!important;
@@ -496,6 +496,6 @@ body.forum-page #live-chat .forum-chat-actions .button:hover{background:#e0bb68!
 @media(max-width:700px){
   body.forum-page #live-chat .forum-chat-message:nth-child(4n+1){background:#203747!important}
   body.forum-page #live-chat .forum-chat-message:nth-child(4n+2){background:#263e4e!important}
-  body.forum-page #live-chat .forum-chat-message:nth-child(4n+3){background:#3a3429!important}
+  body.forum-page #live-chat .forum-chat-message:nth-child(4n+3){background:#203747!important}
   body.forum-page #live-chat .forum-chat-message:nth-child(4n){background:#1b303f!important}
 }
