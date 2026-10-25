@@ -291,3 +291,38 @@
   body.forum-page .forum-disclaimer{padding:0 16px}
   body.forum-page .site-footer{width:100%;max-width:none;margin:0;padding:18px 16px}
 }
+
+
+/* Compact high-density social comments: fit many short messages per phone screen. */
+@media(max-width:700px){
+  body.forum-page #live-chat .forum-chat-toolbar{padding:7px 12px}
+  body.forum-page #live-chat .forum-chat-toolbar .muted{font-size:10px;line-height:1.25}
+  body.forum-page #live-chat .forum-chat-toolbar .state-pill{font-size:10px;padding:4px 7px}
+  body.forum-page #live-chat .forum-chat-list{padding:0;margin:0;gap:0}
+  body.forum-page #live-chat .forum-chat-message{
+    grid-template-columns:25px minmax(0,1fr);gap:0 7px;
+    padding:7px 12px 6px;border-bottom:1px solid #eceef1;
+  }
+  body.forum-page #live-chat .forum-chat-avatar{
+    width:23px;height:23px;font-size:8px;grid-column:1;grid-row:1 / span 3;
+  }
+  body.forum-page #live-chat .forum-chat-message-head{gap:4px;line-height:1.15}
+  body.forum-page #live-chat .forum-chat-message-head strong{font-size:10px;line-height:1.2}
+  body.forum-page #live-chat .forum-chat-message-head time{font-size:9px;line-height:1.2}
+  body.forum-page #live-chat .forum-chat-message p{
+    font-size:10px;line-height:1.25;margin:2px 0 2px;
+    font-weight:400;overflow-wrap:anywhere;
+  }
+  body.forum-page #live-chat .forum-chat-message .chat-reply-button{
+    min-height:18px;padding:0;font-size:9px;line-height:1.2;
+  }
+  body.forum-page #live-chat .forum-chat-message .chat-reply-reference{
+    margin:2px 0;padding:4px 6px;font-size:9px;line-height:1.25;
+  }
+  body.forum-page #live-chat .forum-chat-form{padding:10px 12px}
+  body.forum-page #live-chat .forum-chat-form label{font-size:11px;gap:5px}
+  body.forum-page #live-chat .forum-chat-form textarea{min-height:48px;font-size:12px;line-height:1.3;padding:8px 12px}
+  body.forum-page #live-chat .forum-chat-actions{gap:6px;margin-top:6px}
+  body.forum-page #live-chat .forum-chat-actions .muted{font-size:10px;line-height:1.3}
+  body.forum-page #live-chat .forum-chat-actions .button{min-height:30px;padding:5px 9px;font-size:10px}
+}
