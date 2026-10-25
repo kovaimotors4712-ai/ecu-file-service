@@ -1,3 +1,4 @@
+# Public pages are crawlable; restrict only private/admin and API paths.
 User-agent: *
 Allow: /
 Disallow: /admin
