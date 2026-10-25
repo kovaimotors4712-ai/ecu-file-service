@@ -42,7 +42,7 @@
     </section>
     <section id="admin-dashboard" hidden>
       <div class="admin-title">
-        <div><span class="form-kicker">OPERATIONS</span><h1>Orders</h1><p>Review customer requests, update status and deliver processed files.</p></div>
+        <div><span class="form-kicker">OPERATIONS</span><h1>Orders</h1><p>Review customer requests, update status and deliver processed files. Use Archive/Restore for orders; permanent deletion is restricted to unpaid private requests with no payment or delivery history.</p></div>
         <button id="refresh-orders" class="button button-ghost" type="button">↻ Refresh</button>
       </div>
       <section class="pricing-settings" aria-labelledby="pricing-settings-title">
@@ -156,7 +156,7 @@
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js"></script>
-  <script src="auth.js?v=20261023-customer-archive"></script>
-  <script src="admin.js?v=20261024-delete-enquiries"></script>
+  <script src="auth.js?v=20261025-admin-actions"></script>
+  <script src="admin.js?v=20261025-admin-delete-requests"></script>
 </body>
 </html>
