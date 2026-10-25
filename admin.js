@@ -20,6 +20,7 @@
   let showArchivedOrders = false;
   let showArchivedCustomerRequests = false;
   let showArchivedAdvertisingInquiries = false;
+  let requirementPaymentPollTimer = null;
   let attachmentPreviewUrls = [];
   let photoPreviewObserver = null;
   let realtimeClient = null;
@@ -712,6 +713,20 @@
     });
     title.after(nav,grid);updateAdminFolderBadges();
   }
+  function scheduleRequirementPaymentPoll(rows) {
+    if(requirementPaymentPollTimer){clearTimeout(requirementPaymentPollTimer);requirementPaymentPollTimer=null;}
+    if(showArchivedCustomerRequests||dashboard.hidden)return;
+    const pending=(Array.isArray(rows)?rows:[]).filter(row=>row.software_status==='awaiting_payment'&&row.software_payment_link_id).slice(0,10);
+    if(!pending.length)return;
+    requirementPaymentPollTimer=setTimeout(async function(){
+      requirementPaymentPollTimer=null;
+      let updated=false;
+      await Promise.all(pending.map(async row=>{try{const result=await adminApi('/api/admin/requirements/verify-payment',{method:'POST',body:JSON.stringify({requestId:row.id})});if(result?.verified&&!result.alreadyVerified)updated=true;}catch{} }));
+      if(updated){await loadAdminCustomerRequests();return;}
+      scheduleRequirementPaymentPoll(pending);
+    },30000);
+  }
+
   async function loadAdminCustomerRequests() {
     const list=document.querySelector('#admin-customer-requests-list'),status=document.querySelector('#admin-customer-requests-message');if(!list||!status)return;
     let archiveToggle=document.querySelector('#admin-customer-requests-archive-toggle');
@@ -720,8 +735,8 @@
     status.classList.remove('admin-error');status.textContent='Loading customer requirements…';
     try{
       const archiveFilter=showArchivedCustomerRequests?'not.is.null':'is.null';
-      const rows=await backend.rest(`forum_customer_requests?select=id,user_id,request_type,title,body,status,admin_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_url,software_delivery_path,software_delivery_name,created_at,updated_at,admin_archived_at&admin_archived_at=${archiveFilter}&order=created_at.asc&limit=200`);
-      adminRequestRows=Array.isArray(rows)?rows:[];list.replaceChildren();
+      const rows=await backend.rest(`forum_customer_requests?select=id,user_id,request_type,title,body,status,admin_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_payment_link_id,software_delivery_url,software_delivery_path,software_delivery_name,created_at,updated_at,admin_archived_at&admin_archived_at=${archiveFilter}&order=created_at.asc&limit=200`);
+      adminRequestRows=Array.isArray(rows)?rows:[];scheduleRequirementPaymentPoll(adminRequestRows);list.replaceChildren();
       if(!adminRequestRows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='No customer requirements have been submitted yet.';list.append(empty);}
       adminRequestRows.forEach(function(row){
         const card=document.createElement('article');card.className='admin-order-card admin-request-card';
