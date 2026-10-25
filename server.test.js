@@ -1990,7 +1990,9 @@ test('customer private requests have hide-from-history controls and readable acc
   assert.match(css, /#customer-private-request-history-toggle[\s\S]*?color:#17201e !important/);
   assert.match(html, /styles\.css\?v=20261025-forum-dark-neon/);
   assert.match(html, /auth\.js\?v=20261025-homepage-order/);
-  assert.match(migration, /r\.user_id = auth\.uid\(\)/);
+  assert.match(migration, /user_id = auth\.uid\(\)/);
+  assert.match(migration, /software_payment_link_id is not null/);
+  assert.match(migration, /Use Hide from history instead/);
 });
 
 
