@@ -2014,7 +2014,7 @@ test('private software delivery requires customer ownership and a delivered file
   assert.match(serverSource, /String\(row\.software_status \|\| ''\)\.toLowerCase\(\) !== 'delivered'/);
   assert.match(serverSource, /storage\/v1\/object\/sign\/private-ecu-files/);
   assert.match(serverSource, /url\.pathname === '\/api\/customer\/software-download'/);
-  assert.match(adminSource, /Upload private result file/);
+  assert.match(adminSource, /Upload private requirement result file/);
   assert.match(adminSource, /software_delivery_path:objectPath/);
   assert.match(customerSource, /api\/customer\/software-download/);
   assert.match(customerSource, /Result Ready · Download/);
