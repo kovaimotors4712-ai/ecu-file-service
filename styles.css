@@ -207,3 +207,15 @@ body{line-height:1.55}h1,h2,h3,p,label,button,a{overflow-wrap:break-word}button,
   outline:3px solid #3459c7;
   outline-offset:3px;
 }
+
+
+/* Requirement cards use the same order-like layout, with payment only after admin pricing. */
+.customer-requirement-order-card{display:block;border:1px solid var(--line);padding:14px;margin:0 0 10px;background:#fff;font-size:14px;line-height:1.55;overflow-wrap:anywhere}
+.customer-requirement-order-card .customer-orders-head{gap:10px;align-items:flex-start;flex-wrap:wrap}
+.customer-requirement-order-card .customer-orders-head strong{font-size:14px;color:var(--ink)}
+.customer-requirement-order-card h3{font-size:17px;line-height:1.35;margin:8px 0}
+.customer-requirement-order-card .order-timeline{margin:12px 0;font-size:12px;line-height:1.8;overflow-wrap:anywhere}
+.customer-requirement-payment{margin-top:10px;padding:12px;background:#fff8ed;border:1px solid #fce3b8;border-radius:5px}
+.customer-requirement-payment p{margin:0 0 8px;color:#29332e;font-size:14px}
+.customer-requirement-order-card .customer-order-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.customer-requirement-order-card .customer-order-actions button{min-height:42px}
