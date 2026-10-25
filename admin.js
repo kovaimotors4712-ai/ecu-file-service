@@ -19,6 +19,7 @@
   let orders = [];
   let showArchivedOrders = false;
   let showArchivedCustomerRequests = false;
+  let showArchivedAdvertisingInquiries = false;
   let attachmentPreviewUrls = [];
   let photoPreviewObserver = null;
   let realtimeClient = null;
@@ -542,18 +543,37 @@
 
   async function loadAdvertisingInquiries() {
     const list = document.querySelector('#advertising-inquiry-list');
+    if(!list)return;
+    let archiveToggle=document.querySelector('#advertising-inquiry-archive-toggle');
+    if(!archiveToggle){archiveToggle=document.createElement('button');archiveToggle.id='advertising-inquiry-archive-toggle';archiveToggle.type='button';archiveToggle.className='button button-ghost';list.parentElement.insertBefore(archiveToggle,list);archiveToggle.addEventListener('click',function(){showArchivedAdvertisingInquiries=!showArchivedAdvertisingInquiries;loadAdvertisingInquiries();});}
+    archiveToggle.textContent=showArchivedAdvertisingInquiries?'Show active enquiries':'Show archived enquiries';
     try {
       const result = await adminApi('/api/admin/advertising/inquiries');
+      const allItems=Array.isArray(result.items)?result.items:[];
+      const items=allItems.filter(item=>Boolean(item.admin_archived_at)===showArchivedAdvertisingInquiries);
       const inquirySelect=document.querySelector('#advertising-quote-inquiry');
       if(inquirySelect){
         const previous=inquirySelect.value;
-        inquirySelect.innerHTML='<option value="">Choose an enquiry…</option>'+(result.items||[]).filter(item=>!['declined','closed'].includes(item.status)).map(item=>'<option value="'+escape(item.id)+'">'+escape(item.business_name)+' — '+escape(item.email)+' ('+escape(item.status)+')</option>').join('');
+        inquirySelect.innerHTML='<option value="">Choose an enquiry…</option>'+allItems.filter(item=>!item.admin_archived_at&&!['declined','closed'].includes(item.status)).map(item=>'<option value="'+escape(item.id)+'">'+escape(item.business_name)+' — '+escape(item.email)+' ('+escape(item.status)+')</option>').join('');
         if(previous)inquirySelect.value=previous;
       }
-      list.innerHTML = (result.items||[]).map(item => '<article class="admin-order-card" style="padding:14px;margin-bottom:10px"><span class="form-kicker">'+escape(item.ad_type)+' · '+escape(new Date(item.created_at).toLocaleString())+'</span><h3>'+escape(item.business_name)+'</h3><p>'+escape(item.contact_name)+' · '+escape(item.email)+' · '+escape(item.phone)+'</p>'+(item.website?'<p><a href="'+escape(item.website)+'" target="_blank" rel="noopener noreferrer">'+escape(item.website)+'</a></p>':'')+'<p>'+escape(item.message)+'</p><label>Status <select data-inquiry-id="'+escape(item.id)+'"><option value="new">New</option><option value="contacted">Contacted</option><option value="approved">Approved</option><option value="declined">Declined</option><option value="closed">Closed</option></select></label><button type="button" class="button button-ghost" data-delete-inquiry-id="'+escape(item.id)+'">Delete enquiry</button></article>').join('') || '<p>No advertiser enquiries received yet.</p>';
-      list.querySelectorAll('button[data-delete-inquiry-id]').forEach(button=>button.addEventListener('click',async()=>{const item=(result.items||[]).find(x=>x.id===button.dataset.deleteInquiryId);if(!item||!window.confirm('Permanently delete this advertiser enquiry? This is allowed only when no quote/payment history exists.'))return;button.disabled=true;const message=document.querySelector('#advertising-inquiry-message');message.classList.remove('admin-error');message.textContent='Checking linked quote/payment history…';try{await adminApi('/api/admin/advertising/inquiries',{method:'DELETE',body:JSON.stringify({id:item.id})});message.textContent='Enquiry deleted.';await loadAdvertisingInquiries();await loadAdvertisingQuotes();}catch(error){message.textContent=error.message||'Enquiry could not be deleted. Enquiries with quote/payment history must be closed instead.';message.classList.add('admin-error');button.disabled=false;}}));
-      list.querySelectorAll('select[data-inquiry-id]').forEach(select => {
-        const item=(result.items||[]).find(x=>x.id===select.dataset.inquiryId); select.value=item?.status||'new';
+      list.innerHTML=items.map(item=>'<article class="admin-order-card" style="padding:14px;margin-bottom:10px"><span class="form-kicker">'+escape(item.ad_type)+' · '+escape(new Date(item.created_at).toLocaleString())+'</span><h3>'+escape(item.business_name)+'</h3><p>'+escape(item.contact_name)+' · '+escape(item.email)+' · '+escape(item.phone)+'</p>'+(item.website?'<p><a href="'+escape(item.website)+'" target="_blank" rel="noopener noreferrer">'+escape(item.website)+'</a></p>':'')+'<p>'+escape(item.message)+'</p><label>Status <select data-inquiry-id="'+escape(item.id)+'"><option value="new">New</option><option value="contacted">Contacted</option><option value="approved">Approved</option><option value="declined">Declined</option><option value="closed">Closed</option></select></label><div class="admin-inquiry-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="button button-ghost" data-archive-inquiry-id="'+escape(item.id)+'" data-archived="'+String(Boolean(item.admin_archived_at))+'">'+(item.admin_archived_at?'Restore enquiry':'Remove from active list')+'</button><button type="button" class="button button-ghost" data-delete-inquiry-id="'+escape(item.id)+'">Delete enquiry</button></div></article>').join('')||(showArchivedAdvertisingInquiries?'<p>No archived advertiser enquiries.</p>':'<p>No active advertiser enquiries.</p>');
+      list.querySelectorAll('button[data-archive-inquiry-id]').forEach(button=>button.addEventListener('click',async()=>{
+        const item=items.find(x=>x.id===button.dataset.archiveInquiryId);if(!item)return;
+        const archived=button.dataset.archived==='true';
+        if(!archived&&!window.confirm('Remove this enquiry from the active list? It will be retained and can be restored.'))return;
+        button.disabled=true;const message=document.querySelector('#advertising-inquiry-message');message.classList.remove('admin-error');message.textContent=archived?'Restoring enquiry…':'Archiving enquiry…';
+        try{await adminApi('/api/admin/advertising/inquiries',{method:'PATCH',body:JSON.stringify({id:item.id,archived:!archived})});message.textContent=archived?'Enquiry restored to active list.':'Enquiry archived. Quote and payment history are retained.';await loadAdvertisingInquiries();}
+        catch(error){message.textContent=error.message||'Enquiry archive change failed.';message.classList.add('admin-error');button.disabled=false;}
+      }));
+      list.querySelectorAll('button[data-delete-inquiry-id]').forEach(button=>button.addEventListener('click',async()=>{
+        const item=items.find(x=>x.id===button.dataset.deleteInquiryId);if(!item||!window.confirm('Permanently delete this advertiser enquiry? This is allowed only when no quote/payment history exists.'))return;
+        button.disabled=true;const message=document.querySelector('#advertising-inquiry-message');message.classList.remove('admin-error');message.textContent='Checking linked quote/payment history…';
+        try{await adminApi('/api/admin/advertising/inquiries',{method:'DELETE',body:JSON.stringify({id:item.id})});message.textContent='Enquiry deleted.';await loadAdvertisingInquiries();await loadAdvertisingQuotes();}
+        catch(error){message.textContent=error.message||'Enquiry could not be deleted. Archive it if it has quote/payment history.';message.classList.add('admin-error');button.disabled=false;}
+      }));
+      list.querySelectorAll('select[data-inquiry-id]').forEach(select=>{
+        const item=items.find(x=>x.id===select.dataset.inquiryId);select.value=item?.status||'new';
         select.addEventListener('change',async()=>{select.disabled=true;try{await adminApi('/api/admin/advertising/inquiries',{method:'PATCH',body:JSON.stringify({id:select.dataset.inquiryId,status:select.value})});document.querySelector('#advertising-inquiry-message').textContent='Enquiry status updated.';}catch(error){document.querySelector('#advertising-inquiry-message').textContent=error.message;select.value=item?.status||'new';}finally{select.disabled=false;}});
       });
     } catch(error) { list.textContent=error.message; }
