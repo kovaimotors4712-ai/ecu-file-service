@@ -433,3 +433,69 @@ body.forum-page #live-chat .forum-chat-actions .button:hover{background:#d0ad64}
   body.forum-page #live-chat .forum-chat-toolbar{padding:7px 12px}
   body.forum-page #live-chat .forum-chat-message{padding-top:7px;padding-bottom:6px}
 }
+
+
+/* Higher-contrast professional live chat: dark navy section, distinct deep-tinted message rows. */
+body.forum-page #live-chat.live-chat-panel{
+  background:#101e2a!important;border:1px solid #314657!important;border-top:4px solid #d1a64c!important;
+  box-shadow:0 10px 30px #0c19251c!important;
+}
+body.forum-page #live-chat .section-heading{
+  background:#142b3c!important;border-bottom:1px solid #365064;
+}
+body.forum-page #live-chat .section-heading h2{color:#f5f7fa!important}
+body.forum-page #live-chat .section-heading .forum-kicker{color:#e0bb68!important}
+body.forum-page #live-chat .section-heading .state-pill{
+  background:#203d51!important;color:#eaf1f5!important;border-color:#45647a!important;
+}
+body.forum-page #live-chat>.muted{
+  background:#1b3447!important;color:#c1d0da!important;border-bottom:1px solid #385267!important;
+}
+body.forum-page #live-chat .forum-chat-toolbar{
+  background:#203d51!important;border-bottom:1px solid #3d5a6e!important;
+}
+body.forum-page #live-chat .forum-chat-toolbar .state-pill{
+  background:#d8e5ed!important;color:#173246!important;border-color:#9fb7c7!important;
+}
+body.forum-page #live-chat .forum-chat-toolbar .muted{color:#d0dce4!important}
+body.forum-page #live-chat .forum-chat-list{background:#142431!important}
+body.forum-page #live-chat .forum-chat-message{
+  border-bottom:1px solid #3c5363!important;
+}
+body.forum-page #live-chat .forum-chat-message:nth-child(4n+1){background:#203747!important}
+body.forum-page #live-chat .forum-chat-message:nth-child(4n+2){background:#263e4e!important}
+body.forum-page #live-chat .forum-chat-message:nth-child(4n+3){background:#3a3429!important}
+body.forum-page #live-chat .forum-chat-message:nth-child(4n){background:#1b303f!important}
+body.forum-page #live-chat .forum-chat-avatar{
+  background:#36566c!important;color:#fff!important;border:1px solid #d1a64c!important;
+}
+body.forum-page #live-chat .forum-chat-message:nth-child(4n+3) .forum-chat-avatar{
+  background:#8a6b31!important;color:#fff!important;border-color:#f0d28a!important;
+}
+body.forum-page #live-chat .forum-chat-message-head strong{color:#f2f6f9!important}
+body.forum-page #live-chat .forum-chat-message-head time{color:#b7c6d0!important}
+body.forum-page #live-chat .forum-chat-message p{color:#e8eef2!important}
+body.forum-page #live-chat .forum-chat-message .chat-reply-button{color:#e0bb68!important}
+body.forum-page #live-chat .forum-chat-message .chat-reply-button:hover{color:#ffe2a0!important}
+body.forum-page #live-chat .forum-chat-message .chat-reply-reference{
+  background:#30495a!important;border-left-color:#d1a64c!important;color:#e1eaf0!important;
+}
+body.forum-page #live-chat .forum-chat-form{
+  background:#1a3244!important;border-top:1px solid #3b5669!important;
+}
+body.forum-page #live-chat .forum-chat-form label{color:#edf2f6!important}
+body.forum-page #live-chat .forum-chat-form textarea{
+  background:#263f51!important;border-color:#496579!important;color:#fff!important;
+}
+body.forum-page #live-chat .forum-chat-form textarea::placeholder{color:#b8c8d3!important}
+body.forum-page #live-chat .forum-chat-actions .muted{color:#c3d0d9!important}
+body.forum-page #live-chat .forum-chat-actions .button{
+  background:#d1a64c!important;border-color:#e0bb68!important;color:#172735!important;font-weight:800;
+}
+body.forum-page #live-chat .forum-chat-actions .button:hover{background:#e0bb68!important}
+@media(max-width:700px){
+  body.forum-page #live-chat .forum-chat-message:nth-child(4n+1){background:#203747!important}
+  body.forum-page #live-chat .forum-chat-message:nth-child(4n+2){background:#263e4e!important}
+  body.forum-page #live-chat .forum-chat-message:nth-child(4n+3){background:#3a3429!important}
+  body.forum-page #live-chat .forum-chat-message:nth-child(4n){background:#1b303f!important}
+}
