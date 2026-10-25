@@ -84,11 +84,11 @@
       </section>
 
 <section class="pricing-settings" aria-labelledby="software-products-title" style="margin-top:28px;display:block">
-<div><span class="form-kicker">SOFTWARE STORE</span><h2 id="software-products-title">Software listings & pricing</h2><p>Add, edit, price and publish software products. Published listings appear on the homepage after File Services and on the Software Store page. The current catalogue is enquiry-based; it does not take software payments.</p></div>
+<div><span class="form-kicker">SOFTWARE STORE</span><h2 id="software-products-title">Software listings & pricing</h2><p>Add and publish software listings. Price is optional: leave it blank and customers can request a quote. For each request, review it, set the customer-specific price, generate a Razorpay payment link, verify payment, then upload the private software file.</p></div>
 <form id="software-product-form" class="pricing-form" style="margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
 <label>Software / product name<input name="title" maxlength="180" required placeholder="e.g. Workshop diagnostic utility"></label>
 <label>Version / edition<input name="version" maxlength="80" placeholder="e.g. v2.1"></label>
-<label>Price (INR)<input name="price" type="number" min="0" max="1000000000" step="0.01" required inputmode="decimal" placeholder="0.00"></label>
+<label>Price (INR)<input name="price" type="number" min="0" max="1000000000" step="0.01" inputmode="decimal" placeholder="Leave blank for quote-on-request"></label>
 <label style="display:flex;align-items:center;gap:8px"><input name="price_visible" type="checkbox"> Show price publicly (unchecked = “Request price”)</label>
 <label>Listing order<input name="sort_order" type="number" min="0" max="100000" step="1" value="100" required></label>
 <label style="grid-column:1/-1">Description<textarea name="description" maxlength="4000" rows="3" placeholder="Contents, compatibility, licence and important conditions"></textarea></label>
