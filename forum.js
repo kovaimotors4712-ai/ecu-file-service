@@ -579,6 +579,26 @@
     } catch (_) {chatList.replaceChildren();const empty=document.createElement('div');empty.className='forum-chat-message empty';empty.textContent='Live chat is temporarily unavailable. You can still search and read workshop topics below.';chatList.append(empty);}
     finally {chatRefreshBusy=false;}
   }
+  function classifyChatTopic(message) {
+    const q = String(message || '').toLowerCase();
+    const dtc = q.match(/\\b(?:dtc\\s*)?((?:p|b|c|u)[0-3][0-9a-f]{3})\\b/i);
+    if (dtc || /\\bdtc\\b|fault code|trouble code|diagnostic code|check engine|freeze.?frame/i.test(q)) {
+      return { slug: 'dtc-troubleshooting', title: (dtc ? dtc[1].toUpperCase() + ' — ' : '') + 'DTC troubleshooting: ' + String(message).trim().slice(0, 110) };
+    }
+    if (/\\b(edc\\d+|md1|mdg1|dcm\\s*\\d|me\\d+|ecu|ecm|pcm|bosch|denso|continental)\\b/i.test(q)) {
+      return { slug: 'ecu-identification', title: 'ECU identification: ' + String(message).trim().slice(0, 130) };
+    }
+    if (/wiring|wire harness|pinout|connector|ground wire|voltage drop|short circuit|open circuit|continuity test/i.test(q)) {
+      return { slug: 'wiring-electrical', title: 'Wiring & electrical: ' + String(message).trim().slice(0, 130) };
+    }
+    if (/winols|j2534|openport|flash tool|bench tool|diagnostic tool|software version|license|licence/i.test(q)) {
+      return { slug: 'tools-software', title: 'Tools & software: ' + String(message).trim().slice(0, 130) };
+    }
+    if (/airbag|srs|high voltage|hybrid battery|ev battery|restraint system/i.test(q)) {
+      return { slug: 'workshop-safety', title: 'Workshop safety: ' + String(message).trim().slice(0, 130) };
+    }
+    return null;
+  }
   function assistantReply(message) {
     const q = message.toLowerCase();
     if (/dtc|fault code|p0[0-9a-f]{3}/i.test(q)) return 'Community Assistant (automated): Please include the exact DTC, vehicle year/engine, ECU part number, freeze-frame data and tests already performed. Verify the next step against authoritative service information; this is not a confirmed diagnosis.';
@@ -594,9 +614,28 @@
     if (!body || body.length > 1200) { if (chatStatus) chatStatus.textContent = 'Messages must be 1–1,200 characters.'; return; }
     chatSend.disabled = true;
     try {
-      await api.rest('forum_chat_messages', { method: 'POST', body: { author_id: user.id, body: body, reply_to_message_id: selectedChatReply ? selectedChatReply.id : null }, prefer: 'return=minimal' });
-      chatInput.value = ''; selectedChatReply = null; $('#forum-chat-reply-context').hidden = true; chatInput.placeholder = 'Ask a concise diagnostic question. Never share VINs, passwords or customer data.'; if (chatStatus) chatStatus.textContent = 'Message posted.';
+      const savedMessage = await api.rest('forum_chat_messages?select=id', { method: 'POST', body: { author_id: user.id, body: body, reply_to_message_id: selectedChatReply ? selectedChatReply.id : null }, prefer: 'return=representation' });
+      const postedMessage = Array.isArray(savedMessage) ? savedMessage[0] : savedMessage;
+      let autoTopicSaved = false;
+      try {
+        const classification = classifyChatTopic(body);
+        if (postedMessage && validUuid(postedMessage.id) && classification && body.length >= 40 && profile) {
+          const category = categories.find(function (item) { return item.slug === classification.slug; });
+          if (category) {
+            const title = classification.title.length >= 8 ? classification.title.slice(0, 160) : ('Workshop discussion: ' + classification.title).slice(0, 160);
+            const topicBody = 'Automatically saved from the public live workshop chat. Original message by ' + (profile.display_name || 'community member') + ':\\n\\n' + body;
+            await api.rest('forum_topics?select=id', {
+              method: 'POST',
+              body: { category_id: category.id, author_id: user.id, title: title, body: topicBody, source_chat_message_id: postedMessage.id },
+              prefer: 'return=representation'
+            });
+            autoTopicSaved = true;
+          }
+        }
+      } catch (_) { /* Chat must still work if auto-topic promotion is rate-limited or unavailable. */ }
+      chatInput.value = ''; selectedChatReply = null; $('#forum-chat-reply-context').hidden = true; chatInput.placeholder = 'Ask a concise diagnostic question. Never share VINs, passwords or customer data.'; if (chatStatus) chatStatus.textContent = autoTopicSaved ? 'Message posted and saved automatically to Workshop Topics.' : 'Message posted.';
       await loadChatMessages();
+      if (autoTopicSaved) await loadTopics();
       // A transparent, clearly labelled automated prompt is shown locally only; it never impersonates a user or writes fake chat history.
       const assistant = document.createElement('article'); assistant.className = 'forum-chat-message assistant';
       const head = document.createElement('div'); head.className = 'forum-chat-message-head';
