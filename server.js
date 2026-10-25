@@ -1550,6 +1550,36 @@ async function handleRequirementMessages(request, response, adminMode) {
   return true;
 }
 
+
+async function handleCustomerRefreshRequirementPayment(request, response) {
+  if (request.method !== 'POST') { jsonResponse(response,405,{error:'Method Not Allowed'}); return true; }
+  try {
+    const customer=await requireCustomer(request);
+    if(!customer){jsonResponse(response,401,{error:'Please sign in to refresh payment status.'});return true;}
+    if(!hasRazorpayConfig()||!supabaseServiceRoleKey){jsonResponse(response,503,{error:'Secure payment status refresh is temporarily unavailable.'});return true;}
+    const body=await readJson(request,2048);
+    const requestId=String(body?.requestId||'');
+    if(!/^[0-9a-f-]{36}$/i.test(requestId)){jsonResponse(response,400,{error:'Invalid requirement reference.'});return true;}
+    const token=serviceToken();
+    const loaded=await supabaseRequest(token,'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,user_id,request_type,status,software_status,quoted_price_paise,software_payment_link_id&limit=1',{timeoutMs:12000});
+    if(!loaded.ok){jsonResponse(response,502,{error:'Requirement payment status could not be loaded.'});return true;}
+    const row=(await loaded.json())?.[0];
+    if(!row||row.user_id!==customer.id){jsonResponse(response,404,{error:'Requirement not found in your account.'});return true;}
+    if(['suggestion','feature_request'].includes(String(row.request_type||''))){jsonResponse(response,409,{error:'This request does not use a paid second-stage checkout.'});return true;}
+    if(String(row.status||'').toLowerCase()==='closed'&&!['paid','delivered'].includes(String(row.software_status||'').toLowerCase())){jsonResponse(response,200,{verified:false,closed:true,status:row.software_status||'cancelled'});return true;}
+    if(['paid','delivered'].includes(String(row.software_status||'').toLowerCase())){jsonResponse(response,200,{verified:true,alreadyVerified:true,status:row.software_status});return true;}
+    if(String(row.software_status||'').toLowerCase()!=='awaiting_payment'||!row.software_payment_link_id){jsonResponse(response,200,{verified:false,status:row.software_status||'requested'});return true;}
+    const expected=Number(row.quoted_price_paise);
+    if(!(expected>0)){jsonResponse(response,409,{error:'The agreed second-stage price is not valid.'});return true;}
+    const link=await razorpayApi('payment_links/'+encodeURIComponent(row.software_payment_link_id));
+    if(String(link?.status||'').toLowerCase()!=='paid'||Number(link?.amount)!==expected||Number(link?.amount_paid)!==expected){jsonResponse(response,200,{verified:false,status:row.software_status,paymentStatus:String(link?.status||'unknown')});return true;}
+    const saved=await supabaseRequest(token,'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,software_status,status,quoted_price_paise',{method:'PATCH',prefer:'return=representation',body:{software_status:'paid',status:'in_review',updated_at:new Date().toISOString()},timeoutMs:12000});
+    if(!saved.ok){jsonResponse(response,502,{error:'Razorpay confirmed payment but the request status could not be saved.'});return true;}
+    jsonResponse(response,200,{verified:true,item:(await saved.json())?.[0]||null});
+  }catch(error){jsonResponse(response,error.statusCode||(error.code==='RAZORPAY_UPSTREAM'?502:400),{error:error.message||'Payment status refresh failed.'});}
+  return true;
+}
+
 async function handleAdminDeleteCustomerRequest(request, response) {
   if (request.method !== 'POST') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
   try {
@@ -2031,6 +2061,7 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/admin/customer-requests/delete') return handleAdminDeleteCustomerRequest(request, response);
   if (url.pathname === '/api/admin/requirements/messages') return handleRequirementMessages(request, response, true);
   if (url.pathname === '/api/customer/requirements/messages') return handleRequirementMessages(request, response, false);
+  if (url.pathname === '/api/customer/requirements/refresh-payment') return handleCustomerRefreshRequirementPayment(request, response);
   if (url.pathname === '/api/admin/requirements/payment-link' || url.pathname === '/api/admin/software-requests/payment-link') return handleAdminCreateSoftwarePaymentLink(request, response);
   if (url.pathname === '/api/admin/requirements/verify-payment' || url.pathname === '/api/admin/software-requests/verify-payment') return handleAdminVerifySoftwarePayment(request, response);
   if (url.pathname === '/api/customer/software-download') return handleCustomerSoftwareDownload(request, response);
