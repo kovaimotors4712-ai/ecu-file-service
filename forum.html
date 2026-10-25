@@ -57,8 +57,7 @@
     <a class="forum-home-link" href="/">Back to service</a>
   </header>
 
-  <main class="forum-main forum-first-chat">
-<section class="panel live-chat-panel" id="live-chat" aria-labelledby="live-chat-heading">
+  <section class="panel live-chat-panel" id="live-chat" aria-labelledby="live-chat-heading">
         <div class="section-heading"><div><p class="forum-kicker"><span></span> LIVE WORKSHOP CHAT</p><h2 id="live-chat-heading">Community live desk</h2></div><span class="state-pill"><span class="live-pulse"></span> Refreshes automatically</span></div>
         <p class="muted">Chat with signed-in community members. Detailed DTC, ECU, wiring and tooling messages are automatically classified into searchable Workshop Topics when a matching category is found. Short or unclear messages stay in chat. The Community Assistant is explicitly labelled when it responds.</p>
         <div class="forum-chat-toolbar"><span class="state-pill">Recent community messages</span><span class="muted">Reply directly to a member's message.</span></div>
@@ -72,61 +71,6 @@
           <div class="forum-chat-actions"><small id="forum-chat-status" class="muted">Sign in to post. Public messages are visible to visitors.</small><button type="submit" class="button button-lime" id="forum-chat-send" disabled>Send message ↗</button></div>
         </form>
       </section>
-
-  <section class="panel forum-requests-panel" id="forum-requests-panel" aria-labelledby="forum-requests-heading">
-<div class="section-heading"><div><p class="forum-kicker"><span></span> PRIVATE REQUESTS TO OUR TEAM</p><h2 id="forum-requests-heading">Customer requests & suggestions</h2></div><span class="state-pill">Private to you + admin</span></div>
-<p class="muted">Send a service requirement, feature idea, complaint or suggestion directly to the admin. These requests are visible only to you and authorized admins/moderators.</p>
-<div class="forum-request-cards">
-<article class="forum-request-type-card" id="request-suggestion"><span class="request-card-number">01</span><h3>Suggestions & general requirements</h3><p>Website feedback, service questions, complaints or general ideas.</p><form class="forum-request-form" data-request-type="suggestion"><label>Subject<input name="title" minlength="4" maxlength="120" required placeholder="What would you like us to improve?"></label><label>Details<textarea name="body" minlength="10" maxlength="4000" rows="3" required placeholder="Describe your suggestion or requirement"></textarea></label><button type="submit" class="button button-lime" disabled>Send suggestion ↗</button></form></article>
-<article class="forum-request-type-card" id="request-software"><span class="request-card-number">02</span><h3>Software requirements</h3><p>Tell us which software, utility, version or ECU coverage you need.</p><form class="forum-request-form" data-request-type="software_requirement"><label>Software / ECU name<input name="title" minlength="4" maxlength="120" required placeholder="Software, tool or ECU family"></label><label>Requirement details<textarea name="body" minlength="10" maxlength="4000" rows="3" required placeholder="Version, supported ECU/vehicle, preferred format and any compatibility details"></textarea></label><button type="submit" class="button button-lime" disabled>Send software request ↗</button></form></article>
-<article class="forum-request-type-card" id="request-wiring"><span class="request-card-number">03</span><h3>Wiring diagram requirements</h3><p>Request a wiring diagram by vehicle, model year and ECU/connector details.</p><form class="forum-request-form" data-request-type="wiring_diagram"><label>Vehicle / ECU<input name="title" minlength="4" maxlength="120" required placeholder="Make, model, year or ECU part number"></label><label>Diagram details<textarea name="body" minlength="10" maxlength="4000" rows="3" required placeholder="Specify connector, pinout or wiring section required. Do not include customer personal data."></textarea></label><button type="submit" class="button button-lime" disabled>Send diagram request ↗</button></form></article>
-</div>
-<p id="forum-request-message" class="status-message" aria-live="polite">Sign in to send a private request.</p>
-<div class="forum-request-list-heading"><h3>Request history</h3><button type="button" class="button button-outline" id="forum-request-refresh">Refresh</button></div>
-<div id="forum-request-list" class="forum-request-list" aria-live="polite"><p class="muted">Sign in to view requests.</p></div></section>
-
-    <section class="forum-hero" id="forum-welcome">
-      <p class="forum-kicker"><span></span> AUTOMOTIVE TECHNICIAN COMMUNITY</p>
-      <h1>Better diagnosis.<br><span>Better evidence.</span></h1>
-      <p>Share safe, evidence-led workshop knowledge about DTCs, ECU identification, wiring and repair workflows. Protect customer data and follow vehicle-manufacturer procedures.</p>
-      <div class="forum-hero-meta"><span>Public reading</span><span>Sign-in required to post</span><span>Moderated discussions</span></div>
-    </section>
-
-    <section class="forum-account panel" id="forum-account-panel" aria-labelledby="account-heading">
-      <div class="section-heading">
-        <div><p class="forum-kicker"><span></span> YOUR ACCOUNT</p><h2 id="account-heading">Sign in to join the chat</h2></div>
-        <span id="account-state" class="state-pill">Not signed in</span>
-      </div>
-      <p class="muted">The forum uses your existing ECU File Service India account. Your email and customer files are not displayed publicly.</p>
-      <form id="forum-auth-form" class="forum-auth-form">
-        <label>Email address<input id="forum-auth-email" type="email" autocomplete="email" required maxlength="254"></label>
-        <label>Password<input id="forum-auth-password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></label>
-        <div class="auth-actions">
-          <button type="submit" class="button button-lime" id="forum-sign-in">Sign in</button>
-          <button type="button" class="button button-outline" id="forum-sign-up">Create account</button>
-          <button type="button" class="button button-outline" id="forum-sign-out" hidden>Sign out</button>
-        </div>
-      </form>
-      <p id="forum-auth-message" class="status-message" aria-live="polite"></p>
-    </section>
-
-    <section class="forum-profile panel" id="forum-username-panel" hidden aria-labelledby="username-heading">
-      <div class="section-heading"><div><p class="forum-kicker"><span></span> MEMBER USERNAME</p><h2 id="username-heading">Set your username</h2></div></div>
-      <p class="muted" id="forum-username-help">All members must save a username before posting, replying or chatting.</p>
-      <form id="forum-username-form" class="profile-form">
-        <label>Username<input id="forum-display-name" minlength="2" maxlength="32" autocomplete="nickname" required></label>
-        <button type="submit" class="button button-lime">Save username</button>
-      </form>
-      <p id="forum-username-message" class="status-message" aria-live="polite"></p>
-    </section>
-
-    <section class="panel forum-moderation-panel" id="forum-moderation-panel" hidden aria-labelledby="forum-moderation-heading">
-      <div class="section-heading"><div><p class="forum-kicker"><span></span> MODERATION</p><h2 id="forum-moderation-heading">Open reports</h2></div><button type="button" id="forum-refresh-reports" class="button button-outline">Refresh reports</button></div>
-      <p class="muted">This panel is available only to accounts with an admin or moderator role. Review reports before hiding content or locking a discussion.</p>
-      <p id="forum-moderation-message" class="status-message" aria-live="polite"></p>
-      <div id="forum-moderation-list" class="forum-topic-list"></div>
-    </section>
-
 
     <section class="forum-workspace">
       <aside class="forum-sidebar">
@@ -199,6 +143,61 @@
       </section>
     </section>
     <p class="forum-disclaimer">Community posts are user-generated and are not manufacturer-approved repair instructions. Verify specifications and safe procedures with authoritative service information. Emissions and safety-system work must comply with applicable law.</p>
+
+    <section class="forum-hero" id="forum-welcome">
+      <p class="forum-kicker"><span></span> AUTOMOTIVE TECHNICIAN COMMUNITY</p>
+      <h1>Better diagnosis.<br><span>Better evidence.</span></h1>
+      <p>Share safe, evidence-led workshop knowledge about DTCs, ECU identification, wiring and repair workflows. Protect customer data and follow vehicle-manufacturer procedures.</p>
+      <div class="forum-hero-meta"><span>Public reading</span><span>Sign-in required to post</span><span>Moderated discussions</span></div>
+    </section>
+
+    <section class="forum-account panel" id="forum-account-panel" aria-labelledby="account-heading">
+      <div class="section-heading">
+        <div><p class="forum-kicker"><span></span> YOUR ACCOUNT</p><h2 id="account-heading">Sign in to join the chat</h2></div>
+        <span id="account-state" class="state-pill">Not signed in</span>
+      </div>
+      <p class="muted">The forum uses your existing ECU File Service India account. Your email and customer files are not displayed publicly.</p>
+      <form id="forum-auth-form" class="forum-auth-form">
+        <label>Email address<input id="forum-auth-email" type="email" autocomplete="email" required maxlength="254"></label>
+        <label>Password<input id="forum-auth-password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></label>
+        <div class="auth-actions">
+          <button type="submit" class="button button-lime" id="forum-sign-in">Sign in</button>
+          <button type="button" class="button button-outline" id="forum-sign-up">Create account</button>
+          <button type="button" class="button button-outline" id="forum-sign-out" hidden>Sign out</button>
+        </div>
+      </form>
+      <p id="forum-auth-message" class="status-message" aria-live="polite"></p>
+    </section>
+
+    <section class="forum-profile panel" id="forum-username-panel" hidden aria-labelledby="username-heading">
+      <div class="section-heading"><div><p class="forum-kicker"><span></span> MEMBER USERNAME</p><h2 id="username-heading">Set your username</h2></div></div>
+      <p class="muted" id="forum-username-help">All members must save a username before posting, replying or chatting.</p>
+      <form id="forum-username-form" class="profile-form">
+        <label>Username<input id="forum-display-name" minlength="2" maxlength="32" autocomplete="nickname" required></label>
+        <button type="submit" class="button button-lime">Save username</button>
+      </form>
+      <p id="forum-username-message" class="status-message" aria-live="polite"></p>
+    </section>
+
+    <section class="panel forum-moderation-panel" id="forum-moderation-panel" hidden aria-labelledby="forum-moderation-heading">
+      <div class="section-heading"><div><p class="forum-kicker"><span></span> MODERATION</p><h2 id="forum-moderation-heading">Open reports</h2></div><button type="button" id="forum-refresh-reports" class="button button-outline">Refresh reports</button></div>
+      <p class="muted">This panel is available only to accounts with an admin or moderator role. Review reports before hiding content or locking a discussion.</p>
+      <p id="forum-moderation-message" class="status-message" aria-live="polite"></p>
+      <div id="forum-moderation-list" class="forum-topic-list"></div>
+    </section>
+
+    <section class="panel forum-requests-panel" id="forum-requests-panel" aria-labelledby="forum-requests-heading">
+<div class="section-heading"><div><p class="forum-kicker"><span></span> PRIVATE REQUESTS TO OUR TEAM</p><h2 id="forum-requests-heading">Customer requests & suggestions</h2></div><span class="state-pill">Private to you + admin</span></div>
+<p class="muted">Send a service requirement, feature idea, complaint or suggestion directly to the admin. These requests are visible only to you and authorized admins/moderators.</p>
+<div class="forum-request-cards">
+<article class="forum-request-type-card" id="request-suggestion"><span class="request-card-number">01</span><h3>Suggestions & general requirements</h3><p>Website feedback, service questions, complaints or general ideas.</p><form class="forum-request-form" data-request-type="suggestion"><label>Subject<input name="title" minlength="4" maxlength="120" required placeholder="What would you like us to improve?"></label><label>Details<textarea name="body" minlength="10" maxlength="4000" rows="3" required placeholder="Describe your suggestion or requirement"></textarea></label><button type="submit" class="button button-lime" disabled>Send suggestion ↗</button></form></article>
+<article class="forum-request-type-card" id="request-software"><span class="request-card-number">02</span><h3>Software requirements</h3><p>Tell us which software, utility, version or ECU coverage you need.</p><form class="forum-request-form" data-request-type="software_requirement"><label>Software / ECU name<input name="title" minlength="4" maxlength="120" required placeholder="Software, tool or ECU family"></label><label>Requirement details<textarea name="body" minlength="10" maxlength="4000" rows="3" required placeholder="Version, supported ECU/vehicle, preferred format and any compatibility details"></textarea></label><button type="submit" class="button button-lime" disabled>Send software request ↗</button></form></article>
+<article class="forum-request-type-card" id="request-wiring"><span class="request-card-number">03</span><h3>Wiring diagram requirements</h3><p>Request a wiring diagram by vehicle, model year and ECU/connector details.</p><form class="forum-request-form" data-request-type="wiring_diagram"><label>Vehicle / ECU<input name="title" minlength="4" maxlength="120" required placeholder="Make, model, year or ECU part number"></label><label>Diagram details<textarea name="body" minlength="10" maxlength="4000" rows="3" required placeholder="Specify connector, pinout or wiring section required. Do not include customer personal data."></textarea></label><button type="submit" class="button button-lime" disabled>Send diagram request ↗</button></form></article>
+</div>
+<p id="forum-request-message" class="status-message" aria-live="polite">Sign in to send a private request.</p>
+<div class="forum-request-list-heading"><h3>Request history</h3><button type="button" class="button button-outline" id="forum-request-refresh">Refresh</button></div>
+<div id="forum-request-list" class="forum-request-list" aria-live="polite"><p class="muted">Sign in to view requests.</p></div></section>
+
   </main>
 
   <footer class="site-footer forum-footer">
