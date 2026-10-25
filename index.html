@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261025-community-first">
+  <link rel="stylesheet" href="styles.css?v=20261025-homepage-order">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -66,33 +66,6 @@
       <div class="hero-index">EFSI <span>·</span> 2026</div>
     </section>
 
-    <section class="section homepage-forum-section" id="workshop-forum-preview" aria-labelledby="homepage-forum-title">
-  <div class="section-heading"><div><span class="section-eyebrow">WORKSHOP COMMUNITY</span><h2 id="homepage-forum-title">Workshop Forum</h2><p>Recent workshop discussions, live desk messages and private requests to the site team.</p></div><a class="button button-dark" href="/forum.html">Open full forum ↗</a></div>
-  <div class="homepage-forum-frame"><div id="homepage-forum-topics" class="homepage-forum-topics" aria-live="polite"><p>Loading latest discussions…</p></div><div class="homepage-forum-footer"><a class="button button-dark" href="/forum.html#topics-heading">Browse all discussions ↗</a></div></div>
-<script>
-document.addEventListener('DOMContentLoaded',function(){
-(function(){
-const host=document.getElementById('homepage-forum-topics');if(!host)return;
-const api=window.EfsiSupabase;if(!api||typeof api.rest!=='function'){host.innerHTML='<p>Latest discussions are temporarily unavailable. <a href="/forum.html">Open forum</a>.</p>';return;}
-const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,function(ch){return ch==='&'?'&amp;':ch==='<'?'&lt;':ch==='>'?'&gt;':ch==='"'?'&quot;':'&#39;';});
-async function refresh(){try{
-const rows=await api.rest('forum_topics?select=id,category_id,title,body,created_at,accepted_reply_id,is_locked&order=created_at.desc&limit=5');
-const cats=await api.rest('forum_categories?select=id,title&is_active=eq.true');
-if(!Array.isArray(rows)||!rows.length){host.innerHTML='<div class="homepage-forum-empty"><strong>No discussions yet.</strong><p>Start the first workshop discussion.</p><a href="/forum.html#topics-heading">Create the first topic ↗</a></div>';return;}
-const ids=rows.map(x=>x.id).filter(x=>/^[0-9a-f-]{36}$/i.test(x));const counts={};
-if(ids.length){try{const replies=await api.rest('forum_replies?select=topic_id,is_hidden&is_hidden=eq.false&topic_id=in.('+ids.join(',')+')&limit=5000');if(Array.isArray(replies))replies.forEach(x=>counts[x.topic_id]=(counts[x.topic_id]||0)+1);}catch(e){}}
-host.innerHTML=rows.map(t=>{const cat=cats.find(x=>x.id===t.category_id);const body=String(t.body||'');return '<article class="homepage-forum-topic"><div class="homepage-forum-topic-meta"><span>'+esc(cat?cat.title:'Workshop discussion')+'</span><span>'+esc(new Date(t.created_at).toLocaleDateString())+'</span></div><h3><a href="/forum.html#topics-heading">'+esc(t.title)+'</a></h3><p>'+esc(body.slice(0,150))+(body.length>150?'…':'')+'</p><small>'+(counts[t.id]||0)+' replies'+(t.accepted_reply_id?' · Solved':'')+(t.is_locked?' · Locked':'')+'</small></article>';}).join('');
-}catch(e){host.innerHTML='<p>Latest discussions are temporarily unavailable. <a href="/forum.html">Open forum</a>.</p>';}}
-refresh();window.setInterval(refresh,15000);
-})();
-});
-</script></section>
-
-    <section class="home-community-section" id="workshop-community">
-      <div class="home-community-copy"><span class="quick-kicker">WORKSHOP COMMUNITY</span><h2>Live workshop desk.<br><span>Search the knowledge.</span></h2><p>Join real discussions, ask questions and search past topics by DTC, ECU family, vehicle or symptom. New community? Be the first to start a useful discussion.</p><div class="home-community-actions"><a class="button button-lime" href="/forum.html#live-chat">Open live chat <span>↗</span></a><a class="button button-ghost" href="/forum.html#topics-heading">Search forum history <span>⌕</span></a></div><small>Member counts and conversations are real; no fake member activity is displayed.</small></div>
-      <div class="home-community-panel"><div class="community-panel-head"><span class="live-pulse"></span><strong>COMMUNITY DESK</strong><span>PUBLIC TOPICS</span></div><div class="community-sample"><b>01</b><div><strong>Search previous workshop cases</strong><p>Filter by DTC, ECU, vehicle and solved status.</p></div></div><div class="community-sample"><b>02</b><div><strong>Ask the community</strong><p>Post a real question and receive replies from members.</p></div></div><div class="community-sample"><b>03</b><div><strong>Community Assistant</strong><p>Clearly labelled automated guidance, never impersonating a technician.</p></div></div><a class="community-all-link" href="/forum.html">Go to workshop community <span>↗</span></a></div>
-    </section>
-
     <section class="section order-section" id="order"><div class="section-heading order-heading"><div><div class="eyebrow eyebrow-dark"><span class="eyebrow-line"></span> FILE SERVICE · START HERE</div><h2>Choose your<br><span>module.</span></h2></div><p>Select ECU or Airbag first, then enter vehicle and file details in the secure request form below.</p></div>
       <div class="order-layout"><form class="order-form" id="order-form" novalidate>
         <div class="form-progress"><div class="progress-step active"><span>01</span><b>Module</b></div><i></i><div class="progress-step"><span>02</span><b>Vehicle</b></div><i></i><div class="progress-step"><span>03</span><b>ECU / Module</b></div><i></i><div class="progress-step"><span>04</span><b>Services</b></div><i></i><div class="progress-step"><span>05</span><b>Upload</b></div><i></i><div class="progress-step"><span>06</span><b>Review</b></div></div>
@@ -125,6 +98,33 @@ refresh();window.setInterval(refresh,15000);
     <section class="section software-home-section" id="software-store" aria-labelledby="software-store-title">
 <div class="section-heading"><div><span class="section-eyebrow">SOFTWARE & WORKSHOP TOOLS</span><h2 id="software-store-title">Software Store</h2><p>Browse software listings published by the site team. Product details and prices are maintained by the admin.</p></div><a class="button button-ghost" href="/store.html">View all listings ↗</a></div>
 <div id="homepage-software-grid" class="software-home-grid" aria-live="polite"><article class="software-home-empty">Loading software listings…</article></div></section>
+
+    <section class="section homepage-forum-section" id="workshop-forum-preview" aria-labelledby="homepage-forum-title">
+  <div class="section-heading"><div><span class="section-eyebrow">WORKSHOP COMMUNITY</span><h2 id="homepage-forum-title">Workshop Forum</h2><p>Recent workshop discussions, live desk messages and private requests to the site team.</p></div><a class="button button-dark" href="/forum.html">Open full forum ↗</a></div>
+  <div class="homepage-forum-frame"><div id="homepage-forum-topics" class="homepage-forum-topics" aria-live="polite"><p>Loading latest discussions…</p></div><div class="homepage-forum-footer"><a class="button button-dark" href="/forum.html#topics-heading">Browse all discussions ↗</a></div></div>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+(function(){
+const host=document.getElementById('homepage-forum-topics');if(!host)return;
+const api=window.EfsiSupabase;if(!api||typeof api.rest!=='function'){host.innerHTML='<p>Latest discussions are temporarily unavailable. <a href="/forum.html">Open forum</a>.</p>';return;}
+const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,function(ch){return ch==='&'?'&amp;':ch==='<'?'&lt;':ch==='>'?'&gt;':ch==='"'?'&quot;':'&#39;';});
+async function refresh(){try{
+const rows=await api.rest('forum_topics?select=id,category_id,title,body,created_at,accepted_reply_id,is_locked&order=created_at.desc&limit=5');
+const cats=await api.rest('forum_categories?select=id,title&is_active=eq.true');
+if(!Array.isArray(rows)||!rows.length){host.innerHTML='<div class="homepage-forum-empty"><strong>No discussions yet.</strong><p>Start the first workshop discussion.</p><a href="/forum.html#topics-heading">Create the first topic ↗</a></div>';return;}
+const ids=rows.map(x=>x.id).filter(x=>/^[0-9a-f-]{36}$/i.test(x));const counts={};
+if(ids.length){try{const replies=await api.rest('forum_replies?select=topic_id,is_hidden&is_hidden=eq.false&topic_id=in.('+ids.join(',')+')&limit=5000');if(Array.isArray(replies))replies.forEach(x=>counts[x.topic_id]=(counts[x.topic_id]||0)+1);}catch(e){}}
+host.innerHTML=rows.map(t=>{const cat=cats.find(x=>x.id===t.category_id);const body=String(t.body||'');return '<article class="homepage-forum-topic"><div class="homepage-forum-topic-meta"><span>'+esc(cat?cat.title:'Workshop discussion')+'</span><span>'+esc(new Date(t.created_at).toLocaleDateString())+'</span></div><h3><a href="/forum.html#topics-heading">'+esc(t.title)+'</a></h3><p>'+esc(body.slice(0,150))+(body.length>150?'…':'')+'</p><small>'+(counts[t.id]||0)+' replies'+(t.accepted_reply_id?' · Solved':'')+(t.is_locked?' · Locked':'')+'</small></article>';}).join('');
+}catch(e){host.innerHTML='<p>Latest discussions are temporarily unavailable. <a href="/forum.html">Open forum</a>.</p>';}}
+refresh();window.setInterval(refresh,15000);
+})();
+});
+</script></section>
+
+    <section class="home-community-section" id="workshop-community">
+      <div class="home-community-copy"><span class="quick-kicker">WORKSHOP COMMUNITY</span><h2>Live workshop desk.<br><span>Search the knowledge.</span></h2><p>Join real discussions, ask questions and search past topics by DTC, ECU family, vehicle or symptom. New community? Be the first to start a useful discussion.</p><div class="home-community-actions"><a class="button button-lime" href="/forum.html#live-chat">Open live chat <span>↗</span></a><a class="button button-ghost" href="/forum.html#topics-heading">Search forum history <span>⌕</span></a></div><small>Member counts and conversations are real; no fake member activity is displayed.</small></div>
+      <div class="home-community-panel"><div class="community-panel-head"><span class="live-pulse"></span><strong>COMMUNITY DESK</strong><span>PUBLIC TOPICS</span></div><div class="community-sample"><b>01</b><div><strong>Search previous workshop cases</strong><p>Filter by DTC, ECU, vehicle and solved status.</p></div></div><div class="community-sample"><b>02</b><div><strong>Ask the community</strong><p>Post a real question and receive replies from members.</p></div></div><div class="community-sample"><b>03</b><div><strong>Community Assistant</strong><p>Clearly labelled automated guidance, never impersonating a technician.</p></div></div><a class="community-all-link" href="/forum.html">Go to workshop community <span>↗</span></a></div>
+    </section>
 
     <section class="quick-service-strip quick-request-strip" aria-label="Customer requirements">
       <div class="quick-service-heading"><span class="quick-kicker">PRIVATE REQUESTS TO OUR TEAM</span><h2>Requirements &amp; support</h2><p>Send your needs directly to the admin. Private requests require sign-in.</p></div>
@@ -286,6 +286,6 @@ refresh();window.setInterval(refresh,15000);
   })();
   </script>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase.js?v=ba583d0"></script><script src="auth.js?v=20261025-community-first"></script><script src="app.js?v=20261025-community-first"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase.js?v=ba583d0"></script><script src="auth.js?v=20261025-homepage-order"></script><script src="app.js?v=20261025-homepage-order"></script>
 </body>
 </html>
