@@ -711,6 +711,7 @@
         const body=document.createElement('p');body.className='admin-request-body';body.textContent=row.body||'';
         const reply=document.createElement('textarea');reply.maxLength=4000;reply.rows=3;reply.className='admin-request-reply';reply.placeholder='Private reply to customer';reply.value=row.admin_reply||'';
         const isRequirement=!['suggestion','feature_request'].includes(String(row.request_type||''));
+        const isSoftware=row.request_type==='software_requirement'&&Boolean(row.software_product_id);
         const requirementFields=[];
         let softwareStatus, quotePrice, paymentLink, deliveryLink;
         if(isRequirement){
