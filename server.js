@@ -1456,16 +1456,16 @@ async function handleAdminCreateSoftwarePaymentLink(request, response) {
     if (!/^[0-9a-f-]{36}$/i.test(requestId)) { jsonResponse(response, 400, { error: 'Invalid software request reference.' }); return true; }
     if (!Number.isFinite(rupees) || rupees <= 0 || !Number.isSafeInteger(Math.round(rupees * 100))) { jsonResponse(response, 400, { error: 'Enter a valid price greater than zero.' }); return true; }
     const amountPaise = Math.round(rupees * 100);
-    const loaded = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,title,software_product_id,software_status,quoted_price_paise,software_payment_link,user_id', { timeoutMs: 12000 });
+    const loaded = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,title,request_type,status,software_product_id,software_status,quoted_price_paise,software_payment_link,user_id', { timeoutMs: 12000 });
     if (!loaded.ok) { jsonResponse(response, 502, { error: 'Software request could not be loaded.' }); return true; }
     const rows = await loaded.json(); const row = rows?.[0];
-    if (!row || !row.software_product_id) { jsonResponse(response, 404, { error: 'Software purchase request not found.' }); return true; }
-    if (['paid','delivered','cancelled'].includes(String(row.software_status || '').toLowerCase())) { jsonResponse(response, 409, { error: 'A payment link cannot be generated for this request status.' }); return true; }
+    if (!row || ['suggestion','feature_request'].includes(String(row.request_type||''))) { jsonResponse(response, 404, { error: 'This request type does not support a paid requirement quote.' }); return true; }
+    if (String(row.status||'').toLowerCase()==='closed' || ['paid','delivered','cancelled'].includes(String(row.software_status || '').toLowerCase())) { jsonResponse(response, 409, { error: 'A payment link cannot be generated for a closed, paid, delivered, or cancelled request.' }); return true; }
     const link = await razorpayApi('payment_links', { method:'POST', body:{
       amount: amountPaise, currency:'INR', accept_partial:false,
       description: String(row.title || 'Software purchase').slice(0,240),
       reference_id: requestId.replace(/-/g,'').slice(0,40),
-      reminder_enable:true, notes:{ request_id:requestId, software_product_id:String(row.software_product_id), type:'software_purchase' }
+      reminder_enable:true, notes:{ request_id:requestId, request_type:String(row.request_type||'other'), ...(row.software_product_id?{software_product_id:String(row.software_product_id)}:{}), type:row.request_type==='software_requirement'?'software_purchase':'customer_requirement' }
     }});
     const paymentUrl=String(link?.short_url || link?.url || '').trim();
     let parsed; try { parsed=new URL(paymentUrl); } catch { parsed=null; }
@@ -1490,10 +1490,11 @@ async function handleAdminVerifySoftwarePayment(request, response) {
     const body = await readJson(request);
     const requestId = String(body?.requestId || '');
     if (!/^[0-9a-f-]{36}$/i.test(requestId)) { jsonResponse(response, 400, { error: 'Invalid software request reference.' }); return true; }
-    const loaded = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,software_product_id,software_status,quoted_price_paise,software_payment_link_id&limit=1', { timeoutMs: 12000 });
+    const loaded = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,request_type,status,software_status,quoted_price_paise,software_payment_link_id&limit=1', { timeoutMs: 12000 });
     if (!loaded.ok) { jsonResponse(response, 502, { error: 'Software request could not be loaded.' }); return true; }
     const row = (await loaded.json())?.[0];
-    if (!row || !row.software_product_id) { jsonResponse(response, 404, { error: 'Software purchase request not found.' }); return true; }
+    if (!row || ['suggestion','feature_request'].includes(String(row.request_type||''))) { jsonResponse(response, 404, { error: 'Billable requirement request not found.' }); return true; }
+    if (String(row.status||'').toLowerCase()==='closed' && String(row.software_status||'').toLowerCase()!=='delivered') { jsonResponse(response, 409, { error: 'This request is closed; payment verification is disabled.' }); return true; }
     if (!row.software_payment_link_id || !/^plink_[A-Za-z0-9]+$/.test(String(row.software_payment_link_id))) { jsonResponse(response, 409, { error: 'Create a new Razorpay payment link before verifying payment.' }); return true; }
     if (!(Number(row.quoted_price_paise) > 0)) { jsonResponse(response, 409, { error: 'A valid quoted amount is required.' }); return true; }
     if (String(row.software_status||'').toLowerCase()==='delivered') { jsonResponse(response, 200, { verified:true, alreadyVerified:true, status:row.software_status }); return true; }
@@ -1510,24 +1511,50 @@ async function handleAdminVerifySoftwarePayment(request, response) {
   return true;
 }
 
+
+async function handleAdminDeleteCustomerRequest(request, response) {
+  if (request.method !== 'POST') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
+  try {
+    const admin = await requireAdmin(request);
+    if (!admin) { jsonResponse(response, 403, { error:'Administrator role is required.' }); return true; }
+    if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'Customer request management is unavailable.' }); return true; }
+    const body = await readJson(request, 2048);
+    const requestId = String(body?.requestId || '');
+    if (!/^[0-9a-f-]{36}$/i.test(requestId)) { jsonResponse(response, 400, { error:'Invalid customer request reference.' }); return true; }
+    const token = serviceToken();
+    const loaded = await supabaseRequest(token,'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,request_type,software_status,quoted_price_paise,software_payment_link,software_payment_link_id,software_delivery_path,software_delivery_url&limit=1',{timeoutMs:12000});
+    if (!loaded.ok) { jsonResponse(response,502,{error:'Request could not be checked before deletion.'}); return true; }
+    const row = (await loaded.json())?.[0];
+    if (!row) { jsonResponse(response,404,{error:'Customer request not found.'}); return true; }
+    if (Number(row.quoted_price_paise||0)>0 || row.software_payment_link || row.software_payment_link_id || row.software_delivery_path || row.software_delivery_url || ['awaiting_payment','paid','delivered'].includes(String(row.software_status||'').toLowerCase())) {
+      jsonResponse(response,409,{error:'This request has a quote, payment-link, payment, or delivery record. Archive/close it instead so financial and audit history is retained.'}); return true;
+    }
+    const deleted = await supabaseRequest(token,'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id',{method:'DELETE',prefer:'return=representation',timeoutMs:12000});
+    if (!deleted.ok) { jsonResponse(response,502,{error:'Customer request could not be deleted.'}); return true; }
+    if (!(await deleted.json())?.length) { jsonResponse(response,404,{error:'Customer request not found.'}); return true; }
+    jsonResponse(response,200,{deleted:true}); return true;
+  } catch(error) { jsonResponse(response,error.statusCode||400,{error:error.message||'Customer request could not be deleted.'}); }
+  return true;
+}
+
 async function handleCustomerSoftwareDownload(request, response) {
   if (request.method !== 'POST') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
   try {
     const customer = await requireCustomer(request);
-    if (!customer) { jsonResponse(response, 401, { error: 'Please sign in to download your software.' }); return true; }
+    if (!customer) { jsonResponse(response, 401, { error: 'Please sign in to download your requirement result.' }); return true; }
     const body = await readJson(request);
     const requestId = String(body?.requestId || '');
     if (!/^[0-9a-f-]{36}$/i.test(requestId)) { jsonResponse(response, 400, { error: 'Invalid software request reference.' }); return true; }
-    if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error: 'Secure software delivery is temporarily unavailable.' }); return true; }
+    if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error: 'Secure requirement delivery is temporarily unavailable.' }); return true; }
     const loaded = await supabaseRequest(serviceToken(), 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,user_id,request_type,software_product_id,software_status,software_delivery_path,software_delivery_name&limit=1', { timeoutMs: 12000 });
-    if (!loaded.ok) { jsonResponse(response, 502, { error: 'Could not verify software delivery. Please retry.' }); return true; }
+    if (!loaded.ok) { jsonResponse(response, 502, { error: 'Could not verify requirement delivery. Please retry.' }); return true; }
     const row = (await loaded.json())?.[0];
-    if (!row || row.user_id !== customer.id || row.request_type !== 'software_requirement' || !row.software_product_id) { jsonResponse(response, 404, { error: 'Software delivery not found.' }); return true; }
+    if (!row || row.user_id !== customer.id || ['suggestion','feature_request'].includes(String(row.request_type||''))) { jsonResponse(response, 404, { error: 'Requirement delivery not found.' }); return true; }
     if (String(row.software_status || '').toLowerCase() !== 'delivered' || !row.software_delivery_path) { jsonResponse(response, 403, { error: 'Payment verification and software delivery must be completed before download.' }); return true; }
     const objectPath = String(row.software_delivery_path);
-    if (!objectPath.startsWith('software-deliveries/'+requestId+'/') || objectPath.includes('..') || objectPath.startsWith('/') || objectPath.includes(String.fromCharCode(92))) { jsonResponse(response, 409, { error: 'The saved software delivery path is invalid.' }); return true; }
+    if (!objectPath.startsWith('software-deliveries/'+requestId+'/') || objectPath.includes('..') || objectPath.startsWith('/') || objectPath.includes(String.fromCharCode(92))) { jsonResponse(response, 409, { error: 'The saved requirement delivery path is invalid.' }); return true; }
     const signed = await supabaseRequest(serviceToken(), 'storage/v1/object/sign/private-ecu-files/'+objectPath.split('/').map(encodeURIComponent).join('/'), { method:'POST', body:{ expiresIn:60 }, timeoutMs:12000 });
-    if (!signed.ok) { jsonResponse(response, 502, { error: 'The private software file could not be prepared for download.' }); return true; }
+    if (!signed.ok) { jsonResponse(response, 502, { error: 'The private requirement file could not be prepared for download.' }); return true; }
     const data = await signed.json();
     const signedPath = String(data?.signedURL || data?.signedUrl || '');
     if (!signedPath.startsWith('/object/sign/') && !signedPath.startsWith('http')) { jsonResponse(response, 502, { error: 'Storage returned an invalid secure download link.' }); return true; }
@@ -1535,7 +1562,7 @@ async function handleCustomerSoftwareDownload(request, response) {
     let parsed; try { parsed = new URL(downloadUrl); } catch { parsed = null; }
     if (!parsed || parsed.origin !== new URL(supabaseUrl).origin || !parsed.pathname.includes('/object/sign/')) { jsonResponse(response, 502, { error: 'Storage returned an unsafe download link.' }); return true; }
     jsonResponse(response, 200, { downloadUrl, fileName: String(row.software_delivery_name || 'software-file.bin').slice(0,255) });
-  } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Secure software download failed.' }); }
+  } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Secure requirement download failed.' }); }
   return true;
 }
 
@@ -1953,8 +1980,9 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/advertising/inquiries') return handleAdvertisingInquiry(request, response);
   if (url.pathname === '/api/site-settings') return handlePublicSiteSettings(request, response);
   if (url.pathname === '/api/admin/site-settings') return handleAdminSiteSettings(request, response);
-  if (url.pathname === '/api/admin/software-requests/payment-link') return handleAdminCreateSoftwarePaymentLink(request, response);
-  if (url.pathname === '/api/admin/software-requests/verify-payment') return handleAdminVerifySoftwarePayment(request, response);
+  if (url.pathname === '/api/admin/customer-requests/delete') return handleAdminDeleteCustomerRequest(request, response);
+  if (url.pathname === '/api/admin/requirements/payment-link' || url.pathname === '/api/admin/software-requests/payment-link') return handleAdminCreateSoftwarePaymentLink(request, response);
+  if (url.pathname === '/api/admin/requirements/verify-payment' || url.pathname === '/api/admin/software-requests/verify-payment') return handleAdminVerifySoftwarePayment(request, response);
   if (url.pathname === '/api/customer/software-download') return handleCustomerSoftwareDownload(request, response);
   if (url.pathname === '/api/admin/site-content') return handleAdminSiteContent(request, response);
   if (url.pathname === '/api/admin/advertising/inquiries') return handleAdminAdvertisingInquiries(request, response);
