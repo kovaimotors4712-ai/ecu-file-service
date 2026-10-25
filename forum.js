@@ -547,10 +547,12 @@
   let chatProfilesCache = {};
   function renderChatMessage(row, displayName, profiles) {
     const article = document.createElement('article'); article.className = 'forum-chat-message'; article.setAttribute('data-chat-message-id', row.id);
+    const avatar = document.createElement('span'); avatar.className = 'forum-chat-avatar'; avatar.setAttribute('aria-hidden','true');
+    avatar.textContent = String(displayName || 'C').trim().split(/\\s+/).slice(0,2).map(function(part){return part.charAt(0).toUpperCase();}).join('') || 'C';
     const head = document.createElement('div'); head.className = 'forum-chat-message-head';
     const who = document.createElement('strong'); who.textContent = displayName || 'Community member';
     const time = document.createElement('time'); time.dateTime = row.created_at || ''; time.textContent = formatDate(row.created_at);
-    const body = document.createElement('p'); body.textContent = row.body || ''; head.append(who,time); article.append(head,body);
+    const body = document.createElement('p'); body.textContent = row.body || ''; head.append(who,time); article.append(avatar,head,body);
     if (row.reply_to_message_id) { const parent=chatMessagesById[row.reply_to_message_id]; const reference=document.createElement('div'); reference.className='chat-reply-reference';
       if(parent){const label=document.createElement('strong');label.textContent='Replying to '+displayNameFor(parent.author_id,profiles)+': ';const preview=document.createElement('span');preview.textContent=String(parent.body||'').slice(0,220)+(String(parent.body||'').length>220?'…':'');reference.append(label,preview);}
       else reference.textContent='Reply to an earlier community message'; article.append(reference);}
