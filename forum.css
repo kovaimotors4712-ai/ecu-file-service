@@ -543,3 +543,30 @@ body.forum-page .forum-main.forum-first-chat .forum-hero{order:3}
 body.forum-page .forum-main.forum-first-chat #live-chat{order:1}
 body.forum-page .forum-main.forum-first-chat #forum-account-panel{order:2}
 body.forum-page .forum-main.forum-first-chat #forum-username-panel{order:2}
+
+
+/* Header account card: place sign-in beside the Back to service control. */
+body.forum-page .forum-header-actions{display:flex;align-items:stretch;justify-content:flex-end;gap:10px;margin-left:auto;min-width:0}
+body.forum-page .forum-header-actions .forum-home-link{display:flex;align-items:center;justify-content:center;align-self:flex-start}
+body.forum-page .forum-header-actions .forum-account{margin:0;padding:10px 12px!important;max-width:390px;min-width:250px;border:1px solid #cbd6df;border-radius:6px;background:#f7f9fb;box-shadow:none}
+body.forum-page .forum-header-actions #account-heading{font-size:15px;line-height:1.2;margin:0}
+body.forum-page .forum-header-actions .forum-account .section-heading{align-items:center;gap:8px;margin:0}
+body.forum-page .forum-header-actions .forum-kicker{display:none}
+body.forum-page .forum-header-actions .forum-account>p.muted{display:none}
+body.forum-page .forum-header-actions .forum-auth-form{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;margin-top:8px}
+body.forum-page .forum-header-actions .forum-auth-form label{font-size:10px;gap:3px}
+body.forum-page .forum-header-actions .forum-auth-form input{min-height:34px;padding:6px 8px;font-size:12px}
+body.forum-page .forum-header-actions .auth-actions{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}
+body.forum-page .forum-header-actions .auth-actions .button{min-height:32px;padding:6px 10px;font-size:10px}
+body.forum-page .forum-header-actions #forum-auth-message{font-size:10px;margin-top:4px}
+@media(max-width:700px){
+ body.forum-page .site-header.forum-header{align-items:flex-start}
+ body.forum-page .forum-header-actions{width:100%;margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:8px}
+ body.forum-page .forum-header-actions .forum-home-link{min-height:42px;white-space:normal;text-align:center;padding:8px}
+ body.forum-page .forum-header-actions .forum-account{min-width:0;width:100%;max-width:none;padding:10px!important}
+ body.forum-page .forum-header-actions #account-heading{font-size:14px}
+ body.forum-page .forum-header-actions .forum-account .section-heading{flex-wrap:wrap}
+ body.forum-page .forum-header-actions .forum-auth-form{grid-template-columns:minmax(0,1fr);gap:6px}
+ body.forum-page .forum-header-actions .auth-actions{grid-column:auto;display:grid;grid-template-columns:1fr 1fr}
+ body.forum-page .forum-header-actions .auth-actions .button{width:100%;min-height:36px}
+}
