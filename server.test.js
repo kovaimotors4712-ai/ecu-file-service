@@ -1939,6 +1939,7 @@ test('software requests can create a server-side Razorpay payment link with admi
   assert.match(adminSource, /adminApi\('\/api\/admin\/software-requests\/payment-link'/);
   assert.match(customerSource, /Pay now ↗/);
   assert.doesNotMatch(customerSource, /Quoted price:/);
+  assert.doesNotMatch(customerSource, /quoted_price_paise/, 'customer API queries must not expose the private quote amount');
   assert.match(serverSource, /Your software quote is ready\. Use the secure Razorpay Pay now link in My Account/);
 });
 
