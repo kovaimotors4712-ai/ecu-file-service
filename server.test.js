@@ -1952,6 +1952,20 @@ test('all paid customer requirements use zero-fee intake and second-stage quote/
 });
 
 
+test('advertiser enquiries can be archived/restored and only deleted without quote history', () => {
+  const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261025_advertising_inquiry_archive.sql'), 'utf8');
+  assert.match(server, /admin_archived_at: body\.archived \? new Date\(\)\.toISOString\(\) : null/);
+  assert.match(server, /This enquiry has quote or payment history/);
+  assert.match(admin, /Remove from active list/);
+  assert.match(admin, /Restore enquiry/);
+  assert.match(admin, /showArchivedAdvertisingInquiries/);
+  assert.match(admin, /Delete enquiry/);
+  assert.match(migration, /add column if not exists admin_archived_at timestamptz/i);
+});
+
+
 test('admin can delete advertiser enquiries only when no quote/payment history exists', () => {
   const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
@@ -1984,7 +1998,7 @@ test('admin controls enforce readable contrast and cache-busted current assets',
   assert.match(adminCss, /\.admin-page select option[\s\S]*?color:#111a19 !important/);
   assert.match(adminCss, /#site-content-list \.button-ghost[\s\S]*?opacity:1 !important/);
   assert.match(adminCss, /button:disabled[\s\S]*?opacity:1 !important/);
-  assert.match(adminHtml, /admin\.css\?v=20261024-final-contrast/);
+  assert.match(adminHtml, /admin\.css\?v=20261024-payment-verification/);
   assert.match(adminHtml, /admin\.js\?v=20261025-requirement-order/);
 });
 
@@ -2013,8 +2027,8 @@ test('customer private requests have a guarded delete action and readable accoun
   assert.match(customer, /Hide from history/);
   assert.match(css, /#customer-private-request-list \.customer-request-delete[\s\S]*?background:#8b1e1e !important/);
   assert.match(css, /#customer-private-request-history-toggle[\s\S]*?color:#17201e !important/);
-  assert.match(html, /styles\.css\?v=20261025-requirement-order/);
-  assert.match(html, /auth\.js\?v=20261025-requirement-order/);
+  assert.match(html, /styles\.css\?v=20261025-unified-requirements/);
+  assert.match(html, /auth\.js\?v=20261025-unified-requirements/);
   assert.match(migration, /r\.user_id = auth\.uid\(\)/);
   assert.match(migration, /software_payment_link_id is not null/);
   assert.match(migration, /Use Hide from history instead/);
