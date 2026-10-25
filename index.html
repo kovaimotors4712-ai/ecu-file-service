@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261025-homepage-section-colors">
+  <link rel="stylesheet" href="styles.css?v=20261025-three-distinct-section-designs">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -260,7 +260,96 @@ refresh();window.setInterval(refresh,15000);
     .homepage-forum-frame{border:1px solid #dce4d8;background:#fff;overflow:hidden}
     .homepage-forum-frame iframe{display:block;width:100%;height:820px;border:0;background:#f6f8f2}
     @media(max-width:620px){.homepage-forum-section{padding:28px 14px}.homepage-forum-frame iframe{height:760px}.order-section{padding-top:24px}}
-  .homepage-forum-topics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px}.homepage-forum-topic{min-width:0;border:1px solid var(--line);padding:16px;background:#fff}.homepage-forum-topic-meta{display:flex;justify-content:space-between;gap:8px;font:10px var(--mono);color:#758b2c;text-transform:uppercase}.homepage-forum-topic h3{font:700 17px var(--display);line-height:1.4;margin:10px 0}.homepage-forum-topic h3 a{color:inherit;text-decoration:none}.homepage-forum-topic p{font-size:13px;line-height:1.6;color:#66716a;overflow-wrap:anywhere}.homepage-forum-topic small{font-size:11px;color:#66716a}.homepage-forum-empty{padding:22px;line-height:1.7}.homepage-forum-footer{padding:0 16px 16px}.homepage-forum-frame iframe{display:none}@media(max-width:620px){.homepage-forum-topics{grid-template-columns:minmax(0,1fr);padding:10px}.homepage-forum-topic{padding:14px}.homepage-forum-footer{padding:0 10px 12px}}</style>
+  .homepage-forum-topics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px}.homepage-forum-topic{min-width:0;border:1px solid var(--line);padding:16px;background:#fff}.homepage-forum-topic-meta{display:flex;justify-content:space-between;gap:8px;font:10px var(--mono);color:#758b2c;text-transform:uppercase}.homepage-forum-topic h3{font:700 17px var(--display);line-height:1.4;margin:10px 0}.homepage-forum-topic h3 a{color:inherit;text-decoration:none}.homepage-forum-topic p{font-size:13px;line-height:1.6;color:#66716a;overflow-wrap:anywhere}.homepage-forum-topic small{font-size:11px;color:#66716a}.homepage-forum-empty{padding:22px;line-height:1.7}.homepage-forum-footer{padding:0 16px 16px}.homepage-forum-frame iframe{display:none}@media(max-width:620px){.homepage-forum-topics{grid-template-columns:minmax(0,1fr);padding:10px}.homepage-forum-topic{padding:14px}.homepage-forum-footer{padding:0 10px 12px}}
+    /* Distinct homepage identities: File Service, Software Store, and Workshop Forum */
+    #order.order-section{
+      background:linear-gradient(145deg,#f3f7e9 0%,#fbfcf6 58%,#edf3df 100%);
+      border-top:5px solid #91ad32;
+      border-bottom:1px solid #dbe5c7;
+    }
+    #order .order-heading .eyebrow-dark{color:#4d641e;font-weight:700;letter-spacing:.19em}
+    #order .order-heading h2{font-family:var(--display);font-weight:800;letter-spacing:-.065em;color:#18291d}
+    #order .order-heading h2 span{color:#69851e}
+    #order .order-heading>p{color:#52624f;line-height:1.9}
+    #order .order-form{border:1px solid #cbd9b5;box-shadow:0 14px 34px #31451a12}
+    #order .order-aside{background:linear-gradient(155deg,#1d3024,#142019);border-top:3px solid #c7e65d}
+    #order .form-kicker{color:#6b8525}
+    #order .button-dark{background:#243e2a}
+    #order .button-dark:hover{background:#355536}
+    #order .choice-card.selected,#order .service-option:has(input:checked){background:#f0f7dd;border-color:#809d2b}
+
+    #software-store.software-home-section{
+      background:linear-gradient(135deg,#eaf3ff 0%,#f4efff 54%,#e8f8ff 100%);
+      border-top:5px solid #5865e8;
+      border-bottom:1px solid #c9d6ff;
+      position:relative;
+      isolation:isolate;
+    }
+    #software-store.software-home-section:before{
+      content:"";position:absolute;z-index:-1;right:-95px;top:-115px;width:280px;height:280px;border-radius:50%;
+      background:radial-gradient(circle,#b9c8ff88 0%,#d8e0ff00 72%);pointer-events:none
+    }
+    #software-store .section-heading .section-eyebrow{color:#4b54c7;font-weight:700;letter-spacing:.2em}
+    #software-store .section-heading h2{
+      font-family:Arial,Helvetica,sans-serif;font-weight:900;letter-spacing:-.055em;color:#172554;
+      text-transform:none
+    }
+    #software-store .section-heading p{color:#465779}
+    #software-store .software-home-card{
+      background:linear-gradient(180deg,#fff 0%,#f8faff 100%);
+      border:1px solid #c9d5ff;border-radius:12px;
+      box-shadow:0 8px 22px #3348a610;
+      transition:transform .2s,box-shadow .2s,border-color .2s
+    }
+    #software-store .software-home-card:hover{transform:translateY(-4px);border-color:#8795ff;box-shadow:0 15px 30px #3348a61a}
+    #software-store .software-home-card img{background:#edf2ff;border-radius:8px}
+    #software-store .software-home-card h3{font-family:Arial,Helvetica,sans-serif;color:#202d6b;font-weight:800}
+    #software-store .software-home-card .software-price{color:#3949ab}
+    #software-store .software-home-card .software-version{color:#5865c9}
+    #software-store .software-home-card .software-purchase-request{background:#3949ab!important;border-color:#3949ab!important;border-radius:7px}
+    #software-store .software-home-card .software-purchase-request:hover{background:#27358d!important}
+    #software-store .section-heading>a.button-ghost{color:#fff!important;background:#3949ab!important;border:1px solid #3949ab!important;border-radius:7px;box-shadow:0 5px 0 #c4ceff!important}
+    #software-store .section-heading>a.button-ghost:hover{background:#27358d!important}
+
+    #workshop-forum-preview.homepage-forum-section{
+      background:linear-gradient(135deg,#fff0df 0%,#fff8f0 48%,#ffe7e5 100%);
+      border-top:5px solid #ed6a32;border-bottom:1px solid #f0c8ad;
+      padding-top:clamp(38px,5vw,60px);padding-bottom:clamp(38px,5vw,60px)
+    }
+    #workshop-forum-preview .section-heading .section-eyebrow{color:#b84420;font-weight:800;letter-spacing:.2em}
+    #workshop-forum-preview .section-heading h2{
+      font-family:Georgia,"Times New Roman",serif;font-weight:700;letter-spacing:-.035em;color:#54241d
+    }
+    #workshop-forum-preview .section-heading p{color:#825044;line-height:1.8}
+    #workshop-forum-preview .section-heading>a.button-dark,
+    #workshop-forum-preview .homepage-forum-footer .button-dark{
+      background:#b83e27;color:#fff;border-radius:999px;box-shadow:0 4px 0 #f2c1a5
+    }
+    #workshop-forum-preview .section-heading>a.button-dark:hover,
+    #workshop-forum-preview .homepage-forum-footer .button-dark:hover{background:#8f2e1e}
+    #workshop-forum-preview .homepage-forum-frame{
+      border:1px solid #efc5aa;border-radius:14px;background:#fffaf6;
+      box-shadow:0 12px 32px #8d381310
+    }
+    #workshop-forum-preview .homepage-forum-topics{background:#fffaf6}
+    #workshop-forum-preview .homepage-forum-topic{
+      background:#fff;border:1px solid #f0d7c6;border-radius:10px;
+      box-shadow:0 4px 12px #7b34200a
+    }
+    #workshop-forum-preview .homepage-forum-topic-meta{color:#b84420}
+    #workshop-forum-preview .homepage-forum-topic h3{font-family:Georgia,"Times New Roman",serif;color:#54241d}
+    #workshop-forum-preview .homepage-forum-topic p{color:#76574d}
+    #workshop-forum-preview .homepage-forum-topic small{color:#a05a43}
+    #workshop-forum-preview .homepage-forum-empty{background:#fffaf6;color:#76574d}
+    @media(max-width:620px){
+      #order.order-section{border-top-width:4px}
+      #software-store.software-home-section{border-top-width:4px}
+      #workshop-forum-preview.homepage-forum-section{border-top-width:4px}
+      #software-store .software-home-card{border-radius:10px}
+      #workshop-forum-preview .homepage-forum-frame{border-radius:10px}
+    }
+
+  </style>
   <script>
   (function(){
     const grid=document.getElementById('homepage-software-grid');if(!grid)return;
