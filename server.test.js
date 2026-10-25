@@ -1897,6 +1897,17 @@ test('software catalogue supports optional quote-on-request pricing and public p
   assert.doesNotMatch(page, /name="price"[^>]*required/);
 });
 
+test('customer software requests appear in the same order timeline as file requests', () => {
+  const customerSource = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  assert.match(customerSource, /async function loadCustomerOrders\(\)/);
+  assert.match(customerSource, /customer-software-order-card/);
+  assert.match(customerSource, /Software Request:/);
+  assert.match(customerSource, /forum_customer_requests\?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status/);
+  assert.match(customerSource, /customer-software-download/);
+  assert.match(customerSource, /Pay Now ↗/);
+  assert.match(customerSource, /visibleRows=Array\.isArray\(rows\)\?rows\.filter\(item=>item\.request_type!=='software_requirement'\):rows/);
+});
+
 test('software requests expose an explicit pay and verified-download workflow', () => {
   const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
   const customer = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
