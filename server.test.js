@@ -1889,15 +1889,15 @@ test('software requests expose an explicit pay and verified-download workflow', 
   const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
   const customer = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
   const grants = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261024_grant_site_announcement_delete_service_role.sql'), 'utf8');
-  assert.match(admin, /Add the payment link before this status/);
-  assert.match(admin, /Mark the request Paid only after verifying payment/);
-  assert.match(admin, /Upload a private software file before marking Delivered/);
+  assert.match(admin, /Create the second-stage Razorpay payment link before this status/);
+  assert.match(admin, /Verify Razorpay payment to confirm full payment before marking this request Paid/);
+  assert.match(admin, /Upload a private result file before marking this software request delivered/);
   assert.match(admin, /patch\.status=softwareStatus\.value==='awaiting_payment'\?'waiting_for_customer'/);
-  assert.match(customer, /Payment required/);
+  assert.match(customer, /Second-Stage Payment/);
   assert.match(customer, /Payment verified/);
   assert.match(customer, /Download available/);
-  assert.match(customer, /Pay now ↗/);
-  assert.match(customer, /Download your file/);
+  assert.match(customer, /Pay Now/);
+  assert.match(customer, /Result Ready · Download/);
   assert.match(grants, /grant delete on table public\.site_announcements to service_role/i);
 });
 
@@ -1908,11 +1908,30 @@ test('software requests can create a server-side Razorpay payment link with admi
   const customerSource = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
   assert.match(serverSource, /handleAdminCreateSoftwarePaymentLink/);
   assert.match(serverSource, /\/api\/admin\/software-requests\/payment-link/);
-  assert.match(serverSource, /notes:\{ request_id:requestId, software_product_id:String\(row\.software_product_id\), type:'software_purchase' \}/);
+  assert.match(serverSource, /request_type:String\(row\.request_type\|\|'other'\)/);
   assert.match(serverSource, /software_status:'awaiting_payment', status:'waiting_for_customer'/);
-  assert.match(adminSource, /Generate Razorpay payment link & send Pay now/);
-  assert.match(adminSource, /adminApi\('\/api\/admin\/software-requests\/payment-link'/);
+  assert.match(adminSource, /Create second-stage Razorpay payment link/);
+  assert.match(adminSource, /adminApi\('\/api\/admin\/requirements\/payment-link'/);
   assert.match(customerSource, /Pay now ↗/);
+});
+
+
+test('all paid customer requirements use zero-fee intake and second-stage quote/payment flow', () => {
+  const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const customer = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  assert.match(server, /async function handleAdminCreateSoftwarePaymentLink/);
+  assert.match(server, /\['suggestion','feature_request'\]/);
+  assert.match(server, /type:row\.request_type==='software_requirement'\?'software_purchase':'customer_requirement'/);
+  assert.match(server, /async function handleAdminDeleteCustomerRequest/);
+  assert.match(server, /Request has a quote, payment-link, payment, or delivery record/);
+  assert.match(admin, /const isRequirement=!\['suggestion','feature_request'\]/);
+  assert.match(admin, /Create second-stage Razorpay payment link/);
+  assert.match(admin, /adminApi\('\/api\/admin\/customer-requests\/delete'/);
+  assert.match(customer, /No verification fee is charged for this requirement/);
+  assert.match(customer, /Second-Stage Payment/);
+  assert.match(customer, /customer-requirement-timeline/);
+  assert.match(customer, /customer-messages-open/);
 });
 
 
@@ -1935,9 +1954,9 @@ test('software payment verification is confirmed directly with Razorpay before m
   assert.match(serverSource, /software_payment_link_id/);
   assert.match(serverSource, /amount_paid/);
   assert.match(serverSource, /Number\(link\?\.amount_paid\) !== expected/);
-  assert.match(serverSource, /url\.pathname === '\/api\/admin\/software-requests\/verify-payment'/);
+  assert.match(serverSource, /url\.pathname === '\/api\/admin\/requirements\/verify-payment'/);
   assert.match(adminSource, /Verify Razorpay payment/);
-  assert.match(adminSource, /adminApi\('\/api\/admin\/software-requests\/verify-payment'/);
+  assert.match(adminSource, /adminApi\('\/api\/admin\/requirements\/verify-payment'/);
   assert.match(migrationSource, /add column if not exists software_payment_link_id text/i);
 });
 
@@ -1963,7 +1982,7 @@ test('software payment verification checks Razorpay paid status and exact amount
   assert.match(source, /software_status:'paid', status:'in_review'/);
   assert.match(source, /\/api\/admin\/software-requests\/verify-payment/);
   assert.match(admin, /Verify Razorpay payment/);
-  assert.match(admin, /Use Verify Razorpay payment to confirm the actual payment/);
+  assert.match(admin, /Verify Razorpay payment to confirm full payment before marking this request Paid/);
 });
 
 
@@ -1973,12 +1992,12 @@ test('customer private requests have a guarded delete action and readable accoun
   const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261024_customer_request_delete.sql'), 'utf8');
   assert.match(customer, /forum_delete_own_customer_request/);
-  assert.match(customer, /Delete request/);
+  assert.match(customer, /Cancel request/);
   assert.match(customer, /Hide from history/);
   assert.match(css, /#customer-private-request-list \.customer-request-delete[\s\S]*?background:#8b1e1e !important/);
   assert.match(css, /#customer-private-request-history-toggle[\s\S]*?color:#17201e !important/);
-  assert.match(html, /styles\.css\?v=20261024-customer-actions/);
-  assert.match(html, /auth\.js\?v=20261024-customer-actions/);
+  assert.match(html, /styles\.css\?v=20261025-requirement-order/);
+  assert.match(html, /auth\.js\?v=20261025-requirement-order/);
   assert.match(migration, /r\.user_id = auth\.uid\(\)/);
   assert.match(migration, /software_payment_link_id is not null/);
   assert.match(migration, /Use Hide from history instead/);
@@ -1995,10 +2014,10 @@ test('private software delivery requires customer ownership and a delivered file
   assert.match(serverSource, /String\(row\.software_status \|\| ''\)\.toLowerCase\(\) !== 'delivered'/);
   assert.match(serverSource, /storage\/v1\/object\/sign\/private-ecu-files/);
   assert.match(serverSource, /url\.pathname === '\/api\/customer\/software-download'/);
-  assert.match(adminSource, /Upload private software file/);
+  assert.match(adminSource, /Upload private result file/);
   assert.match(adminSource, /software_delivery_path:objectPath/);
   assert.match(customerSource, /api\/customer\/software-download/);
-  assert.match(customerSource, /Download your file/);
+  assert.match(customerSource, /Result Ready · Download/);
   assert.match(migrationSource, /software_delivery_path text/);
   assert.match(migrationSource, /software_delivery_name text/);
 });
