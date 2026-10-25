@@ -1456,7 +1456,7 @@ async function handleAdminCreateSoftwarePaymentLink(request, response) {
     if (!/^[0-9a-f-]{36}$/i.test(requestId)) { jsonResponse(response, 400, { error: 'Invalid software request reference.' }); return true; }
     if (!Number.isFinite(rupees) || rupees <= 0 || !Number.isSafeInteger(Math.round(rupees * 100))) { jsonResponse(response, 400, { error: 'Enter a valid price greater than zero.' }); return true; }
     const amountPaise = Math.round(rupees * 100);
-    const loaded = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,title,software_product_id,software_status,quoted_price_paise,software_payment_link,user_id', { timeoutMs: 12000 });
+    const loaded = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,title,software_product_id,software_status,quoted_price_paise,software_payment_link,user_id,admin_reply', { timeoutMs: 12000 });
     if (!loaded.ok) { jsonResponse(response, 502, { error: 'Software request could not be loaded.' }); return true; }
     const rows = await loaded.json(); const row = rows?.[0];
     if (!row || !row.software_product_id) { jsonResponse(response, 404, { error: 'Software purchase request not found.' }); return true; }
@@ -1472,7 +1472,7 @@ async function handleAdminCreateSoftwarePaymentLink(request, response) {
     if (!parsed || parsed.protocol!=='https:' || !/(?:^|\.)(?:rzp\.io|razorpay\.com)$/i.test(parsed.hostname) || parsed.username || parsed.password) {
       jsonResponse(response, 502, { error:'Razorpay returned an invalid payment link.' }); return true;
     }
-    const paymentLinkId=String(link?.id||''); if(!/^plink_[A-Za-z0-9]+$/.test(paymentLinkId)){jsonResponse(response,502,{error:'Razorpay did not return a valid payment-link reference.'});return true;} const patch={ quoted_price_paise:amountPaise, software_payment_link:paymentUrl, software_payment_link_id:paymentLinkId, software_status:'awaiting_payment', status:'waiting_for_customer', updated_at:new Date().toISOString() };
+    const paymentLinkId=String(link?.id||''); if(!/^plink_[A-Za-z0-9]+$/.test(paymentLinkId)){jsonResponse(response,502,{error:'Razorpay did not return a valid payment-link reference.'});return true;} const paymentMessage='Your software price is ₹'+(amountPaise/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})+'. Use the secure Razorpay Pay now link in My Account → My requests & messages: '+paymentUrl; const priorReply=String(row.admin_reply||'').trim(); const patch={ quoted_price_paise:amountPaise, software_payment_link:paymentUrl, software_payment_link_id:paymentLinkId, software_status:'awaiting_payment', status:'waiting_for_customer', admin_reply:paymentMessage, updated_at:new Date().toISOString() };
     const saved=await supabaseRequest(admin.token,'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,quoted_price_paise,software_payment_link,software_status,status',{method:'PATCH',prefer:'return=representation',body:patch,timeoutMs:12000});
     if(!saved.ok){jsonResponse(response,502,{error:'Payment link was created, but could not be saved to the request. Check Razorpay before retrying.'});return true;}
     jsonResponse(response,200,{item:(await saved.json())?.[0]||null,paymentLink:paymentUrl});
@@ -1502,7 +1502,7 @@ async function handleAdminVerifySoftwarePayment(request, response) {
     if (String(link?.status||'').toLowerCase() !== 'paid' || Number(link?.amount) !== expected || Number(link?.amount_paid) !== expected) {
       jsonResponse(response, 409, { error: 'Razorpay does not confirm full payment for the quoted amount yet.', paymentStatus:String(link?.status||'unknown') }); return true;
     }
-    const patch = { software_status:'paid', status:'in_review', updated_at:new Date().toISOString() };
+    const patch = { software_status:'paid', status:'in_review', admin_reply:'Payment received and verified by Razorpay. We will prepare your software and add the secure download here.', updated_at:new Date().toISOString() };
     const saved = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,software_status,status,quoted_price_paise', { method:'PATCH', prefer:'return=representation', body:patch, timeoutMs:12000 });
     if (!saved.ok) { jsonResponse(response, 502, { error: 'Payment was verified by Razorpay, but the request status could not be saved. Refresh and retry verification.' }); return true; }
     jsonResponse(response, 200, { verified:true, item:(await saved.json())?.[0]||null });
