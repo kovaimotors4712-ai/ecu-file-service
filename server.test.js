@@ -1916,6 +1916,23 @@ test('software requests can create a server-side Razorpay payment link with admi
 });
 
 
+test('customer and admin requirement message threads are owner-checked and auditable', () => {
+  const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const customer = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261025_requirement_messages.sql'), 'utf8');
+  assert.match(server, /async function handleRequirementMessages/);
+  assert.match(server, /row\.user_id !== actor\.id/);
+  assert.match(server, /message\.length > 2000/);
+  assert.match(server, /\/api\/customer\/requirements\/messages/);
+  assert.match(server, /\/api\/admin\/requirements\/messages/);
+  assert.match(customer, /api\/customer\/requirements\/messages/);
+  assert.match(admin, /api\/admin\/requirements\/messages/);
+  assert.match(migration, /sender_role in \('customer','admin'\)/);
+  assert.match(migration, /references public\.forum_customer_requests\(id\) on delete cascade/i);
+});
+
+
 test('all paid customer requirements use zero-fee intake and second-stage quote/payment flow', () => {
   const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
