@@ -226,3 +226,18 @@
   -webkit-text-fill-color:#59645d !important;
   opacity:1 !important;
 }
+
+
+/* Simplified software order desk: show only the actions needed for the next step. */
+.admin-request-card:has(.admin-software-request-fields) .admin-request-status,
+.admin-request-card:has(.admin-software-request-fields) > .admin-request-status{display:none!important}
+.admin-software-request-fields{gap:12px!important;padding:14px!important;border-radius:8px!important;background:#f5f8fa!important}
+.admin-software-request-fields>label:first-child{display:none!important}
+.admin-software-request-fields label:has(input[type="url"]){display:none!important}
+.admin-software-request-fields label:has(input[type="number"]){max-width:360px}
+.admin-request-card:has(.admin-software-request-fields) .admin-request-reply{min-height:84px}
+.admin-request-card:has(.admin-software-request-fields) .button{min-height:42px}
+@media(max-width:640px){
+ .admin-software-request-fields{padding:10px!important}
+ .admin-software-request-fields label:has(input[type="number"]){max-width:none}
+}
