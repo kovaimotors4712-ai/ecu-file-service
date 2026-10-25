@@ -7,7 +7,10 @@
   (function () {
     try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (_) {}
     function resetForumScroll() {
-      if (!window.location.pathname.endsWith('/forum.html')) return;
+      if (!window.location.pathname.includes('/forum')) return;
+      try {
+        if (window.location.hash) history.replaceState(null, '', window.location.pathname + window.location.search);
+      } catch (_) {}
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
       if (document.body) document.body.scrollTop = 0;
@@ -21,8 +24,10 @@
         if (document.body) document.body.scrollTop = 0;
       }, 120);
     }
+    document.addEventListener('DOMContentLoaded', resetForumScroll);
     window.addEventListener('pageshow', resetForumScroll);
     window.addEventListener('load', resetForumScroll);
+    window.addEventListener('hashchange', resetForumScroll);
   })();
   </script>
   <meta name="theme-color" content="#101a19">
@@ -33,8 +38,8 @@
   <meta property="og:url" content="https://ecufileservice.in/forum.html">
   <meta property="og:type" content="website">
   <title>Automotive Workshop Community | ECU File Service India</title>
-  <link rel="stylesheet" href="/styles.css?v=20261025-scroll-reset">
-  <link rel="stylesheet" href="/forum.css?v=20261025-scroll-reset">
+  <link rel="stylesheet" href="/styles.css?v=20261025-top-fix2">
+  <link rel="stylesheet" href="/forum.css?v=20261025-top-fix2">
 </head>
 <body class="forum-page">
   <div class="announcement"><span class="status-dot"></span> COMMUNITY BETA · MODERATED WORKSHOP DISCUSSIONS <span class="announcement-right">SAFETY FIRST</span></div>
@@ -212,6 +217,6 @@
  }catch(_){}
 })();
 </script>
-<script src="/forum.js?v=20261025-scroll-reset"></script>
+<script src="/forum.js?v=20261025-top-fix2"></script>
 </body>
 </html>
