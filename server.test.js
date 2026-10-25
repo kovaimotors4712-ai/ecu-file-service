@@ -1891,11 +1891,11 @@ test('software requests expose an explicit pay and verified-download workflow', 
   const grants = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261024_grant_site_announcement_delete_service_role.sql'), 'utf8');
   assert.match(admin, /Create the second-stage Razorpay payment link before this status/);
   assert.match(admin, /Verify Razorpay payment to confirm full payment before marking this request Paid/);
-  assert.match(admin, /Upload a private result file before marking this software request delivered/);
+  assert.match(admin, /Upload a private result file before marking this requirement delivered/);
   assert.match(admin, /patch\.status=softwareStatus\.value==='awaiting_payment'\?'waiting_for_customer'/);
   assert.match(customer, /Second-Stage Payment/);
   assert.match(customer, /Payment verified/);
-  assert.match(customer, /Download available/);
+  assert.match(customer, /Result ready/);
   assert.match(customer, /Pay Now/);
   assert.match(customer, /Result Ready · Download/);
   assert.match(grants, /grant delete on table public\.site_announcements to service_role/i);
@@ -1912,7 +1912,7 @@ test('software requests can create a server-side Razorpay payment link with admi
   assert.match(serverSource, /software_status:'awaiting_payment', status:'waiting_for_customer'/);
   assert.match(adminSource, /Create second-stage Razorpay payment link/);
   assert.match(adminSource, /adminApi\('\/api\/admin\/requirements\/payment-link'/);
-  assert.match(customerSource, /Pay now ↗/);
+  assert.match(customerSource, /Pay Now/);
 });
 
 
@@ -1924,7 +1924,7 @@ test('all paid customer requirements use zero-fee intake and second-stage quote/
   assert.match(server, /\['suggestion','feature_request'\]/);
   assert.match(server, /type:row\.request_type==='software_requirement'\?'software_purchase':'customer_requirement'/);
   assert.match(server, /async function handleAdminDeleteCustomerRequest/);
-  assert.match(server, /Request has a quote, payment-link, payment, or delivery record/);
+  assert.match(server, /This request has a quote, payment-link, payment, or delivery record/);
   assert.match(admin, /const isRequirement=!\['suggestion','feature_request'\]/);
   assert.match(admin, /Create second-stage Razorpay payment link/);
   assert.match(admin, /adminApi\('\/api\/admin\/customer-requests\/delete'/);
@@ -1968,7 +1968,7 @@ test('admin controls enforce readable contrast and cache-busted current assets',
   assert.match(adminCss, /#site-content-list \.button-ghost[\s\S]*?opacity:1 !important/);
   assert.match(adminCss, /button:disabled[\s\S]*?opacity:1 !important/);
   assert.match(adminHtml, /admin\.css\?v=20261024-final-contrast/);
-  assert.match(adminHtml, /admin\.js\?v=20261024-final-contrast/);
+  assert.match(adminHtml, /admin\.js\?v=20261025-requirement-order/);
 });
 
 
@@ -1991,7 +1991,7 @@ test('customer private requests have a guarded delete action and readable accoun
   const css = fs.readFileSync(path.join(__dirname, 'styles.css'), 'utf8');
   const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261024_customer_request_delete.sql'), 'utf8');
-  assert.match(customer, /forum_delete_own_customer_request/);
+  assert.match(customer, /forum_cancel_own_customer_request/);
   assert.match(customer, /Cancel request/);
   assert.match(customer, /Hide from history/);
   assert.match(css, /#customer-private-request-list \.customer-request-delete[\s\S]*?background:#8b1e1e !important/);
