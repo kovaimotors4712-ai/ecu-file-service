@@ -143,8 +143,15 @@
     const rows = await api.rest('forum_profiles?select=user_id,display_name,bio&user_id=eq.' + encodeURIComponent(user.id) + '&limit=1');
     profile = Array.isArray(rows) && rows.length ? rows[0] : null;
     $('#forum-display-name').value = profile ? profile.display_name : '';
-    $('#forum-bio').value = profile ? profile.bio || '' : '';
-    setMessage($('#forum-profile-message'), profile ? 'Your public profile is saved.' : 'Choose a display name and save your profile before creating a topic or reply.');
+    const isAdmin = Boolean(user && String(user.app_metadata && user.app_metadata.role || '').toLowerCase() === 'admin');
+    $('#forum-username-panel').hidden = !user || (Boolean(profile && profile.display_name) && !isAdmin);
+    $('#username-heading').textContent = isAdmin ? 'Change your username' : 'Set your username';
+    $('#forum-username-help').textContent = isAdmin
+      ? 'Admin account: you can change your username whenever you want.'
+      : 'All members must save a username before posting, replying or chatting.';
+    setMessage($('#forum-username-message'), profile && profile.display_name
+      ? (isAdmin ? 'Admin username is saved. You can change it any time.' : 'Username saved.')
+      : 'A username is required before you can participate.');
   }
 
   async function loadModerationQueue() {
@@ -249,7 +256,7 @@
     $('#forum-sign-in').hidden = signedIn;
     $('#forum-sign-up').hidden = signedIn;
     $('#forum-sign-out').hidden = !signedIn;
-    $('#forum-profile-panel').hidden = !signedIn;
+    $('#forum-username-panel').hidden = true;
     $('#forum-new-topic-toggle').disabled = !signedIn;
     document.querySelectorAll('.forum-request-form button[type="submit"]').forEach(function(button){button.disabled=!signedIn;});
     $('#forum-reply-form').hidden = !signedIn || !activeTopic || activeTopic.is_locked;
@@ -260,12 +267,12 @@
         loadCustomerRequests();
       } catch (_) {
         profile = null;
-        setMessage($('#forum-profile-message'), 'Profile could not be loaded. Try refreshing or signing in again.', 'error');
+        setMessage($('#forum-username-message'), 'Username could not be loaded. Refresh and try again.', 'error');
       }
     } else {
       profile = null;
       setMessage($('#forum-auth-message'), 'Sign in or create an account to post and reply.');
-      setMessage($('#forum-profile-message'), '');
+      setMessage($('#forum-username-message'), '');
       $('#forum-request-send').disabled = true;
       $('#forum-request-list').textContent = 'Sign in to view requests.';
     }
@@ -400,25 +407,28 @@
     await loadTopics();
   });
 
-  $('#forum-profile-form').addEventListener('submit', async function (event) {
+  $('#forum-username-form').addEventListener('submit', async function (event) {
     event.preventDefault();
-    if (!user || !validUuid(user.id)) return setMessage($('#forum-profile-message'), 'Sign in before saving your profile.', 'error');
+    if (!user || !validUuid(user.id)) return setMessage($('#forum-username-message'), 'Sign in before saving your username.', 'error');
     const displayName = $('#forum-display-name').value.trim();
-    const bio = $('#forum-bio').value.trim();
-    if (displayName.length < 2 || displayName.length > 32 || bio.length > 240) {
-      return setMessage($('#forum-profile-message'), 'Use a display name of 2–32 characters and a bio under 240 characters.', 'error');
+    if (displayName.length < 2 || displayName.length > 32) {
+      return setMessage($('#forum-username-message'), 'Username must be 2–32 characters.', 'error');
     }
+    const button = $('#forum-username-form').querySelector('button[type="submit"]');
+    button.disabled = true;
     try {
       await api.rest('forum_profiles?on_conflict=user_id', {
         method: 'POST',
-        body: { user_id: user.id, display_name: displayName, bio: bio },
+        body: { user_id: user.id, display_name: displayName, bio: '' },
         prefer: 'resolution=merge-duplicates,return=representation'
       });
       await loadProfile();
       await loadTopics();
-      setMessage($('#forum-profile-message'), 'Public profile saved.', 'success');
+      setMessage($('#forum-username-message'), 'Username saved.', 'success');
     } catch (_) {
-      setMessage($('#forum-profile-message'), 'Profile could not be saved. The display name may already be in use.', 'error');
+      setMessage($('#forum-username-message'), 'Username could not be saved. It may already be in use; try another.', 'error');
+    } finally {
+      button.disabled = false;
     }
   });
 
@@ -435,7 +445,7 @@
   $('#forum-new-topic-form').addEventListener('submit', async function (event) {
     event.preventDefault();
     if (!user) return setMessage($('#forum-create-message'), 'Sign in before creating a topic.', 'error');
-    if (!profile) return setMessage($('#forum-create-message'), 'Save your public display name before creating a topic.', 'error');
+    if (!profile) return setMessage($('#forum-create-message'), 'Save your username before creating a topic.', 'error');
     const categoryId = $('#forum-new-topic-category').value;
     const title = $('#forum-new-topic-title').value.trim();
     const body = $('#forum-new-topic-body').value.trim();
@@ -522,7 +532,7 @@
   $('#forum-reply-form').addEventListener('submit', async function (event) {
     event.preventDefault();
     if (!user || !activeTopic || activeTopic.is_locked) return;
-    if (!profile) return setMessage($('#forum-reply-form-message'), 'Save your public display name before replying.', 'error');
+    if (!profile) return setMessage($('#forum-reply-form-message'), 'Save your username before replying.', 'error');
     const body = $('#forum-reply-body').value.trim();
     if (body.length < 2 || body.length > 8000) return setMessage($('#forum-reply-form-message'), 'Replies must be 2–8,000 characters.', 'error');
     const button = $('#forum-reply-form').querySelector('button[type=submit]');
@@ -686,6 +696,7 @@
   if (chatForm) chatForm.addEventListener('submit', async function (event) {
     event.preventDefault();
     if (!api || !user) { if (chatStatus) chatStatus.textContent = 'Please sign in above to post to the public chat.'; return; }
+    if (!profile || !profile.display_name) { if (chatStatus) chatStatus.textContent = 'Save your username above before chatting.'; $('#forum-username-panel').hidden = false; $('#forum-display-name').focus(); return; }
     const body = String(chatInput.value || '').trim();
     if (!body || body.length > 1200) { if (chatStatus) chatStatus.textContent = 'Messages must be 1–1,200 characters.'; return; }
     chatSend.disabled = true;
