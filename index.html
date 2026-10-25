@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261025-forum-teal-glass">
+  <link rel="stylesheet" href="styles.css?v=20261025-forum-dark-neon">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -312,42 +312,47 @@ refresh();window.setInterval(refresh,15000);
     #software-store .section-heading>a.button-ghost:hover{background:#27358d!important}
 
     #workshop-forum-preview.homepage-forum-section{
-      background:linear-gradient(130deg,#e8f8f6 0%,#f4fffd 46%,#dff5f0 100%);
-      border-top:5px solid #087f8c;border-bottom:1px solid #b9e5df;
+      background:linear-gradient(135deg,#0b1220 0%,#101c2c 52%,#17182d 100%);
+      border-top:5px solid #00d6c9;border-bottom:1px solid #26394d;
       padding-top:clamp(38px,5vw,60px);padding-bottom:clamp(38px,5vw,60px);
-      position:relative;isolation:isolate
+      position:relative;isolation:isolate;overflow:hidden
     }
     #workshop-forum-preview.homepage-forum-section:before{
-      content:"";position:absolute;z-index:-1;right:-75px;top:-80px;width:270px;height:270px;border-radius:50%;
-      background:radial-gradient(circle,#7edbd055 0%,#7edbd000 72%);pointer-events:none
+      content:"";position:absolute;z-index:-1;right:-75px;top:-100px;width:330px;height:330px;border-radius:50%;
+      background:radial-gradient(circle,#00d6c933 0%,#00d6c900 72%);pointer-events:none
     }
-    #workshop-forum-preview .section-heading .section-eyebrow{color:#087f8c;font-weight:800;letter-spacing:.2em}
+    #workshop-forum-preview.homepage-forum-section:after{
+      content:"";position:absolute;z-index:-1;left:-130px;bottom:-190px;width:360px;height:360px;border-radius:50%;
+      background:radial-gradient(circle,#635bff22 0%,#635bff00 72%);pointer-events:none
+    }
+    #workshop-forum-preview .section-heading .section-eyebrow{color:#48f0df;font-weight:800;letter-spacing:.2em}
     #workshop-forum-preview .section-heading h2{
-      font-family:var(--display);font-weight:800;letter-spacing:-.055em;color:#103b40
+      font-family:var(--display);font-weight:800;letter-spacing:-.055em;color:#f4f8ff
     }
-    #workshop-forum-preview .section-heading h2 span{color:#087f8c}
-    #workshop-forum-preview .section-heading p{color:#41676a;line-height:1.8}
+    #workshop-forum-preview .section-heading h2 span{color:#48f0df}
+    #workshop-forum-preview .section-heading p{color:#aabbd0;line-height:1.8}
     #workshop-forum-preview .section-heading>a.button-dark,
     #workshop-forum-preview .homepage-forum-footer .button-dark{
-      background:linear-gradient(115deg,#087f8c,#0caaa0);color:#fff;border:1px solid #087f8c;border-radius:8px;box-shadow:0 4px 0 #b4e8df
+      background:linear-gradient(115deg,#00a99d,#00d6c9);color:#06151d;border:1px solid #00d6c9;border-radius:8px;box-shadow:0 4px 0 #174b54;font-weight:800
     }
     #workshop-forum-preview .section-heading>a.button-dark:hover,
-    #workshop-forum-preview .homepage-forum-footer .button-dark:hover{background:linear-gradient(115deg,#05616b,#07877f)}
+    #workshop-forum-preview .homepage-forum-footer .button-dark:hover{background:linear-gradient(115deg,#00c4b5,#58f4e5)}
     #workshop-forum-preview .homepage-forum-frame{
-      border:1px solid #b9e5df;border-radius:16px;background:#f8fffd;
-      box-shadow:0 14px 34px #145e5814
+      border:1px solid #2b4357;border-radius:16px;background:#101b2b;
+      box-shadow:0 16px 38px #0008
     }
-    #workshop-forum-preview .homepage-forum-topics{background:#f8fffd}
+    #workshop-forum-preview .homepage-forum-topics{background:#101b2b}
     #workshop-forum-preview .homepage-forum-topic{
-      background:linear-gradient(150deg,#fff 0%,#f2fcfa 100%);border:1px solid #cbeae5;border-radius:12px;
-      box-shadow:0 5px 16px #145e580c;transition:transform .18s,box-shadow .18s,border-color .18s
+      background:linear-gradient(145deg,#17263a 0%,#111d2e 100%);border:1px solid #2b4357;border-radius:12px;
+      box-shadow:0 6px 18px #0003;transition:transform .18s,box-shadow .18s,border-color .18s
     }
-    #workshop-forum-preview .homepage-forum-topic:hover{transform:translateY(-3px);border-color:#79cfc4;box-shadow:0 12px 22px #145e5814}
-    #workshop-forum-preview .homepage-forum-topic-meta{color:#087f8c}
-    #workshop-forum-preview .homepage-forum-topic h3{font-family:var(--display);font-weight:800;color:#103b40}
-    #workshop-forum-preview .homepage-forum-topic p{color:#41676a}
-    #workshop-forum-preview .homepage-forum-topic small{color:#4b8583}
-    #workshop-forum-preview .homepage-forum-empty{background:#f8fffd;color:#41676a}
+    #workshop-forum-preview .homepage-forum-topic:hover{transform:translateY(-3px);border-color:#00bfb5;box-shadow:0 12px 24px #0005}
+    #workshop-forum-preview .homepage-forum-topic-meta{color:#48f0df}
+    #workshop-forum-preview .homepage-forum-topic h3{font-family:var(--display);font-weight:800;color:#f2f7ff}
+    #workshop-forum-preview .homepage-forum-topic h3 a{color:inherit}
+    #workshop-forum-preview .homepage-forum-topic p{color:#b5c4d6}
+    #workshop-forum-preview .homepage-forum-topic small{color:#91a8c0}
+    #workshop-forum-preview .homepage-forum-empty{background:#101b2b;color:#b5c4d6}
     @media(max-width:620px){
       #order.order-section{border-top-width:4px}
       #software-store.software-home-section{border-top-width:4px}
