@@ -127,7 +127,7 @@
     if (pendingPanel) pendingPanel.hidden = !email;
     if (notificationPanel) notificationPanel.hidden = !email;
     if (email && dialog?.open) {
-      loadCustomerOrders(); loadPendingCheckouts(); loadCustomerNotifications(); loadCustomerPrivateRequests(); subscribeToOrders();
+      loadCustomerOrders(); loadPendingCheckouts(); loadCustomerNotifications(); subscribeToOrders();
       // Do not call saveSession() from renderAccountState(): it re-enters this function
       // and previously caused an unbounded getUser → saveSession → render loop.
     }
