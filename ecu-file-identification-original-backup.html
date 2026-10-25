@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Learn what to record when identifying an ECU and how to preserve original BIN or HEX files with hashes, clear labels and safe working copies.">
+  <link rel="canonical" href="https://ecufileservice.in/ecu-file-identification-original-backup.html">
+  <meta property="og:title" content="ECU Identification and Original BIN/HEX File Backup | ECU File Service India">
+  <meta property="og:description" content="A careful workflow for ECU hardware/software identification, original file preservation and compatibility checks.">
+  <meta property="og:url" content="https://ecufileservice.in/ecu-file-identification-original-backup.html">
+  <meta property="og:type" content="article">
+  <title>ECU Identification and Original BIN/HEX File Backup | ECU File Service India</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"Article","headline":"ECU Identification and Original BIN/HEX File Backup","description":"A careful workflow for ECU hardware/software identification, original file preservation and compatibility checks.","mainEntityOfPage":"https://ecufileservice.in/ecu-file-identification-original-backup.html","author":{"@type":"Organization","name":"ECU File Service India"},"publisher":{"@type":"Organization","name":"ECU File Service India","url":"https://ecufileservice.in/"},"inLanguage":"en-IN"}
+  </script>
+</head>
+<body>
+  <div class="announcement"><span class="status-dot"></span> ECU WORKSHOP REFERENCE · FILE INTEGRITY <span class="announcement-right">PRESERVE ORIGINALS</span></div>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="ECU File Service India home"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 10h26v20H7z"/><path d="M12 15h5v10h-5zm11 0h5m-5 5h5m-5 5h5M3 15h4m-4 5h4m-4 5h4m26-10h4m-4 5h4m-4 5h4"/></svg></span><span class="brand-name">ECU File Service India</span></a>
+    <nav class="desktop-nav" aria-label="Main navigation"><a href="/">Home</a><a href="/ecu-file-services.html">ECU services</a><a href="/guides.html">Guides</a><a href="/forum.html">Forum</a></nav>
+  </header>
+  <main style="max-width:860px;margin:0 auto;padding:48px 22px 72px">
+    <p class="eyebrow">ECU IDENTIFICATION · BIN/HEX FILE HANDLING</p>
+    <h1>ECU Identification and Original BIN/HEX File Backup</h1>
+    <p class="hero-copy">Two files with similar names or sizes are not necessarily interchangeable. Accurate ECU identification and a protected original readout help a technician compare files responsibly, investigate faults and plan a recovery if a programming operation fails.</p>
+    <p>This checklist is for professional automotive workshops. Use equipment and procedures approved for the exact controller and vehicle. Do not write a file merely because its filename, vehicle model or checksum appears similar.</p>
+    <h2>1. Record the complete controller identity</h2>
+    <p>Capture identifiers before opening or comparing a binary file. Depending on the vehicle and tool, useful identifiers can include:</p>
+    <ul><li>Vehicle make, model, model year, engine/fuel variant and market.</li><li>ECU manufacturer, family, hardware number and label/part number.</li><li>Software version, calibration ID, boot/software identifiers and diagnostic identification returned by the tool.</li><li>Reading tool, software version, selected protocol and read method.</li><li>Whether the file is a full read, virtual read, calibration-only area, EEPROM dump or a specific memory region.</li></ul>
+    <p>Record the source and date of every identifier. If a value is unavailable, mark it as unknown rather than inferring it from a similar controller.</p>
+    <h2>2. Keep the original immutable</h2>
+    <ol><li>Save the first successful read into a clearly named original folder.</li><li>Make a second copy for analysis; do not edit or overwrite the only original.</li><li>Use filenames that describe the vehicle/controller and read type without including customer names, phone numbers or registration details.</li><li>Record file size in bytes and calculate a SHA-256 hash so that later copies can be checked for accidental changes.</li><li>Store backups in access-controlled storage and keep a second protected copy according to the workshop's retention policy.</li></ol>
+    <h2>3. Understand what a hash can and cannot tell you</h2>
+    <p>A SHA-256 hash is a practical fingerprint of the exact file bytes. If the hash changes, the bytes changed. If two files have the same hash, they are byte-for-byte identical for ordinary workshop verification purposes. A hash does not prove that a file is correct for the ECU, safe to program, legally usable or free of malicious content. Compatibility still needs independent evidence.</p>
+    <h2>4. Verify compatibility before any programming</h2>
+    <ul><li>Match ECU hardware and software identifiers, not just vehicle make and model.</li><li>Confirm memory region, file length, read method and any tool-specific format requirements.</li><li>Check trusted documentation and approved tooling for checksum and integrity requirements.</li><li>Understand whether the operation changes calibration, coding, immobilizer data or other protected areas.</li><li>Confirm stable power support, correct connection procedure and a realistic recovery plan before programming.</li></ul>
+    <h2>5. Preserve evidence and protect customer data</h2>
+    <p>Keep a short audit note describing the original filename, hash, file size, controller identifiers, tool/read method and any analysis performed on copies. Remove VINs, personal identifiers and account details from examples shared publicly. Never publish API keys, login credentials or private download URLs. Send files only to an authorized recipient through a verified channel.</p>
+    <h2>6. Avoid these common mistakes</h2>
+    <ul><li>Overwriting the original with an edited or modified file.</li><li>Mixing full reads, virtual reads, EEPROM and calibration files without labeling the difference.</li><li>Assuming equal file size means equal software or compatible contents.</li><li>Using a reference file without verifying its provenance, licence and exact compatibility.</li><li>Starting a write without checking voltage, programming instructions and recovery options.</li></ul>
+    <h2>Frequently asked questions</h2>
+    <h3>Does matching file size mean two ECU files are compatible?</h3><p>No. Size is only one attribute. Confirm ECU hardware/software identity, memory region, read method and approved compatibility evidence.</p>
+    <h3>Why save a SHA-256 hash?</h3><p>It provides a repeatable way to detect whether the file bytes have changed between storage, transfer and analysis.</p>
+    <h3>Can I post an ECU file publicly to ask for help?</h3><p>Do not upload private customer data or files that you are not authorized to share. First remove identifying details and confirm that sharing is permitted. You can describe the controller IDs and symptoms in the <a href="/forum.html">workshop forum</a>.</p>
+    <div style="margin:36px 0;padding:24px;border:1px solid #52615b;border-radius:14px"><h2>Continue learning</h2><p><a href="/guides.html">Browse all diagnostic guides</a> · <a href="/ecu-file-services.html">Explore ECU file services</a> · <a href="/contact.html">Contact support</a></p></div>
+    <p><small>Educational information only. Follow manufacturer service documentation, approved programming instructions, data-protection obligations and applicable law.</small></p>
+  </main>
+  <footer class="site-footer"><a href="/">ECU File Service India</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a></footer>
+</body>
+</html>
