@@ -213,7 +213,7 @@
         const reply=item.admin_reply?`<div class="customer-private-request-reply"><strong>TEAM MESSAGE</strong><p>${escapeHtml(item.admin_reply)}</p></div>`:'';
         const canCancel=['requested','in_review','quoted'].includes(rawStatus)&&!item.software_payment_link;
         const cancelAction=canCancel?`<button type="button" class="customer-software-cancel" data-request-id="${escapeHtml(item.id)}">Cancel request</button>`:'';
-        return `<details class="customer-order-card customer-order-collapsible customer-software-order-card"><summary class="customer-order-top"><b>Software Request: ${escapeHtml(item.title||'Software')}</b><span>${escapeHtml(labels[rawStatus]||'Request received')} <span aria-hidden="true">＋</span></span></summary><div class="customer-order-body"><p><strong>Request:</strong> ${escapeHtml(item.title||'Software request')}</p><p>${escapeHtml(item.body||'')}</p><p><strong>Submitted:</strong> ${new Date(item.created_at).toLocaleDateString()}</p>${timeline}<p>${escapeHtml(messages[rawStatus]||messages.requested)}</p>${price}${reply}${payment}${download}${item.updated_at?`<small>Last updated ${new Date(item.updated_at).toLocaleString()}</small>`:''}</div><div class="customer-order-actions">${cancelAction}<button type="button" class="customer-software-hide" data-request-id="${escapeHtml(item.id)}" data-hidden="${item.customer_hidden_at?'true':'false'}">${item.customer_hidden_at?'Restore to history':'Hide from history'}</button></div></details>`;
+        return `<details class="customer-order-card customer-order-collapsible customer-software-order-card" data-software-request-id="${escapeHtml(item.id)}"><summary class="customer-order-top"><b>Software Request: ${escapeHtml(item.title||'Software')}</b><span>${escapeHtml(labels[rawStatus]||'Request received')} <span aria-hidden="true">＋</span></span></summary><div class="customer-order-body"><p><strong>Request:</strong> ${escapeHtml(item.title||'Software request')}</p><p>${escapeHtml(item.body||'')}</p><p><strong>Submitted:</strong> ${new Date(item.created_at).toLocaleDateString()}</p>${timeline}<p>${escapeHtml(messages[rawStatus]||messages.requested)}</p>${price}${reply}${payment}${download}${item.updated_at?`<small>Last updated ${new Date(item.updated_at).toLocaleString()}</small>`:''}</div><div class="customer-order-actions">${cancelAction}<button type="button" class="customer-messages-open customer-software-messages-open" data-order-id="${escapeHtml(item.id)}" data-software-request="true">Messages</button><button type="button" class="customer-software-hide" data-request-id="${escapeHtml(item.id)}" data-hidden="${item.customer_hidden_at?'true':'false'}">${item.customer_hidden_at?'Restore to history':'Hide from history'}</button></div></details>`;
       });
       list.innerHTML = [...fileCards,...softwareCards].join('');
     } catch (error) { if (requestId === ordersRequest) list.textContent = `Your order history could not be loaded. ${error.message || 'Retry.'}`; }
@@ -479,8 +479,56 @@
   document.querySelector('#customer-orders .customer-order-list')?.addEventListener('click', async event => {
     const button = event.target.closest('.customer-messages-open'); if (!button) return;
     const orderId = button.dataset.orderId;
+    if (button.dataset.softwareRequest === 'true') {
+      openSoftwareRequestMessagesDialog(orderId);
+      return;
+    }
     openMessagesDialog(orderId);
   });
+
+  async function openSoftwareRequestMessagesDialog(requestId) {
+    const card = document.querySelector(`[data-software-request-id="${CSS.escape(requestId)}"]`);
+    if (!card) return;
+    const dialog = document.createElement('dialog');
+    dialog.className = 'account-dialog';
+    dialog.innerHTML = `<div class="messages-dialog" style="padding:20px;max-width:500px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+        <h3 style="margin:0;font-size:16px">Software Request Messages</h3>
+        <button type="button" class="dialog-close-btn" style="padding:4px 8px">Close</button>
+      </div>
+      <div class="messages-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--line);padding:10px;margin-bottom:15px;background:#fcfdfb;display:grid;gap:8px">Loading...</div>
+      <form class="message-send-form" style="display:flex;gap:8px">
+        <textarea name="message" required placeholder="Message the team about this software request..." maxlength="2000" style="flex:1;height:60px;padding:8px;resize:vertical"></textarea>
+        <button type="submit" class="button" style="align-self:flex-end">Send</button>
+      </form>
+    </div>`;
+    document.body.appendChild(dialog);
+    dialog.showModal();
+    dialog.querySelector('.dialog-close-btn').addEventListener('click', () => dialog.close());
+    const list = dialog.querySelector('.messages-list');
+    const form = dialog.querySelector('.message-send-form');
+    async function loadMessages() {
+      try {
+        const response = await rest(`forum_customer_requests?id=eq.${encodeURIComponent(requestId)}&select=id,title,body,admin_reply,customer_auto_reply,created_at,updated_at&limit=1`);
+        const item = Array.isArray(response) ? response[0] : null;
+        if (!item) throw new Error('Software request not found.');
+        const entries = [];
+        if (item.customer_auto_reply) entries.push({who:'TEAM',message:item.customer_auto_reply,at:item.created_at});
+        if (item.body) entries.push({who:'YOU',message:item.body,at:item.created_at});
+        if (item.admin_reply) entries.push({who:'ADMIN SUPPORT',message:item.admin_reply,at:item.updated_at||item.created_at});
+        list.innerHTML = entries.length ? entries.map(m => `<div style="padding:8px 12px;border-radius:6px;background:${m.who==='ADMIN SUPPORT'||m.who==='TEAM'?'#eef3ec':'#f1f5f9'};font-size:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font:750 10px var(--mono);color:#55605b"><span>${m.who}</span><span>${new Date(m.at).toLocaleString()}</span></div><div style="white-space:pre-wrap;word-break:break-word">${escapeHtml(m.message)}</div></div>`).join('') : '<p>No messages yet.</p>';
+        list.scrollTop = list.scrollHeight;
+      } catch (error) { list.textContent = error.message || 'Could not load request messages.'; }
+    }
+    await loadMessages();
+    const textarea = form.querySelector('textarea');
+    textarea.disabled = true;
+    form.querySelector('button[type="submit"]').disabled = true;
+    const note = document.createElement('small');
+    note.textContent = 'You can view the request and team reply here. Sending new messages is not available for this request yet.';
+    form.replaceWith(note);
+    dialog.addEventListener('close', () => dialog.remove());
+  }
 
   async function openMessagesDialog(orderId) {
     const dialog = document.createElement('dialog');
