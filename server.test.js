@@ -1885,6 +1885,18 @@ test('homepage forum preview, collapsible customer orders, and protected announc
 });
 
 
+test('software catalogue supports optional quote-on-request pricing and public price visibility', () => {
+  const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const page = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
+  assert.match(server, /body\.price_visible!==undefined\)out\.price_visible=body\.price_visible===true/);
+  assert.match(admin, /priceVisible=data\.get\('price_visible'\)==='on'/);
+  assert.match(admin, /priceVisible&&!priceText/);
+  assert.match(admin, /Quote on request/);
+  assert.match(page, /Leave blank for quote-on-request/);
+  assert.doesNotMatch(page, /name="price"[^>]*required/);
+});
+
 test('software requests expose an explicit pay and verified-download workflow', () => {
   const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
   const customer = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
