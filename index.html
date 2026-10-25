@@ -102,21 +102,44 @@
     <section class="section homepage-forum-section" id="workshop-forum-preview" aria-labelledby="homepage-forum-title">
   <div class="section-heading"><div><span class="section-eyebrow">WORKSHOP COMMUNITY</span><h2 id="homepage-forum-title">Workshop Forum</h2><p>Exchange diagnostic knowledge, discuss repairs and connect with the workshop community.</p></div><a class="button button-dark" href="/forum.html">Open full forum ↗</a></div>
   <div class="homepage-forum-frame"><div id="homepage-forum-topics" class="homepage-forum-topics" aria-live="polite"><p>Loading latest discussions…</p></div><div class="homepage-forum-footer"><a class="button button-dark" href="/forum.html">Browse all discussions ↗</a></div></div>
+  <div class="homepage-live-chat-preview" aria-labelledby="homepage-live-chat-title">
+    <div class="homepage-live-chat-heading"><div><span class="section-eyebrow">COMMUNITY LIVE CHAT</span><h3 id="homepage-live-chat-title">Latest community messages</h3></div><a class="button button-dark" href="/forum.html">Open community ↗</a></div>
+    <div id="homepage-live-chat-messages" class="homepage-live-chat-messages" aria-live="polite"><p>Loading recent community messages…</p></div>
+    <p class="homepage-live-chat-note">Updates automatically with recent public messages from the live workshop chat.</p>
+  </div>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 (function(){
-const host=document.getElementById('homepage-forum-topics');if(!host)return;
-const api=window.EfsiSupabase;if(!api||typeof api.rest!=='function'){host.innerHTML='<p>Latest discussions are temporarily unavailable. <a href="/forum.html">Open forum</a>.</p>';return;}
+const host=document.getElementById('homepage-forum-topics');
+const chatHost=document.getElementById('homepage-live-chat-messages');
+const api=window.EfsiSupabase;
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,function(ch){return ch==='&'?'&amp;':ch==='<'?'&lt;':ch==='>'?'&gt;':ch==='"'?'&quot;':'&#39;';});
-async function refresh(){try{
+if(!api||typeof api.rest!=='function'){
+if(host)host.innerHTML='<p>Latest discussions are temporarily unavailable. <a href="/forum.html">Open forum</a>.</p>';
+if(chatHost)chatHost.innerHTML='<p>Community messages are temporarily unavailable. <a href="/forum.html">Open community</a>.</p>';
+return;
+}
+let topicsBusy=false,chatBusy=false;
+async function refreshTopics(){if(!host||topicsBusy)return;topicsBusy=true;try{
 const rows=await api.rest('forum_topics?select=id,category_id,title,body,created_at,accepted_reply_id,is_locked&order=created_at.desc&limit=5');
 const cats=await api.rest('forum_categories?select=id,title&is_active=eq.true');
 if(!Array.isArray(rows)||!rows.length){host.innerHTML='<div class="homepage-forum-empty"><strong>No discussions yet.</strong><p>Start the first workshop discussion.</p><a href="/forum.html">Create the first topic ↗</a></div>';return;}
 const ids=rows.map(x=>x.id).filter(x=>/^[0-9a-f-]{36}$/i.test(x));const counts={};
 if(ids.length){try{const replies=await api.rest('forum_replies?select=topic_id,is_hidden&is_hidden=eq.false&topic_id=in.('+ids.join(',')+')&limit=5000');if(Array.isArray(replies))replies.forEach(x=>counts[x.topic_id]=(counts[x.topic_id]||0)+1);}catch(e){}}
 host.innerHTML=rows.map(t=>{const cat=cats.find(x=>x.id===t.category_id);const body=String(t.body||'');return '<article class="homepage-forum-topic"><div class="homepage-forum-topic-meta"><span>'+esc(cat?cat.title:'Workshop discussion')+'</span><span>'+esc(new Date(t.created_at).toLocaleDateString())+'</span></div><h3><a href="/forum.html">'+esc(t.title)+'</a></h3><p>'+esc(body.slice(0,150))+(body.length>150?'…':'')+'</p><small>'+(counts[t.id]||0)+' replies'+(t.accepted_reply_id?' · Solved':'')+(t.is_locked?' · Locked':'')+'</small></article>';}).join('');
-}catch(e){host.innerHTML='<p>Latest discussions are temporarily unavailable. <a href="/forum.html">Open forum</a>.</p>';}}
-refresh();window.setInterval(refresh,15000);
+}catch(e){host.innerHTML='<p>Latest discussions are temporarily unavailable. <a href="/forum.html">Open forum</a>.</p>';}finally{topicsBusy=false;}}
+async function refreshLiveChat(){if(!chatHost||chatBusy)return;chatBusy=true;try{
+const rows=await api.rest('forum_chat_messages?select=id,author_id,body,created_at&order=created_at.desc&limit=5');
+if(!Array.isArray(rows)||!rows.length){chatHost.innerHTML='<div class="homepage-live-chat-empty">No public chat messages yet. <a href="/forum.html">Open the community to start a conversation ↗</a></div>';return;}
+const ids=Array.from(new Set(rows.map(x=>x.author_id).filter(x=>/^[0-9a-f-]{36}$/i.test(x))));
+let profiles=[];
+if(ids.length){try{profiles=await api.rest('forum_profiles?select=user_id,display_name&user_id=in.('+ids.join(',')+')');}catch(e){}}
+const names={};(Array.isArray(profiles)?profiles:[]).forEach(p=>{names[p.user_id]=p.display_name;});
+chatHost.innerHTML=rows.map(m=>'<article class="homepage-live-chat-message"><div class="homepage-live-chat-meta"><strong>'+esc(names[m.author_id]||'Community member')+'</strong><time datetime="'+esc(m.created_at)+'">'+esc(new Date(m.created_at).toLocaleString())+'</time></div><p>'+esc(m.body||'')+'</p></article>').join('');
+}catch(e){chatHost.innerHTML='<p>Recent community messages could not be loaded right now. <a href="/forum.html">Open community</a>.</p>';}finally{chatBusy=false;}}
+refreshTopics();refreshLiveChat();
+window.setInterval(refreshTopics,15000);
+window.setInterval(refreshLiveChat,12000);
 })();
 });
 </script></section>
@@ -260,7 +283,19 @@ refresh();window.setInterval(refresh,15000);
     .homepage-forum-frame{border:1px solid #dce4d8;background:#fff;overflow:hidden}
     .homepage-forum-frame iframe{display:block;width:100%;height:820px;border:0;background:#f6f8f2}
     @media(max-width:620px){.homepage-forum-section{padding:28px 14px}.homepage-forum-frame iframe{height:760px}.order-section{padding-top:24px}}
-  .homepage-forum-topics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px}.homepage-forum-topic{min-width:0;border:1px solid var(--line);padding:16px;background:#fff}.homepage-forum-topic-meta{display:flex;justify-content:space-between;gap:8px;font:10px var(--mono);color:#758b2c;text-transform:uppercase}.homepage-forum-topic h3{font:700 17px var(--display);line-height:1.4;margin:10px 0}.homepage-forum-topic h3 a{color:inherit;text-decoration:none}.homepage-forum-topic p{font-size:13px;line-height:1.6;color:#66716a;overflow-wrap:anywhere}.homepage-forum-topic small{font-size:11px;color:#66716a}.homepage-forum-empty{padding:22px;line-height:1.7}.homepage-forum-footer{padding:0 16px 16px}.homepage-forum-frame iframe{display:none}@media(max-width:620px){.homepage-forum-topics{grid-template-columns:minmax(0,1fr);padding:10px}.homepage-forum-topic{padding:14px}.homepage-forum-footer{padding:0 10px 12px}}
+  .homepage-live-chat-preview{margin-top:18px;border:1px solid var(--line);background:#fff;padding:16px}
+.homepage-live-chat-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.homepage-live-chat-heading h3{margin:4px 0 0;font:750 22px/1.2 var(--display);color:var(--ink)}
+.homepage-live-chat-messages{display:grid;gap:0;border:1px solid var(--line);background:#fff}
+.homepage-live-chat-message{padding:13px 15px;border-bottom:1px solid var(--line);min-width:0}
+.homepage-live-chat-message:last-child{border-bottom:0}
+.homepage-live-chat-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
+.homepage-live-chat-meta strong{color:var(--ink);font-size:12px}
+.homepage-live-chat-message p{margin:7px 0 0;color:var(--ink);font-size:13px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.homepage-live-chat-empty{padding:18px;color:var(--muted);font-size:13px}
+.homepage-live-chat-note{margin:8px 0 0;color:var(--muted);font-size:10px}
+@media(max-width:620px){.homepage-live-chat-preview{padding:12px}.homepage-live-chat-heading{align-items:flex-start;flex-direction:column}.homepage-live-chat-heading h3{font-size:20px}.homepage-live-chat-meta{align-items:flex-start;flex-direction:column;gap:3px}}
+.homepage-forum-topics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px}.homepage-forum-topic{min-width:0;border:1px solid var(--line);padding:16px;background:#fff}.homepage-forum-topic-meta{display:flex;justify-content:space-between;gap:8px;font:10px var(--mono);color:#758b2c;text-transform:uppercase}.homepage-forum-topic h3{font:700 17px var(--display);line-height:1.4;margin:10px 0}.homepage-forum-topic h3 a{color:inherit;text-decoration:none}.homepage-forum-topic p{font-size:13px;line-height:1.6;color:#66716a;overflow-wrap:anywhere}.homepage-forum-topic small{font-size:11px;color:#66716a}.homepage-forum-empty{padding:22px;line-height:1.7}.homepage-forum-footer{padding:0 16px 16px}.homepage-forum-frame iframe{display:none}@media(max-width:620px){.homepage-forum-topics{grid-template-columns:minmax(0,1fr);padding:10px}.homepage-forum-topic{padding:14px}.homepage-forum-footer{padding:0 10px 12px}}
     /* Distinct homepage identities: File Service, Software Store, and Workshop Forum */
     #order.order-section{
       background:linear-gradient(145deg,#f3f7e9 0%,#fbfcf6 58%,#edf3df 100%);
