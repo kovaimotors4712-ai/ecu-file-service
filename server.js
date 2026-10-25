@@ -1444,6 +1444,27 @@ async function handleAdminSiteSettings(request, response) {
   jsonResponse(response,405,{error:'Method Not Allowed'});return true;
 }
 
+async function resolveSoftwareRequestProduct(admin, row, requestId) {
+  if (!row || row.request_type !== 'software_requirement') return null;
+  let productId = String(row.software_product_id || '').trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(productId)) {
+    const match = String(row.body || '').match(/(?:^|\\n)Product ID:\\s*([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\\b/i);
+    productId = match ? match[1] : '';
+  }
+  if (!productId) return null;
+  const productResult = await supabaseRequest(admin.token, 'rest/v1/software_products?id=eq.' + encodeURIComponent(productId) + '&select=id&limit=1', { timeoutMs: 12000 });
+  if (!productResult.ok || !(await productResult.json())?.length) return null;
+  if (String(row.software_product_id || '') !== productId) {
+    const repaired = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.' + encodeURIComponent(requestId), {
+      method: 'PATCH', prefer: 'return=minimal',
+      body: { software_product_id: productId, software_status: ['not_applicable',''].includes(String(row.software_status || '')) ? 'requested' : row.software_status, updated_at: new Date().toISOString() },
+      timeoutMs: 12000
+    });
+    if (!repaired.ok) return null;
+  }
+  return productId;
+}
+
 async function handleAdminCreateSoftwarePaymentLink(request, response) {
   if (request.method !== 'POST') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
   try {
@@ -1456,16 +1477,17 @@ async function handleAdminCreateSoftwarePaymentLink(request, response) {
     if (!/^[0-9a-f-]{36}$/i.test(requestId)) { jsonResponse(response, 400, { error: 'Invalid software request reference.' }); return true; }
     if (!Number.isFinite(rupees) || rupees <= 0 || !Number.isSafeInteger(Math.round(rupees * 100))) { jsonResponse(response, 400, { error: 'Enter a valid price greater than zero.' }); return true; }
     const amountPaise = Math.round(rupees * 100);
-    const loaded = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,title,software_product_id,software_status,quoted_price_paise,software_payment_link,user_id,admin_reply', { timeoutMs: 12000 });
+    const loaded = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,title,body,request_type,software_product_id,software_status,quoted_price_paise,software_payment_link,user_id,admin_reply&limit=1', { timeoutMs: 12000 });
     if (!loaded.ok) { jsonResponse(response, 502, { error: 'Software request could not be loaded.' }); return true; }
     const rows = await loaded.json(); const row = rows?.[0];
-    if (!row || !row.software_product_id) { jsonResponse(response, 404, { error: 'Software purchase request not found.' }); return true; }
+    const resolvedProductId = await resolveSoftwareRequestProduct(admin, row, requestId);
+    if (!row || !resolvedProductId) { jsonResponse(response, 404, { error: 'Software request or linked catalogue product was not found. Refresh the request and check the software listing.' }); return true; }
     if (['paid','delivered','cancelled'].includes(String(row.software_status || '').toLowerCase())) { jsonResponse(response, 409, { error: 'A payment link cannot be generated for this request status.' }); return true; }
     const link = await razorpayApi('payment_links', { method:'POST', body:{
       amount: amountPaise, currency:'INR', accept_partial:false,
       description: String(row.title || 'Software purchase').slice(0,240),
       reference_id: requestId.replace(/-/g,'').slice(0,40),
-      reminder_enable:true, notes:{ request_id:requestId, software_product_id:String(row.software_product_id), type:'software_purchase' }
+      reminder_enable:true, notes:{ request_id:requestId, software_product_id:resolvedProductId, type:'software_purchase' }
     }});
     const paymentUrl=String(link?.short_url || link?.url || '').trim();
     let parsed; try { parsed=new URL(paymentUrl); } catch { parsed=null; }
@@ -1490,10 +1512,11 @@ async function handleAdminVerifySoftwarePayment(request, response) {
     const body = await readJson(request);
     const requestId = String(body?.requestId || '');
     if (!/^[0-9a-f-]{36}$/i.test(requestId)) { jsonResponse(response, 400, { error: 'Invalid software request reference.' }); return true; }
-    const loaded = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,software_product_id,software_status,quoted_price_paise,software_payment_link_id&limit=1', { timeoutMs: 12000 });
+    const loaded = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,body,request_type,software_product_id,software_status,quoted_price_paise,software_payment_link_id&limit=1', { timeoutMs: 12000 });
     if (!loaded.ok) { jsonResponse(response, 502, { error: 'Software request could not be loaded.' }); return true; }
     const row = (await loaded.json())?.[0];
-    if (!row || !row.software_product_id) { jsonResponse(response, 404, { error: 'Software purchase request not found.' }); return true; }
+    const resolvedProductId = await resolveSoftwareRequestProduct(admin, row, requestId);
+    if (!row || !resolvedProductId) { jsonResponse(response, 404, { error: 'Software request or linked catalogue product was not found.' }); return true; }
     if (!row.software_payment_link_id || !/^plink_[A-Za-z0-9]+$/.test(String(row.software_payment_link_id))) { jsonResponse(response, 409, { error: 'Create a new Razorpay payment link before verifying payment.' }); return true; }
     if (!(Number(row.quoted_price_paise) > 0)) { jsonResponse(response, 409, { error: 'A valid quoted amount is required.' }); return true; }
     if (String(row.software_status||'').toLowerCase()==='delivered') { jsonResponse(response, 200, { verified:true, alreadyVerified:true, status:row.software_status }); return true; }
