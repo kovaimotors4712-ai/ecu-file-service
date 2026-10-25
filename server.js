@@ -1480,14 +1480,13 @@ async function handleAdminCreateSoftwarePaymentLink(request, response) {
     const loaded = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,title,body,request_type,software_product_id,software_status,quoted_price_paise,software_payment_link,user_id,admin_reply&limit=1', { timeoutMs: 12000 });
     if (!loaded.ok) { jsonResponse(response, 502, { error: 'Software request could not be loaded.' }); return true; }
     const rows = await loaded.json(); const row = rows?.[0];
-    const resolvedProductId = await resolveSoftwareRequestProduct(admin, row, requestId);
-    if (!row || !resolvedProductId) { jsonResponse(response, 404, { error: 'Software request or linked catalogue product was not found. Refresh the request and check the software listing.' }); return true; }
+    if (!row || row.request_type !== 'software_requirement') { jsonResponse(response, 404, { error: 'Software customer request was not found. Refresh the customer request list and retry.' }); return true; }
     if (['paid','delivered','cancelled'].includes(String(row.software_status || '').toLowerCase())) { jsonResponse(response, 409, { error: 'A payment link cannot be generated for this request status.' }); return true; }
     const link = await razorpayApi('payment_links', { method:'POST', body:{
       amount: amountPaise, currency:'INR', accept_partial:false,
       description: String(row.title || 'Software purchase').slice(0,240),
       reference_id: requestId.replace(/-/g,'').slice(0,40),
-      reminder_enable:true, notes:{ request_id:requestId, software_product_id:resolvedProductId, type:'software_purchase' }
+      reminder_enable:true, notes:{ request_id:requestId, software_product_id:String(row.software_product_id || ''), type:'software_purchase' }
     }});
     const paymentUrl=String(link?.short_url || link?.url || '').trim();
     let parsed; try { parsed=new URL(paymentUrl); } catch { parsed=null; }
@@ -1515,8 +1514,7 @@ async function handleAdminVerifySoftwarePayment(request, response) {
     const loaded = await supabaseRequest(admin.token, 'rest/v1/forum_customer_requests?id=eq.'+encodeURIComponent(requestId)+'&select=id,body,request_type,software_product_id,software_status,quoted_price_paise,software_payment_link_id&limit=1', { timeoutMs: 12000 });
     if (!loaded.ok) { jsonResponse(response, 502, { error: 'Software request could not be loaded.' }); return true; }
     const row = (await loaded.json())?.[0];
-    const resolvedProductId = await resolveSoftwareRequestProduct(admin, row, requestId);
-    if (!row || !resolvedProductId) { jsonResponse(response, 404, { error: 'Software request or linked catalogue product was not found.' }); return true; }
+    if (!row || row.request_type !== 'software_requirement') { jsonResponse(response, 404, { error: 'Software customer request was not found.' }); return true; }
     if (!row.software_payment_link_id || !/^plink_[A-Za-z0-9]+$/.test(String(row.software_payment_link_id))) { jsonResponse(response, 409, { error: 'Create a new Razorpay payment link before verifying payment.' }); return true; }
     if (!(Number(row.quoted_price_paise) > 0)) { jsonResponse(response, 409, { error: 'A valid quoted amount is required.' }); return true; }
     if (String(row.software_status||'').toLowerCase()==='delivered') { jsonResponse(response, 200, { verified:true, alreadyVerified:true, status:row.software_status }); return true; }
