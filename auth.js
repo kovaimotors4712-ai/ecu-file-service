@@ -206,11 +206,36 @@
         const autoReply=document.createElement('div');autoReply.className='customer-private-request-reply';
         const autoTitle=document.createElement('strong');autoTitle.textContent='AUTOMATIC CONFIRMATION';
         const autoText=document.createElement('p');autoText.textContent=item.customer_auto_reply||'Your request has been received. The team will review it and reply here.';
-        autoReply.append(autoTitle,autoText);messages.append(autoReply);
-        if(item.admin_reply){const teamReply=document.createElement('div');teamReply.className='customer-private-request-reply';const teamTitle=document.createElement('strong');teamTitle.textContent='TEAM MESSAGE';const teamText=document.createElement('p');teamText.textContent=item.admin_reply;teamReply.append(teamTitle,teamText);messages.append(teamReply);}
+        autoReply.append(autoTitle,autoText);
+        const threadList=document.createElement('div');threadList.className='customer-requirement-thread';
+        const threadStatus=document.createElement('p');threadStatus.className='customer-requirement-message-status';threadStatus.setAttribute('role','status');
+        const messageForm=document.createElement('form');messageForm.className='customer-requirement-message-form';
+        const messageInput=document.createElement('textarea');messageInput.rows=3;messageInput.maxLength=2000;messageInput.required=true;messageInput.placeholder='Write a message to the team…';messageInput.setAttribute('aria-label','Message to the team');
+        const sendMessage=document.createElement('button');sendMessage.type='submit';sendMessage.className='button button-dark';sendMessage.textContent='Send message';
+        messageForm.append(messageInput,sendMessage);
+        messages.append(autoReply,threadList,threadStatus,messageForm);
+        const refreshMessages=async function(){
+          threadList.replaceChildren();threadStatus.textContent='Loading messages…';
+          try{
+            const token=await accessToken();
+            const response=await fetch('/api/customer/requirements/messages',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify({requestId:item.id,action:'list'})});
+            const result=await response.json().catch(()=>({}));
+            if(!response.ok)throw new Error(result.error||'Messages could not be loaded.');
+            const items=Array.isArray(result.items)?result.items:[];
+            if(items.length){
+              items.forEach(entry=>{const bubble=document.createElement('div');bubble.className='customer-requirement-message '+(entry.sender_role==='customer'?'from-customer':'from-team');const who=document.createElement('strong');who.textContent=entry.sender_role==='customer'?'You':'ECU File Service team';const text=document.createElement('p');text.textContent=entry.message||'';const when=document.createElement('small');when.textContent=new Date(entry.created_at).toLocaleString('en-IN');bubble.append(who,text,when);threadList.append(bubble);});
+            }else if(item.admin_reply){
+              const bubble=document.createElement('div');bubble.className='customer-requirement-message from-team';const who=document.createElement('strong');who.textContent='ECU File Service team';const text=document.createElement('p');text.textContent=item.admin_reply;bubble.append(who,text);threadList.append(bubble);
+            }else{
+              const empty=document.createElement('p');empty.className='customer-requirement-note';empty.textContent='No team message yet. You can send a message below.';threadList.append(empty);
+            }
+            threadStatus.textContent='';
+          }catch(error){threadStatus.textContent=error.message||'Messages could not be loaded.';threadStatus.classList.add('admin-error');}
+        };
+        messageForm.addEventListener('submit',async function(event){event.preventDefault();const message=messageInput.value.trim();if(!message)return;sendMessage.disabled=true;threadStatus.classList.remove('admin-error');threadStatus.textContent='Sending message…';try{const token=await accessToken();const response=await fetch('/api/customer/requirements/messages',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify({requestId:item.id,action:'send',message})});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||'Message could not be sent.');messageInput.value='';await refreshMessages();}catch(error){threadStatus.textContent=error.message||'Message could not be sent.';threadStatus.classList.add('admin-error');}finally{sendMessage.disabled=false;}});
         content.append(messages);
         const actions=document.createElement('div');actions.className='customer-order-actions customer-requirement-actions';
-        const messageButton=document.createElement('button');messageButton.type='button';messageButton.className='customer-messages-open';messageButton.textContent='Messages';messageButton.setAttribute('aria-expanded','false');messageButton.addEventListener('click',function(){messages.hidden=!messages.hidden;messageButton.textContent=messages.hidden?'Messages':'Hide messages';messageButton.setAttribute('aria-expanded',String(!messages.hidden));});
+        const messageButton=document.createElement('button');messageButton.type='button';messageButton.className='customer-messages-open';messageButton.textContent='Messages';messageButton.setAttribute('aria-expanded','false');messageButton.addEventListener('click',async function(event){event.preventDefault();event.stopPropagation();messages.hidden=!messages.hidden;messageButton.textContent=messages.hidden?'Messages':'Hide messages';messageButton.setAttribute('aria-expanded',String(!messages.hidden));if(!messages.hidden)await refreshMessages();});
         actions.append(messageButton);
         const canCancel=!item.software_payment_link&&!['paid','delivered','cancelled'].includes(current);
         if(canCancel){const cancelRequest=document.createElement('button');cancelRequest.type='button';cancelRequest.className='customer-request-delete';cancelRequest.textContent='Cancel request';cancelRequest.addEventListener('click',async function(event){event.preventDefault();event.stopPropagation();if(!window.confirm('Cancel this request? It will be removed from your active list. If a payment link has already been issued, contact support before paying.'))return;cancelRequest.disabled=true;try{await rest('rpc/forum_cancel_own_customer_request',{method:'POST',body:{p_request_id:item.id}});await loadCustomerPrivateRequests();}catch(error){cancelRequest.disabled=false;const notice=document.createElement('p');notice.className='admin-message admin-error';notice.textContent=error.message||'Request could not be cancelled. Please retry.';content.append(notice);}});actions.append(cancelRequest);}
