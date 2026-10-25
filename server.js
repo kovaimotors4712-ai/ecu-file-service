@@ -1704,8 +1704,18 @@ async function handleAdminAdvertisingInquiries(request, response) {
   }
   if (request.method === 'PATCH') {
     const body = await readJson(request, 4096);
-    if (!/^[0-9a-f-]{36}$/i.test(String(body.id || '')) || !['new','contacted','approved','declined','closed'].includes(body.status)) { jsonResponse(response, 400, { error:'Invalid enquiry reference or status.' }); return true; }
-    const result = await supabaseRequest(token, 'rest/v1/advertising_inquiries?id=eq.'+encodeURIComponent(body.id)+'&select=id,status', { method:'PATCH', prefer:'return=representation', body:{ status:body.status, updated_at:new Date().toISOString() }, timeoutMs:12000 });
+    if (!/^[0-9a-f-]{36}$/i.test(String(body.id || ''))) { jsonResponse(response, 400, { error:'Invalid enquiry reference.' }); return true; }
+    const patch = { updated_at:new Date().toISOString() };
+    if (body.status !== undefined) {
+      if (!['new','contacted','approved','declined','closed'].includes(body.status)) { jsonResponse(response, 400, { error:'Invalid enquiry status.' }); return true; }
+      patch.status = body.status;
+    }
+    if (body.archived !== undefined) {
+      if (typeof body.archived !== 'boolean') { jsonResponse(response, 400, { error:'Invalid archive choice.' }); return true; }
+      patch.admin_archived_at = body.archived ? new Date().toISOString() : null;
+    }
+    if (patch.status === undefined && body.archived === undefined) { jsonResponse(response, 400, { error:'No supported enquiry changes supplied.' }); return true; }
+    const result = await supabaseRequest(token, 'rest/v1/advertising_inquiries?id=eq.'+encodeURIComponent(body.id)+'&select=id,status,admin_archived_at', { method:'PATCH', prefer:'return=representation', body:patch, timeoutMs:12000 });
     if (!result.ok) { jsonResponse(response, 502, { error:'Enquiry status could not be updated.' }); return true; }
     const rows = await result.json();
     if (!rows?.length) { jsonResponse(response, 404, { error:'Enquiry not found.' }); return true; }
