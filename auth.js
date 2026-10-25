@@ -145,7 +145,7 @@
     list.replaceChildren();
     const loading=document.createElement('p');loading.className='muted';loading.textContent='Loading your private requests…';list.append(loading);
     try{
-      const rows=await rest(`forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_url,software_delivery_path,software_delivery_name,created_at,updated_at,customer_hidden_at&customer_hidden_at=${showHiddenPrivateRequests?'not.is.null':'is.null'}&status=neq.closed&order=created_at.desc&limit=50`);
+      const rows=await rest(`forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,software_payment_link,software_delivery_url,software_delivery_path,software_delivery_name,created_at,updated_at,customer_hidden_at&customer_hidden_at=${showHiddenPrivateRequests?'not.is.null':'is.null'}&status=neq.closed&order=created_at.desc&limit=50`);
       const visibleRows=Array.isArray(rows)?rows.filter(item=>item.request_type!=='software_requirement'):rows;
       list.replaceChildren();
       if(!Array.isArray(visibleRows)||!visibleRows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent=showHiddenPrivateRequests?'No hidden private requests.':'No private messages yet. Software requests appear under Your orders.';list.append(empty);return;}
@@ -187,7 +187,7 @@
     try {
       const [rows, softwareRows] = await Promise.all([
         rest(`orders?select=id,status,category,vehicle_brand,vehicle_type,vehicle_model,vehicle_year,ecu_manufacturer,ecu_model,reading_tool,selected_services,payment_status,payment_provider,provider_order_id,provider_payment_id,second_stage_amount,second_stage_status,second_stage_payment_link,created_at,order_files!order_files_order_id_fkey(id,kind,original_name,object_path,created_at),customer_hidden_at&customer_id=eq.${encodeURIComponent(customerId)}&customer_hidden_at=${showHiddenOrders?'not.is.null':'is.null'}&order=created_at.desc&limit=50`),
-        rest(`forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,quoted_price_paise,software_payment_link,software_delivery_path,software_delivery_name,created_at,updated_at,customer_hidden_at&request_type=eq.software_requirement&customer_hidden_at=${showHiddenOrders?'not.is.null':'is.null'}&status=neq.closed&order=created_at.desc&limit=50`).catch(()=>[])
+        rest(`forum_customer_requests?select=id,request_type,title,body,status,admin_reply,customer_auto_reply,software_product_id,software_status,software_payment_link,software_delivery_path,software_delivery_name,created_at,updated_at,customer_hidden_at&request_type=eq.software_requirement&customer_hidden_at=${showHiddenOrders?'not.is.null':'is.null'}&status=neq.closed&order=created_at.desc&limit=50`).catch(()=>[])
       ]);
       if (requestId !== ordersRequest || session?.user?.id !== customerId) return;
       if ((!Array.isArray(rows)||!rows.length) && (!Array.isArray(softwareRows)||!softwareRows.length)) { list.textContent = showHiddenOrders?'No hidden orders.':'No orders yet. Your active and completed file and software requests will appear here.'; return; }
