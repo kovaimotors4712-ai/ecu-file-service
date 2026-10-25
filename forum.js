@@ -581,11 +581,11 @@
   }
   function classifyChatTopic(message) {
     const q = String(message || '').toLowerCase();
-    const dtc = q.match(/\\b(?:dtc\\s*)?((?:p|b|c|u)[0-3][0-9a-f]{3})\\b/i);
-    if (dtc || /\\bdtc\\b|fault code|trouble code|diagnostic code|check engine|freeze.?frame/i.test(q)) {
+    const dtc = q.match(/\b(?:dtc\s*)?((?:p|b|c|u)[0-3][0-9a-f]{3})\b/i);
+    if (dtc || /\bdtc\b|fault code|trouble code|diagnostic code|check engine|freeze.?frame/i.test(q)) {
       return { slug: 'dtc-troubleshooting', title: (dtc ? dtc[1].toUpperCase() + ' — ' : '') + 'DTC troubleshooting: ' + String(message).trim().slice(0, 110) };
     }
-    if (/\\b(edc\\d+|md1|mdg1|dcm\\s*\\d|me\\d+|ecu|ecm|pcm|bosch|denso|continental)\\b/i.test(q)) {
+    if (/\b(edc\d+|md1|mdg1|dcm\s*\d|me\d+|ecu|ecm|pcm|bosch|denso|continental)\b/i.test(q)) {
       return { slug: 'ecu-identification', title: 'ECU identification: ' + String(message).trim().slice(0, 130) };
     }
     if (/wiring|wire harness|pinout|connector|ground wire|voltage drop|short circuit|open circuit|continuity test/i.test(q)) {
