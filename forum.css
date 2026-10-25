@@ -499,3 +499,40 @@ body.forum-page #live-chat .forum-chat-actions .button:hover{background:#e0bb68!
   body.forum-page #live-chat .forum-chat-message:nth-child(4n+3){background:#203747!important}
   body.forum-page #live-chat .forum-chat-message:nth-child(4n){background:#1b303f!important}
 }
+
+
+/* Chat-first landing layout: visitors see the live workshop conversation immediately. */
+body.forum-page .forum-main.forum-first-chat{display:flex;flex-direction:column;gap:14px}
+body.forum-page .forum-first-chat .forum-hero{padding:14px 18px;margin-bottom:0}
+body.forum-page .forum-first-chat .forum-hero .forum-kicker,
+body.forum-page .forum-first-chat .forum-hero>p:not(.forum-kicker),
+body.forum-page .forum-first-chat .forum-hero .forum-hero-meta{display:none}
+body.forum-page .forum-first-chat .forum-hero h1{font-size:clamp(24px,4vw,34px);line-height:1.15;margin:0}
+body.forum-page .forum-first-chat .forum-account{order:2;padding:12px 16px}
+body.forum-page .forum-first-chat #account-heading{font-size:17px;margin:0}
+body.forum-page .forum-first-chat .forum-account .section-heading{margin-bottom:6px}
+body.forum-page .forum-first-chat .forum-account>p.muted{font-size:12px;margin:4px 0}
+body.forum-page .forum-first-chat .forum-auth-form{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+body.forum-page .forum-first-chat .forum-auth-form label{font-size:12px;gap:4px}
+body.forum-page .forum-first-chat .forum-auth-form input{min-height:40px;padding:8px 10px}
+body.forum-page .forum-first-chat .forum-auth-form .auth-actions{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
+body.forum-page .forum-first-chat .forum-auth-form .button{min-height:38px;padding:8px 14px}
+body.forum-page .forum-first-chat #live-chat{order:1;margin:0}
+body.forum-page .forum-first-chat #live-chat .section-heading{padding:14px 16px}
+body.forum-page .forum-first-chat #live-chat .section-heading h2{font-size:24px}
+body.forum-page .forum-first-chat #live-chat>.muted{font-size:13px;line-height:1.45}
+body.forum-page .forum-first-chat #live-chat .forum-chat-toolbar{gap:8px;flex-wrap:wrap}
+body.forum-page .forum-first-chat #live-chat .search-label{display:block;padding:10px 14px 0;font-size:12px;color:#d7e3eb}
+body.forum-page .forum-first-chat #live-chat #forum-chat-search{min-height:48px;font-size:17px}
+@media(max-width:700px){
+ body.forum-page .forum-main.forum-first-chat{gap:8px;padding-top:8px}
+ body.forum-page .forum-first-chat .forum-hero{padding:10px 14px}
+ body.forum-page .forum-first-chat .forum-hero h1{font-size:23px}
+ body.forum-page .forum-first-chat #live-chat .section-heading{padding:10px 12px}
+ body.forum-page .forum-first-chat #live-chat .section-heading h2{font-size:21px}
+ body.forum-page .forum-first-chat #live-chat>.muted{padding:8px 12px;font-size:12px}
+ body.forum-page .forum-first-chat .forum-account{padding:10px 12px}
+ body.forum-page .forum-first-chat .forum-auth-form{grid-template-columns:1fr}
+ body.forum-page .forum-first-chat .forum-auth-form .auth-actions{grid-column:auto}
+ body.forum-page .forum-first-chat .forum-auth-form .button{flex:1}
+}
