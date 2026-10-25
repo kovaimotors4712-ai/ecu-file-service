@@ -557,6 +557,10 @@
 
   // Public live workshop chat: real authenticated messages only; no fabricated members.
   // Enforce the requested first-section order after the page is parsed.
+  // Start visitors at the top of the forum rather than restoring a previous lower scroll position.
+  if (window.location.pathname.endsWith('/forum.html')) {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }
   const forumMain = document.querySelector('main.forum-main');
   const liveChatFirst = document.getElementById('live-chat');
   if (forumMain && liveChatFirst && forumMain.firstElementChild !== liveChatFirst) {
