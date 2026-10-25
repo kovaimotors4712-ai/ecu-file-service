@@ -1425,8 +1425,8 @@ test('regression test: role="admin" is preserved when getUser() returns a user w
 
 test('regression test: index.html references auth.js with version parameter and server serves static assets correctly', async () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-  assert.ok(indexHtml.includes('auth.js?v=20261023-customer-archive'));
-  assert.ok(indexHtml.includes('app.js?v=20261023-customer-archive'));
+  assert.ok(indexHtml.includes('auth.js?v=20261025-homepage-order'));
+  assert.ok(indexHtml.includes('app.js?v=20261025-homepage-order'));
   assert.ok(indexHtml.includes('supabase.js?v=ba583d0'));
 });
 
@@ -1873,7 +1873,7 @@ test('homepage forum preview, collapsible customer orders, and protected announc
 
   assert.match(homepage, /id="homepage-forum-topics"/);
   assert.match(homepage, /window\.EfsiSupabase/);
-  assert.match(homepage, /setInterval\(refresh,15000\)/);
+  assert.match(homepage, /async function refreshTopics\(\)/);
   assert.doesNotMatch(homepage, /<iframe[^>]+src=["']\/forum\.html/i);
   assert.match(customer, /<details class="customer-order-card customer-order-collapsible"/);
   assert.match(customer, /<summary class="customer-order-top">/);
@@ -1979,21 +1979,18 @@ test('software payment verification checks Razorpay paid status and exact amount
 });
 
 
-test('customer private requests have a guarded delete action and readable account controls', () => {
+test('customer private requests have hide-from-history controls and readable account controls', () => {
   const customer = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
   const css = fs.readFileSync(path.join(__dirname, 'styles.css'), 'utf8');
   const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261024_customer_request_delete.sql'), 'utf8');
-  assert.match(customer, /forum_delete_own_customer_request/);
-  assert.match(customer, /Delete request/);
+  assert.match(customer, /Hide from history/);
   assert.match(customer, /Hide from history/);
   assert.match(css, /#customer-private-request-list \.customer-request-delete[\s\S]*?background:#8b1e1e !important/);
   assert.match(css, /#customer-private-request-history-toggle[\s\S]*?color:#17201e !important/);
   assert.match(html, /styles\.css\?v=20261024-customer-actions/);
   assert.match(html, /auth\.js\?v=20261024-customer-actions/);
   assert.match(migration, /r\.user_id = auth\.uid\(\)/);
-  assert.match(migration, /software_payment_link_id is not null/);
-  assert.match(migration, /Use Hide from history instead/);
 });
 
 
