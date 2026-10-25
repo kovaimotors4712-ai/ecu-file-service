@@ -278,80 +278,72 @@ refresh();window.setInterval(refresh,15000);
     #order .button-dark:hover{background:#355536}
     #order .choice-card.selected,#order .service-option:has(input:checked){background:#f0f7dd;border-color:#809d2b}
 
+    /* Software Store — restrained graphite, warm white and brushed bronze */
     #software-store.software-home-section{
-      background:linear-gradient(135deg,#effaf7 0%,#f7fcfa 58%,#e4f5ef 100%);
-      border-top:5px solid #0f766e;border-bottom:1px solid #c7e7dc;
-      position:relative;isolation:isolate;color:#163a36;
+      background:#f4f4f1;
+      border-top:4px solid #8a633d;border-bottom:1px solid #d8d6cf;
+      position:relative;isolation:isolate;color:#242a30;
     }
-    #software-store.software-home-section:before{
-      content:"";position:absolute;z-index:-1;right:-95px;top:-115px;width:280px;height:280px;border-radius:50%;
-      background:radial-gradient(circle,#14b8a630 0%,#14b8a600 72%);pointer-events:none
-    }
-    #software-store .section-heading .section-eyebrow{color:#0f766e;font-weight:800;letter-spacing:.2em}
+    #software-store.software-home-section:before{content:none}
+    #software-store .section-heading .section-eyebrow{color:#86613f;font-weight:800;letter-spacing:.16em}
     #software-store .section-heading h2{
-      font-family:Arial,Helvetica,sans-serif;font-weight:900;letter-spacing:-.055em;color:#123b36;
+      font-family:Arial,Helvetica,sans-serif;font-weight:800;letter-spacing:-.04em;color:#20262c;
       text-transform:none
     }
-    #software-store .section-heading p{color:#496761}
+    #software-store .section-heading p{color:#5f656a}
     #software-store .software-home-card{
-      background:linear-gradient(145deg,#ffffff 0%,#f7fcfa 100%);
-      border:1px solid #cde7df;border-radius:12px;
-      box-shadow:0 8px 22px #0f766e0d;
+      background:#ffffff;border:1px solid #d8d9d6;border-radius:8px;
+      box-shadow:0 4px 14px #1c252b0b;
       transition:transform .2s,box-shadow .2s,border-color .2s
     }
-    #software-store .software-home-card:hover{transform:translateY(-4px);border-color:#14b8a6;box-shadow:0 15px 30px #0f766e1a}
-    #software-store .software-home-card img{background:#e8f6f1;border:1px solid #cde7df;border-radius:8px}
-    #software-store .software-home-card h3{font-family:Arial,Helvetica,sans-serif;color:#163a36;font-weight:800}
-    #software-store .software-home-card p{color:#496761}
-    #software-store .software-home-card .software-price{color:#0f766e;font-weight:800}
-    #software-store .software-home-card .software-version{color:#128277}
-    #software-store .software-home-card .software-purchase-request{background:#0f766e!important;border-color:#0f766e!important;color:#ffffff!important;border-radius:7px}
-    #software-store .software-home-card .software-purchase-request:hover{background:#115e59!important}
-    #software-store .section-heading>a.button-ghost{color:#ffffff!important;background:#0f766e!important;border:1px solid #0f766e!important;border-radius:7px;box-shadow:0 4px 0 #0b4f4a!important}
-    #software-store .section-heading>a.button-ghost:hover{background:#115e59!important}
+    #software-store .software-home-card:hover{transform:translateY(-2px);border-color:#aa8969;box-shadow:0 9px 22px #1c252b16}
+    #software-store .software-home-card img{background:#f0f0ed;border:1px solid #deded8;border-radius:6px}
+    #software-store .software-home-card h3{font-family:Arial,Helvetica,sans-serif;color:#242a30;font-weight:750}
+    #software-store .software-home-card p{color:#5f656a}
+    #software-store .software-home-card .software-price{color:#795633;font-weight:800}
+    #software-store .software-home-card .software-version{color:#687078}
+    #software-store .software-home-card .software-purchase-request{background:#303840!important;border-color:#303840!important;color:#ffffff!important;border-radius:5px}
+    #software-store .software-home-card .software-purchase-request:hover{background:#20262c!important}
+    #software-store .section-heading>a.button-ghost{color:#ffffff!important;background:#303840!important;border:1px solid #303840!important;border-radius:5px;box-shadow:none!important}
+    #software-store .section-heading>a.button-ghost:hover{background:#20262c!important}
 
+    /* Workshop Forum — deep graphite with a restrained steel-blue accent */
     #workshop-forum-preview.homepage-forum-section{
-      background:linear-gradient(135deg,#111827 0%,#171b36 54%,#211b43 100%);
-      border-top:5px solid #8b5cf6;border-bottom:1px solid #39305f;
+      background:#20262d;
+      border-top:4px solid #66849b;border-bottom:1px solid #39434d;
       padding-top:clamp(38px,5vw,60px);padding-bottom:clamp(38px,5vw,60px);
       position:relative;isolation:isolate;overflow:hidden
     }
-    #workshop-forum-preview.homepage-forum-section:before{
-      content:"";position:absolute;z-index:-1;right:-75px;top:-100px;width:330px;height:330px;border-radius:50%;
-      background:radial-gradient(circle,#8b5cf638 0%,#8b5cf600 72%);pointer-events:none
-    }
-    #workshop-forum-preview.homepage-forum-section:after{
-      content:"";position:absolute;z-index:-1;left:-130px;bottom:-190px;width:360px;height:360px;border-radius:50%;
-      background:radial-gradient(circle,#38bdf824 0%,#38bdf800 72%);pointer-events:none
-    }
-    #workshop-forum-preview .section-heading .section-eyebrow{color:#c4b5fd;font-weight:800;letter-spacing:.2em}
+    #workshop-forum-preview.homepage-forum-section:before,
+    #workshop-forum-preview.homepage-forum-section:after{content:none}
+    #workshop-forum-preview .section-heading .section-eyebrow{color:#9eb4c4;font-weight:800;letter-spacing:.16em}
     #workshop-forum-preview .section-heading h2{
-      font-family:var(--display);font-weight:800;letter-spacing:-.055em;color:#f5f3ff
+      font-family:var(--display);font-weight:800;letter-spacing:-.045em;color:#f0f2f4
     }
-    #workshop-forum-preview .section-heading h2 span{color:#c4b5fd}
-    #workshop-forum-preview .section-heading p{color:#c1c5d8;line-height:1.8}
+    #workshop-forum-preview .section-heading h2 span{color:#9eb4c4}
+    #workshop-forum-preview .section-heading p{color:#c0c8ce;line-height:1.8}
     #workshop-forum-preview .section-heading>a.button-dark,
     #workshop-forum-preview .homepage-forum-footer .button-dark{
-      background:linear-gradient(115deg,#6d3bd1,#8b5cf6);color:#ffffff;border:1px solid #a78bfa;border-radius:8px;box-shadow:0 4px 0 #39236f;font-weight:800
+      background:#526d80;color:#ffffff;border:1px solid #718b9d;border-radius:5px;box-shadow:none;font-weight:750
     }
     #workshop-forum-preview .section-heading>a.button-dark:hover,
-    #workshop-forum-preview .homepage-forum-footer .button-dark:hover{background:linear-gradient(115deg,#7c4de0,#a78bfa)}
+    #workshop-forum-preview .homepage-forum-footer .button-dark:hover{background:#405969}
     #workshop-forum-preview .homepage-forum-frame{
-      border:1px solid #39305f;border-radius:16px;background:#171b30;
-      box-shadow:0 16px 38px #0008
+      border:1px solid #3d4852;border-radius:9px;background:#252d35;
+      box-shadow:0 10px 26px #0003
     }
-    #workshop-forum-preview .homepage-forum-topics{background:#171b30}
+    #workshop-forum-preview .homepage-forum-topics{background:#252d35}
     #workshop-forum-preview .homepage-forum-topic{
-      background:linear-gradient(145deg,#242541 0%,#1a2037 100%);border:1px solid #39305f;border-radius:12px;
-      box-shadow:0 6px 18px #0003;transition:transform .18s,box-shadow .18s,border-color .18s
+      background:#2b343d;border:1px solid #414c56;border-radius:7px;
+      box-shadow:0 3px 10px #0002;transition:transform .18s,box-shadow .18s,border-color .18s
     }
-    #workshop-forum-preview .homepage-forum-topic:hover{transform:translateY(-3px);border-color:#8b5cf6;box-shadow:0 12px 24px #0005}
-    #workshop-forum-preview .homepage-forum-topic-meta{color:#c4b5fd}
-    #workshop-forum-preview .homepage-forum-topic h3{font-family:var(--display);font-weight:800;color:#f5f3ff}
+    #workshop-forum-preview .homepage-forum-topic:hover{transform:translateY(-2px);border-color:#7894a7;box-shadow:0 8px 18px #0003}
+    #workshop-forum-preview .homepage-forum-topic-meta{color:#a9bdcb}
+    #workshop-forum-preview .homepage-forum-topic h3{font-family:var(--display);font-weight:750;color:#f0f2f4}
     #workshop-forum-preview .homepage-forum-topic h3 a{color:inherit}
-    #workshop-forum-preview .homepage-forum-topic p{color:#c1c5d8}
-    #workshop-forum-preview .homepage-forum-topic small{color:#a5b4fc}
-    #workshop-forum-preview .homepage-forum-empty{background:#171b30;color:#c1c5d8}
+    #workshop-forum-preview .homepage-forum-topic p{color:#c0c8ce}
+    #workshop-forum-preview .homepage-forum-topic small{color:#a9bdcb}
+    #workshop-forum-preview .homepage-forum-empty{background:#252d35;color:#c0c8ce}
     @media(max-width:620px){
       #order.order-section{border-top-width:4px}
       #software-store.software-home-section{border-top-width:4px}
