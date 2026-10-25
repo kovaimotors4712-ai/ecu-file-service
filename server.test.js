@@ -1931,7 +1931,8 @@ test('software requests can create a server-side Razorpay payment link with admi
   const customerSource = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
   assert.match(serverSource, /handleAdminCreateSoftwarePaymentLink/);
   assert.match(serverSource, /\/api\/admin\/software-requests\/payment-link/);
-  assert.match(serverSource, /notes:\{ request_id:requestId, software_product_id:String\(row\.software_product_id\), type:'software_purchase' \}/);
+  assert.match(serverSource, /notes:\{ request_id:requestId, software_product_id:resolvedProductId, type:'software_purchase' \}/);
+  assert.match(serverSource, /async function resolveSoftwareRequestProduct/);
   assert.match(serverSource, /software_status:'awaiting_payment', status:'waiting_for_customer'/);
   assert.match(adminSource, /Generate Razorpay payment link & send Pay now/);
   assert.match(adminSource, /adminApi\('\/api\/admin\/software-requests\/payment-link'/);
