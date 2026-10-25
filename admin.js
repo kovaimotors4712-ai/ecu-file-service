@@ -712,7 +712,7 @@
         const meta=document.createElement('p');meta.textContent='Request '+String(row.id||'').slice(0,8)+' · '+new Date(row.created_at).toLocaleString('en-IN')+' · '+String(row.status||'open').replace(/_/g,' ');
         const body=document.createElement('p');body.className='admin-request-body';body.textContent=row.body||'';
         const reply=document.createElement('textarea');reply.maxLength=4000;reply.rows=3;reply.className='admin-request-reply';reply.placeholder='Private reply to customer';reply.value=row.admin_reply||'';
-        const isSoftware=row.request_type==='software_requirement'&&Boolean(row.software_product_id);
+        const isSoftware=row.request_type==='software_requirement'||Boolean(row.software_product_id)||row.software_status!=null;
         const softwareFields=[];
         let softwareStatus, quotePrice, paymentLink, deliveryLink;
         if(isSoftware){
