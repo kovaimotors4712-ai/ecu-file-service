@@ -635,11 +635,12 @@
   softwareProductForm?.addEventListener('submit',async event=>{
     event.preventDefault();const button=softwareProductForm.querySelector('button[type="submit"]');button.disabled=true;softwareProductMessage.classList.remove('admin-error');softwareProductMessage.textContent='Saving software listing…';
     try{
-      const data=new FormData(softwareProductForm),priceText=String(data.get('price')||'').trim();
-      if(!/^\d+(?:\.\d{1,2})?$/.test(priceText))throw new Error('Enter a valid price with up to two decimal places.');
-      const parts=priceText.split('.'),pricePaise=Number(parts[0])*100+Number((parts[1]||'').padEnd(2,'0'));
+      const data=new FormData(softwareProductForm),priceText=String(data.get('price')||'').trim(),priceVisible=data.get('price_visible')==='on';
+      if(priceText&&!/^\\d+(?:\\.\\d{1,2})?$/.test(priceText))throw new Error('Enter a valid price with up to two decimal places.');
+      if(priceVisible&&!priceText)throw new Error('Enter a price before choosing to show it publicly.');
+      const parts=priceText?priceText.split('.'):[],pricePaise=priceText?Number(parts[0])*100+Number((parts[1]||'').padEnd(2,'0')):0;
       if(!Number.isSafeInteger(pricePaise)||pricePaise<0)throw new Error('Enter a valid non-negative price.');
-      const id=String(data.get('id')||'').trim(),payload={title:data.get('title'),version:data.get('version'),description:data.get('description'),price_paise:pricePaise,price_visible:data.get('price_visible')==='on',sort_order:Number(data.get('sort_order')||100),image_url:data.get('image_url'),product_url:data.get('product_url'),contact_url:data.get('contact_url'),is_published:data.get('is_published')==='on'};
+      const id=String(data.get('id')||'').trim(),payload={title:data.get('title'),version:data.get('version'),description:data.get('description'),price_paise:pricePaise,price_visible:priceVisible,sort_order:Number(data.get('sort_order')||100),image_url:data.get('image_url'),product_url:data.get('product_url'),contact_url:data.get('contact_url'),is_published:data.get('is_published')==='on'};
       if(id)payload.id=id;
       await adminApi('/api/admin/software-products',{method:id?'PATCH':'POST',body:JSON.stringify(payload)});
       resetSoftwareProductForm();softwareProductMessage.textContent='Software listing saved.';await loadSoftwareProducts();
