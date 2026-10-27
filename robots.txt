@@ -1,3 +1,23 @@
+# Explicit crawl rules for Googlebot.
+User-agent: Googlebot
+Allow: /announcements.html
+Allow: /about.html
+Allow: /guides.html
+Allow: /ecu-fault-code-diagnosis.html
+Allow: /ecu-file-identification-original-backup.html
+Allow: /ecu-file-services.html
+Allow: /airbag-crash-clear.html
+Allow: /contact.html
+Allow: /store.html
+Allow: /membership.html
+Allow: /forum.html
+Allow: /advertise.html
+Allow: /terms.html
+Allow: /privacy.html
+Disallow: /admin
+Disallow: /admin.html
+Disallow: /api/
+
 # Allow search engines to crawl public website pages.
 User-agent: *
 Allow: /
