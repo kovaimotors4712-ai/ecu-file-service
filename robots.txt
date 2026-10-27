@@ -1,4 +1,4 @@
-# Public pages are crawlable; restrict only private/admin and API paths.
+# Allow search engines to crawl public website pages.
 User-agent: *
 Allow: /
 Disallow: /admin
