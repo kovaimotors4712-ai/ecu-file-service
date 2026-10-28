@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101a19">
+<meta name="description" content="Find car repair workshops and automotive diagnostic specialists by city or PIN code in India. Compare workshop services and customer ratings.">
+<link rel="canonical" href="https://ecufileservice.in/workshops.html">
+<title>Find Car Workshops Near You | ECU File Service India</title>
+<link rel="stylesheet" href="/styles.css?v=20261028-workshops">
+<style>
+.workshops-main{max-width:1180px;margin:auto;padding:30px 22px 64px}.workshops-hero{background:#101a19;color:#fff;padding:clamp(28px,5vw,58px);margin:18px 0}.workshops-hero h1{font-size:clamp(32px,5vw,54px);line-height:1.08;margin:0 0 15px}.workshops-hero h1 span{color:#d4ed72}.workshops-hero p{max-width:760px;color:#d0d8d1;line-height:1.8}.workshops-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.72fr);gap:18px;align-items:start}.w-panel{background:#fff;border:1px solid #e2e7de;padding:22px;margin-bottom:18px;color:#19231e}.w-panel h2{margin:0 0 15px;font-size:23px}.w-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.w-fields .wide{grid-column:1/-1}.w-panel label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700}.w-panel input,.w-panel select,.w-panel textarea{width:100%;min-width:0;border:1px solid #d9e0d5;padding:11px;background:#fbfcf8;color:#19231e;font:inherit;border-radius:2px}.w-panel textarea{min-height:88px}.w-panel button{cursor:pointer}.w-button{display:inline-flex;align-items:center;justify-content:center;padding:11px 15px;border:1px solid #c7e05f;background:#d4ed72;color:#172119;font-weight:800;margin-top:12px}.w-secondary{background:#fff;border:1px solid #d5dfd2;color:#28372d;padding:9px 12px;font-weight:700}.w-message{font-size:12px;line-height:1.6;color:#526348}.w-message.error{color:#a33b31}.w-list{display:grid;gap:12px}.w-card{border:1px solid #e2e7de;padding:17px;background:#fff}.w-card h3{margin:0 0 6px;font-size:19px}.w-card p{font-size:13px;line-height:1.65;color:#536056;margin:7px 0}.w-meta{font-size:11px;color:#68766a}.w-card-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.w-card a{color:#405b21;font-weight:800;font-size:12px}.w-stars{color:#7d932e;letter-spacing:2px}.w-admin{border-left:4px solid #d4ed72}.w-card details{margin-top:12px;border-top:1px solid #edf0e9;padding-top:10px}.w-card summary{cursor:pointer;font-size:12px;font-weight:800}.w-card form{display:grid;gap:10px;margin-top:10px}.w-card form label{font-size:11px}.w-card form textarea{min-height:65px}.w-pill{display:inline-block;padding:4px 7px;background:#f1f6e4;color:#50652c;font-size:10px;text-transform:uppercase;font-weight:800}.w-empty{padding:22px;border:1px dashed #d5dfd2;color:#5b695e;font-size:13px}
+@media(max-width:800px){.workshops-grid{grid-template-columns:1fr}.w-fields{grid-template-columns:1fr}.w-fields .wide{grid-column:auto}.workshops-main{padding-inline:14px}}
+</style>
+</head>
+<body>
+<div class="announcement"><span class="status-dot"></span> CAR OWNER WORKSHOP DIRECTORY <span class="announcement-right">INDIA</span></div>
+<header class="site-header"><a class="brand" href="/"><span class="brand-name">ECU FILE SERVICE INDIA</span></a><nav class="desktop-nav"><a href="/car-diagnostic-help.html">Car owner help</a><a href="/forum.html">Community forum</a><a href="/">Home</a></nav><div class="header-actions"><a class="forum-header-cta" href="/forum.html">Community</a></div></header>
+<main class="workshops-main">
+<section class="workshops-hero"><p class="eyebrow">LOCAL AUTOMOTIVE SUPPORT</p><h1>Find a car workshop<br><span>near your area.</span></h1><p>Search by city or six-digit PIN code, compare available services and read published customer reviews. Workshop listings are reviewed before they appear publicly.</p></section>
+<div class="workshops-grid">
+<section>
+<div class="w-panel"><h2>Search workshops</h2><div class="w-fields"><label>City<input id="search-city" maxlength="100" placeholder="e.g. Coimbatore"></label><label>PIN code<input id="search-pin" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="6-digit PIN code"></label></div><button id="search-button" class="w-button">Search directory</button><p id="search-message" class="w-message" aria-live="polite"></p></div>
+<div class="w-panel"><h2>Available workshops</h2><div id="workshop-list" class="w-list"><div class="w-empty">Loading approved listings…</div></div></div>
+</section>
+<aside>
+<div class="w-panel"><h2>Register your workshop</h2><p class="w-message">Sign in with your existing site account first. Your listing stays pending until a moderator approves it.</p><form id="workshop-form"><div class="w-fields">
+<label class="wide">Workshop name<input name="name" required minlength="2" maxlength="120"></label>
+<label class="wide">Services offered<input name="services" required maxlength="300" placeholder="General repair, ECU diagnostics, electrical"></label>
+<label class="wide">Full address<input name="address" required minlength="5" maxlength="300"></label>
+<label>City<input name="city" required minlength="2" maxlength="100"></label><label>State<input name="state" value="Tamil Nadu" required maxlength="100"></label>
+<label>PIN code<input name="pincode" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6"></label><label>Phone<input name="phone" required maxlength="25" placeholder="+91…"></label>
+<label>WhatsApp (optional)<input name="whatsapp" maxlength="25"></label><label>Website (optional)<input name="website_url" type="url" placeholder="https://…"></label>
+<label class="wide">Opening hours<input name="opening_hours" maxlength="500" placeholder="e.g. Mon–Sat, 9:00–18:00"></label>
+<label class="wide">Workshop description<textarea name="description" maxlength="2000" placeholder="Describe your services and experience"></textarea></label>
+</div><button class="w-button" type="submit">Submit for review</button><p id="register-message" class="w-message" aria-live="polite"></p></form></div>
+<div class="w-panel"><h2>Customer feedback</h2><p class="w-message">Choose a listed workshop to leave a rating or report a concern. Reviews are moderated; do not post private vehicle or customer information.</p><p id="feedback-message" class="w-message"></p></div>
+<div class="w-panel w-admin" id="admin-panel" hidden><h2>Moderator controls</h2><p class="w-message">Approve or reject workshop listings, publish or hide reviews, and review complaints. Changes are enforced by database access policies.</p><div id="admin-queue" class="w-list">Loading moderation queue…</div><button id="admin-refresh" class="w-secondary" type="button">Refresh queue</button><p id="admin-message" class="w-message" aria-live="polite"></p></div>
+</aside>
+</div>
+</main>
+<footer class="site-footer"><a class="brand" href="/"><span class="brand-name">ECU FILE SERVICE INDIA</span></a><nav class="footer-links"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/contact.html">Contact</a></nav><span class="footer-right">© 2026 ECU File Service India</span></footer>
+<script src="/supabase.js"></script>
+<script>
+(function(){
+'use strict';
+const api=window.EfsiSupabase;
+const $=s=>document.querySelector(s);
+const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let user=null, isAdmin=false, workshops=[];
+function msg(el,t,error){if(!el)return;el.textContent=t||'';el.classList.toggle('error',!!error);}
+function signedUser(){try{return api&&api.getSession()?api.getSession().user:null;}catch(_){return null;}}
+function urlSafe(v){try{const u=new URL(v);return u.protocol==='https:'&&!u.username&&!u.password;}catch(_){return false;}}
+async function load(){
+ user=signedUser();isAdmin=!!(user&&user.app_metadata&&['admin','moderator'].includes(String(user.app_metadata.role||'').toLowerCase()));
+ $('#admin-panel').hidden=!isAdmin;
+ try{const rows=await api.rest('workshops?select=id,owner_id,name,description,services,address,city,state,pincode,phone,whatsapp,website_url,opening_hours,is_verified,created_at&status=eq.approved&order=is_verified.desc,name.asc&limit=200');workshops=Array.isArray(rows)?rows:[];render();msg($('#search-message'),workshops.length?'Listings are from approved workshops.':'No approved workshops are listed yet. Workshop owners can register below.');}
+ catch(e){workshops=[];render();msg($('#search-message'),'Directory data is not available right now. Please try again later.',true);}
+ if(isAdmin)await loadAdmin();
+}
+function render(){
+ const city=$('#search-city').value.trim().toLowerCase(),pin=$('#search-pin').value.trim();
+ const rows=workshops.filter(w=>(!city||String(w.city+' '+w.state).toLowerCase().includes(city))&&(!pin||w.pincode===pin));
+ if(!rows.length){$('#workshop-list').innerHTML='<div class="w-empty">No matching approved workshops found. Try a nearby city or PIN code.</div>';return;}
+ $('#workshop-list').innerHTML=rows.map(w=>{
+ const services=Array.isArray(w.services)?w.services.join(', '):'';
+ const map='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent([w.name,w.address,w.city,w.state,w.pincode].join(', '));
+ const phone=String(w.phone||'').replace(/[^+0-9]/g,'');
+ const wa=String(w.whatsapp||w.phone||'').replace(/[^0-9]/g,'');
+ return '<article class="w-card"><div class="w-meta">'+(w.is_verified?'<span class="w-pill">Verified listing</span> ':'')+esc(w.city)+', '+esc(w.state)+' · '+esc(w.pincode)+'</div><h3>'+esc(w.name)+'</h3><p>'+esc(w.description||services||'Automotive workshop')+'</p><p><strong>Services:</strong> '+esc(services||'Contact workshop for details')+'</p><p>'+esc(w.address)+'</p><p><strong>Hours:</strong> '+esc(w.opening_hours||'Contact workshop')+'</p><p><strong>Customer rating:</strong> <span id="rating-'+esc(w.id)+'">Loading reviews…</span></p><div class="w-card-actions"><a href="'+map+'" target="_blank" rel="noopener noreferrer">Google Maps ↗</a><a href="tel:'+esc(phone)+'">Call workshop</a>'+(wa?'<a href="https://wa.me/'+esc(wa)+'" target="_blank" rel="noopener noreferrer">WhatsApp ↗</a>':'')+(w.website_url&&urlSafe(w.website_url)?'<a href="'+esc(w.website_url)+'" target="_blank" rel="noopener noreferrer">Website ↗</a>':'')+'</div><div id="reviews-'+esc(w.id)+'"></div><details><summary>Rate or report this workshop</summary><form class="review-form" data-id="'+esc(w.id)+'"><label>Rating<select name="rating" required><option value="">Select stars</option><option value="5">5 — Excellent</option><option value="4">4 — Good</option><option value="3">3 — Average</option><option value="2">2 — Poor</option><option value="1">1 — Very poor</option></select></label><label>Review title<input name="title" required minlength="3" maxlength="120"></label><label>Review<textarea name="body" required minlength="10" maxlength="2000"></textarea></label><button class="w-button" type="submit">Submit review</button></form><form class="report-form" data-id="'+esc(w.id)+'"><label>Report a concern<textarea name="reason" required minlength="10" maxlength="1500" placeholder="Describe the issue without sharing private customer data"></textarea></label><button class="w-secondary" type="submit">Submit private report</button></form></details></article>';
+ }).join('');
+ rows.forEach(w=>loadReviews(w.id));
+}
+async function loadReviews(id){
+ try{const rows=await api.rest('workshop_reviews?select=id,rating,title,body,created_at&workshop_id=eq.'+encodeURIComponent(id)+'&status=eq.published&order=created_at.desc&limit=20');const list=Array.isArray(rows)?rows:[];const avg=list.length?list.reduce((s,r)=>s+Number(r.rating),0)/list.length:0;const rating=$('#rating-'+id);if(rating)rating.textContent=list.length?avg.toFixed(1)+' / 5 ('+list.length+' published review'+(list.length===1?'':'s')+')':'No published reviews yet';const target=$('#reviews-'+id);if(target)target.innerHTML=list.map(r=>'<div class="w-card"><div class="w-stars">'+('★'.repeat(Number(r.rating)))+('☆'.repeat(5-Number(r.rating)))+'</div><strong>'+esc(r.title)+'</strong><p>'+esc(r.body)+'</p><small class="w-meta">'+esc(new Date(r.created_at).toLocaleDateString())+'</small></div>').join('');}
+ catch(_){const rating=$('#rating-'+id);if(rating)rating.textContent='Reviews unavailable';}
+}
+$('#search-button').addEventListener('click',render);
+$('#search-city').addEventListener('keydown',e=>{if(e.key==='Enter')render();});
+$('#search-pin').addEventListener('input',()=>{if($('#search-pin').value.length===6)render();});
+$('#workshop-form').addEventListener('submit',async e=>{
+ e.preventDefault();user=signedUser();if(!user)return msg($('#register-message'),'Sign in first using your existing site account, then submit the listing.',true);
+ const f=new FormData(e.currentTarget),name=String(f.get('name')||'').trim(),phone=String(f.get('phone')||'').trim(),website=String(f.get('website_url')||'').trim();
+ if(website&&!urlSafe(website))return msg($('#register-message'),'Website links must use HTTPS.',true);
+ const payload={owner_id:user.id,name,description:String(f.get('description')||'').trim(),services:String(f.get('services')||'').split(',').map(x=>x.trim()).filter(Boolean).slice(0,30),address:String(f.get('address')||'').trim(),city:String(f.get('city')||'').trim(),state:String(f.get('state')||'Tamil Nadu').trim(),pincode:String(f.get('pincode')||'').trim(),phone,whatsapp:String(f.get('whatsapp')||'').trim()||null,website_url:website||null,opening_hours:String(f.get('opening_hours')||'').trim(),status:'pending',is_verified:false};
+ const btn=e.currentTarget.querySelector('button[type=submit]');btn.disabled=true;
+ try{await api.rest('workshops',{method:'POST',body:payload,prefer:'return=minimal'});e.currentTarget.reset();msg($('#register-message'),'Submitted. Your workshop will appear publicly after moderator review.');}
+ catch(err){msg($('#register-message'),'Could not submit. Sign in again and check the required details. '+String(err.message||'').slice(0,120),true);}
+ finally{btn.disabled=false;}
+});
+document.addEventListener('submit',async e=>{
+ const rf=e.target.closest('.review-form');if(rf){e.preventDefault();user=signedUser();if(!user)return msg($('#feedback-message'),'Sign in before leaving a review.',true);const f=new FormData(rf);const payload={workshop_id:rf.dataset.id,reviewer_id:user.id,rating:Number(f.get('rating')),title:String(f.get('title')||'').trim(),body:String(f.get('body')||'').trim(),status:'pending'};try{await api.rest('workshop_reviews',{method:'POST',body:payload,prefer:'return=minimal'});rf.reset();msg($('#feedback-message'),'Review submitted for moderation. Only published reviews appear publicly.');}catch(err){msg($('#feedback-message'),'Review could not be submitted. You may already have reviewed this workshop, or the details need checking.',true);}return;}
+ const rep=e.target.closest('.report-form');if(rep){e.preventDefault();user=signedUser();if(!user)return msg($('#feedback-message'),'Sign in before submitting a report.',true);const reason=String(new FormData(rep).get('reason')||'').trim();try{await api.rest('workshop_reports',{method:'POST',body:{reporter_id:user.id,workshop_id:rep.dataset.id,reason,status:'open'},prefer:'return=minimal'});rep.reset();msg($('#feedback-message'),'Your report was submitted privately for moderator review.');}catch(err){msg($('#feedback-message'),'Report could not be submitted. Sign in again and retry.',true);}return;}
+});
+async function loadAdmin(){
+ try{
+ const [pending,reviews,reports]=await Promise.all([
+ api.rest('workshops?select=id,name,city,state,pincode,status,owner_id,created_at&status=in.(pending,rejected,suspended)&order=created_at.asc&limit=100'),
+ api.rest('workshop_reviews?select=id,workshop_id,rating,title,body,status,created_at&status=in.(pending,published,hidden)&order=created_at.asc&limit=100'),
+ api.rest('workshop_reports?select=id,workshop_id,review_id,reason,status,created_at&status=in.(open,investigating)&order=created_at.asc&limit=100')
+ ]);
+ const items=[...(pending||[]).map(x=>({...x,_type:'workshop'})),...(reviews||[]).map(x=>({...x,_type:'review'})),...(reports||[]).map(x=>({...x,_type:'report'}))];
+ $('#admin-queue').innerHTML=items.length?items.map(x=>'<article class="w-card"><div class="w-meta">'+esc(x._type)+' · '+esc(x.status)+'</div><h3>'+esc(x.name||x.title||'Customer report')+'</h3><p>'+esc(x.city?[x.city,x.state,x.pincode].join(', '):x.body||x.reason||'')+'</p><div class="w-card-actions">'+(x._type==='workshop'?'<button class="w-secondary" data-action="approve" data-type="workshop" data-id="'+esc(x.id)+'">Approve listing</button><button class="w-secondary" data-action="reject" data-type="workshop" data-id="'+esc(x.id)+'">Reject listing</button><button class="w-secondary" data-action="suspend" data-type="workshop" data-id="'+esc(x.id)+'">Suspend</button>':x._type==='review'?'<button class="w-secondary" data-action="publish" data-type="review" data-id="'+esc(x.id)+'">Publish review</button><button class="w-secondary" data-action="hide" data-type="review" data-id="'+esc(x.id)+'">Hide review</button>':'<button class="w-secondary" data-action="resolve" data-type="report" data-id="'+esc(x.id)+'">Resolve report</button><button class="w-secondary" data-action="dismiss" data-type="report" data-id="'+esc(x.id)+'">Dismiss report</button>')+'</div></article>').join(''):'<div class="w-empty">No pending workshops, review actions or open reports.</div>';
+ }catch(e){$('#admin-queue').textContent='Moderation queue could not be loaded. Check admin role and database policies.';}
+}
+$('#admin-refresh').addEventListener('click',loadAdmin);
+$('#admin-queue').addEventListener('click',async e=>{
+ const b=e.target.closest('button[data-action]');if(!b)return;if(!isAdmin||!user)return msg($('#admin-message'),'Admin access required.',true);
+ const {action,type,id}=b.dataset;let table,body;
+ if(type==='workshop'){table='workshops';body=action==='approve'?{status:'approved',is_verified:true,updated_at:new Date().toISOString()}:{status:action==='reject'?'rejected':'suspended',is_verified:false,updated_at:new Date().toISOString()};}
+ else if(type==='review'){table='workshop_reviews';body={status:action==='publish'?'published':'hidden',updated_at:new Date().toISOString()};}
+ else{table='workshop_reports';body={status:action==='resolve'?'resolved':'dismissed',resolved_by:user.id,resolved_at:new Date().toISOString()};}
+ b.disabled=true;try{await api.rest(table+'?id=eq.'+encodeURIComponent(id),{method:'PATCH',body,prefer:'return=minimal'});await api.rest('community_admin_audit',{method:'POST',body:{actor_id:user.id,action:action,target_type:type,target_id:id,details:{source:'workshops-page'}},prefer:'return=minimal'});msg($('#admin-message'),'Moderation action saved.');await load();}catch(err){msg($('#admin-message'),'Action failed. Verify moderator role and database policies.',true);}finally{b.disabled=false;}
+});
+load();
+})();
+</script>
+</body></html>
