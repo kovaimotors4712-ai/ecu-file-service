@@ -2063,7 +2063,7 @@ function createHttpServer() {
         '',
         'Sitemap: https://ecufileservice.in/sitemap.xml',
         ''
-      ].join('\\n');
+      ].join('\n');
       response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store, no-cache, must-revalidate', 'X-Content-Type-Options': 'nosniff' });
       response.end(robotsBody);
       return;
