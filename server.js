@@ -2048,23 +2048,13 @@ function createHttpServer() {
     try { pathname = decodeURIComponent(requestUrl.pathname); } catch { response.writeHead(400).end('Bad request'); return; }
     if (pathname === '/robots.txt') {
       const robotsBody = [
-        '# Allow search engines to crawl public website pages.',
-        'User-agent: Googlebot',
-        'Allow: /',
-        'Disallow: /admin',
-        'Disallow: /admin.html',
-        'Disallow: /api/',
-        '',
         'User-agent: *',
         'Allow: /',
-        'Disallow: /admin',
-        'Disallow: /admin.html',
-        'Disallow: /api/',
         '',
         'Sitemap: https://ecufileservice.in/sitemap.xml',
         ''
       ].join('\n');
-      response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store, no-cache, must-revalidate', 'X-Content-Type-Options': 'nosniff' });
+      response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0', 'Pragma': 'no-cache', 'Expires': '0', 'X-Content-Type-Options': 'nosniff' });
       response.end(robotsBody);
       return;
     }
