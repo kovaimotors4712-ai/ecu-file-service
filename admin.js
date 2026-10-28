@@ -762,9 +762,10 @@
   const inviteForm=document.querySelector('#member-invite-form');
   let memberUsers=[];
   function memberStatus(user){return user.banned_until&&new Date(user.banned_until).getTime()>Date.now()?'Suspended':'Active';}
-  async function memberRequest(method,body){
+  async function memberRequest(method,body,page){
     const token=await backend.getAccessToken();
-    const response=await fetch('/api/admin/users',{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+    const endpoint='/api/admin/users'+(method==='GET'?'?page='+encodeURIComponent(page||1):'');
+    const response=await fetch(endpoint,{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
     const result=await parseJson(response);
     if(!response.ok)throw new Error(result.error||'Member action failed.');
     return result;
@@ -780,10 +781,33 @@
       return '<article style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="overflow-wrap:anywhere">'+safeEmail+'</strong><span>'+status+' · '+(u.role==='admin'?'Administrator':'Member')+'</span></div><small>Created '+created+' · Last sign-in '+last+'</small><small style="overflow-wrap:anywhere;color:#68756f">ID: '+safeId+'</small>'+(u.role==='admin'?'<p>Protected administrator account</p>':'<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="button button-ghost" data-member-action="'+(status==='Suspended'?'unban':'ban')+'" data-member-id="'+safeId+'">'+(status==='Suspended'?'Restore access':'Suspend access')+'</button><button type="button" class="button button-ghost" data-member-action="delete" data-member-id="'+safeId+'" style="border-color:#b91c1c;color:#b91c1c">Delete account</button></div>')+'</article>';
     }).join('');
   }
+  let memberPage=1;
+  let memberHasNextPage=false;
+  const memberPager=document.createElement('div');
+  memberPager.className='admin-actions';
+  memberPager.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:10px 0';
+  const memberPrev=document.createElement('button');
+  memberPrev.type='button';memberPrev.className='button button-ghost';memberPrev.textContent='Previous 100';
+  const memberNext=document.createElement('button');
+  memberNext.type='button';memberNext.className='button button-ghost';memberNext.textContent='Next 100';
+  memberPrev.addEventListener('click',()=>{if(memberPage>1){memberPage--;loadMembers();}});
+  memberNext.addEventListener('click',()=>{if(memberHasNextPage){memberPage++;loadMembers();}});
+  memberPager.append(memberPrev,memberNext);
+  memberList.parentElement.insertBefore(memberPager,memberList);
   async function loadMembers(){
     memberList.textContent='Loading member accounts…';memberMessage.textContent='';
-    try{const result=await memberRequest('GET');memberUsers=result.users||[];renderMembers();memberMessage.textContent='Loaded '+memberUsers.length+' member accounts (page 1; 100 per page).';}
-    catch(error){memberList.textContent='Member accounts could not be loaded.';memberMessage.textContent=error.message;memberMessage.classList.add('admin-error');}
+    memberPrev.disabled=memberPage<=1;memberNext.disabled=true;
+    try{
+      const result=await memberRequest('GET',undefined,memberPage);
+      memberUsers=result.users||[];memberHasNextPage=memberUsers.length===100;
+      renderMembers();
+      memberMessage.textContent='Loaded '+memberUsers.length+' member accounts (page '+memberPage+'; 100 per page).';
+      memberPrev.disabled=memberPage<=1;memberNext.disabled=!memberHasNextPage;
+    }catch(error){
+      memberList.textContent='Member accounts could not be loaded.';
+      memberMessage.textContent=error.message;memberMessage.classList.add('admin-error');
+      memberPrev.disabled=memberPage<=1;memberNext.disabled=true;
+    }
   }
   inviteForm.addEventListener('submit',async function(event){
     event.preventDefault();const button=inviteForm.querySelector('button[type="submit"]');button.disabled=true;memberMessage.classList.remove('admin-error');
