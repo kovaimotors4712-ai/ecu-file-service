@@ -185,11 +185,13 @@
         const status = target && target.is_hidden ? ' · Already hidden' : '';
         const topicActions = entry.kind === 'topic' && target ? "<button type='button' class='button button-outline' data-mod-action='lock-topic' data-target-id='" + escapeHtml(target.id) + "'>" + (target.is_locked ? 'Unlock topic' : 'Lock topic') + "</button>" : '';
         const hideAction = target && !target.is_hidden ? "<button type='button' class='button button-outline' data-mod-action='hide-" + entry.kind + "' data-target-id='" + escapeHtml(target.id) + "'>Hide " + entry.kind + "</button>" : '';
+        const editAction = target ? "<button type='button' class='button button-outline' data-mod-action='edit-" + entry.kind + "' data-target-id='" + escapeHtml(target.id) + "'>Edit " + entry.kind + "</button>" : '';
+        const deleteAction = target ? "<button type='button' class='button button-outline' data-mod-action='delete-" + entry.kind + "' data-target-id='" + escapeHtml(target.id) + "'>Delete " + entry.kind + "</button>" : '';
         const resolveAction = "<button type='button' class='button button-lime' data-mod-action='resolve-report' data-report-id='" + escapeHtml(report.id) + "'>Resolve report</button>";
         return "<article class='topic-card'><div class='topic-card-top'><span class='topic-tag'>" + (entry.kind === 'topic' ? 'Reported topic' : 'Reported reply') + "</span><span class='state-pill'>" + escapeHtml(report.status) + "</span></div>" +
           "<h3>" + escapeHtml(targetText.slice(0, 220)) + "</h3><p class='topic-preview'>" + escapeHtml(report.reason) + "</p>" +
           "<div class='topic-meta'><span>Reported " + escapeHtml(formatDate(report.created_at)) + escapeHtml(status) + "</span></div>" +
-          "<div class='auth-actions'>" + hideAction + topicActions + resolveAction + "</div></article>";
+          "<div class='auth-actions'>" + hideAction + editAction + topicActions + deleteAction + resolveAction + "</div></article>";
       }).join('');
       setMessage(message, targets.length + ' open report(s).');
     } catch (_) {
@@ -216,6 +218,25 @@
         await api.rest(table + '?id=eq.' + encodeURIComponent(targetId), {
           method: 'PATCH', body: { is_hidden: true }, prefer: 'return=minimal'
         });
+      } else if ((action === 'edit-topic' || action === 'edit-reply') && validUuid(targetId)) {
+        const isTopic = action === 'edit-topic';
+        const table = isTopic ? 'forum_topics' : 'forum_replies';
+        const rows = await api.rest(table + '?select=id,title,body&id=eq.' + encodeURIComponent(targetId) + '&limit=1');
+        const row = Array.isArray(rows) ? rows[0] : null;
+        if (!row) throw new Error('Content not found');
+        const title = isTopic ? window.prompt('Edit topic title (8–160 characters):', row.title || '') : null;
+        if (isTopic && title === null) return;
+        const body = window.prompt('Edit public content:', row.body || '');
+        if (body === null) return;
+        if (isTopic && (title.trim().length < 8 || title.trim().length > 160)) throw new Error('Topic title must be 8–160 characters');
+        if (body.trim().length < (isTopic ? 20 : 2) || body.trim().length > (isTopic ? 12000 : 8000)) throw new Error('Content length is invalid');
+        await api.rest(table + '?id=eq.' + encodeURIComponent(targetId), {
+          method: 'PATCH', body: isTopic ? { title: title.trim(), body: body.trim(), updated_at: new Date().toISOString() } : { body: body.trim(), updated_at: new Date().toISOString() }, prefer: 'return=minimal'
+        });
+      } else if ((action === 'delete-topic' || action === 'delete-reply') && validUuid(targetId)) {
+        if (!window.confirm('Permanently delete this ' + (action === 'delete-topic' ? 'topic and its replies' : 'reply') + '? This cannot be undone.')) return;
+        const table = action === 'delete-topic' ? 'forum_topics' : 'forum_replies';
+        await api.rest(table + '?id=eq.' + encodeURIComponent(targetId), { method: 'DELETE', prefer: 'return=minimal' });
       } else if (action === 'lock-topic' && validUuid(targetId)) {
         const topic = await api.rest('forum_topics?select=id,is_locked&id=eq.' + encodeURIComponent(targetId) + '&limit=1');
         const row = Array.isArray(topic) ? topic[0] : null;
