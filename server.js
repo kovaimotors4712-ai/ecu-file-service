@@ -1965,11 +1965,65 @@ async function handleAdminSoftwareProducts(request,response){
   jsonResponse(response,405,{error:'Method Not Allowed'});return true;
 }
 
+
+async function handleAdminUsers(request,response){
+  const admin=await requireAdmin(request);
+  if(!admin){jsonResponse(response,403,{error:'Administrator role is required.'});return true;}
+  if(!supabaseServiceRoleKey){jsonResponse(response,503,{error:'Account management is not configured.'});return true;}
+  const token=serviceToken();
+  if(request.method==='GET'){
+    const pageRaw=Number(new URL(request.url,'http://localhost').searchParams.get('page')||1);
+    const page=Number.isInteger(pageRaw)&&pageRaw>0?Math.min(pageRaw,1000):1;
+    const result=await supabaseRequest(token,'auth/v1/admin/users?page='+page+'&per_page=100',{timeoutMs:20000});
+    if(!result.ok){jsonResponse(response,502,{error:'Member accounts could not be loaded.'});return true;}
+    const data=await result.json();
+    const users=Array.isArray(data)?data:(Array.isArray(data.users)?data.users:[]);
+    jsonResponse(response,200,{users:users.map(u=>({id:u.id,email:u.email||'',created_at:u.created_at||null,last_sign_in_at:u.last_sign_in_at||null,banned_until:u.banned_until||null,email_confirmed_at:u.email_confirmed_at||null,role:u.app_metadata?.role==='admin'?'admin':'member'})),page,perPage:100});
+    return true;
+  }
+  try{
+    const body=await readJson(request,12000);
+    const id=String(body.id||'');
+    if(request.method==='POST'){
+      const email=String(body.email||'').trim().toLowerCase();
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254){jsonResponse(response,400,{error:'Enter a valid member email address.'});return true;}
+      const invited=await supabaseRequest(token,'auth/v1/invite',{method:'POST',body:{email,data:{}} ,timeoutMs:20000});
+      if(!invited.ok){const detail=await invited.json().catch(()=>({}));jsonResponse(response,invited.status===422?409:502,{error:detail.msg||detail.message||detail.error_description||'Invitation could not be sent. Check whether the account already exists.'});return true;}
+      const user=await invited.json().catch(()=>({}));
+      jsonResponse(response,201,{invited:true,user:{id:user.id,email:user.email||email,created_at:user.created_at||null,banned_until:user.banned_until||null,role:'member'}});
+      return true;
+    }
+    if(!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(id)){jsonResponse(response,400,{error:'Invalid member account ID.'});return true;}
+    if(id===admin.id){jsonResponse(response,400,{error:'You cannot suspend or delete your own administrator account here.'});return true;}
+    const target=await supabaseRequest(token,'auth/v1/admin/users/'+encodeURIComponent(id),{timeoutMs:15000});
+    if(!target.ok){jsonResponse(response,target.status===404?404:502,{error:'Member account could not be verified.'});return true;}
+    const targetUser=await target.json();
+    if(targetUser?.app_metadata?.role==='admin'){jsonResponse(response,403,{error:'Administrator accounts are protected from member-management actions.'});return true;}
+    if(request.method==='PATCH'){
+      const action=String(body.action||'');
+      if(!['ban','unban'].includes(action)){jsonResponse(response,400,{error:'Choose suspend or restore access.'});return true;}
+      const update=await supabaseRequest(token,'auth/v1/admin/users/'+encodeURIComponent(id),{method:'PUT',body:{ban_duration:action==='ban'?'876000h':'none'},timeoutMs:15000});
+      if(!update.ok){jsonResponse(response,502,{error:'Member access could not be updated.'});return true;}
+      const updated=await update.json().catch(()=>({}));
+      jsonResponse(response,200,{updated:true,user:{id:updated.id||id,email:updated.email||targetUser.email,banned_until:updated.banned_until||null}});
+      return true;
+    }
+    if(request.method==='DELETE'){
+      const removed=await supabaseRequest(token,'auth/v1/admin/users/'+encodeURIComponent(id),{method:'DELETE',timeoutMs:15000});
+      if(!removed.ok){jsonResponse(response,502,{error:'Member account could not be deleted. Related customer records may need to be retained.'});return true;}
+      jsonResponse(response,200,{deleted:true,id});
+      return true;
+    }
+    jsonResponse(response,405,{error:'Method Not Allowed'});return true;
+  }catch(error){jsonResponse(response,error.statusCode||400,{error:error.message||'Member action failed.'});return true;}
+}
+
 async function handleApi(request, response, url) {
   if (url.pathname === '/api/health') { jsonResponse(response, 200, { configured: hasSafeSupabaseConfig, paymentConfigured: paymentsConfigured(), paymentReadiness: paymentReadinessChecks() }); return true; }
   if (url.pathname === '/api/site-content') return handlePublicSiteContent(request, response);
   if (url.pathname === '/api/software-products') return handlePublicSoftwareProducts(request, response);
   if (url.pathname === '/api/admin/software-products') return handleAdminSoftwareProducts(request, response);
+  if (url.pathname === '/api/admin/users') return handleAdminUsers(request, response);
   if (url.pathname === '/api/admin/advertising/quotes') return handleAdminAdvertisingQuotes(request, response);
   if (url.pathname === '/api/advertising/quote') return handlePublicAdvertisingQuote(request, response);
   if (url.pathname === '/api/advertising/payment/create-order') return handleCreateAdvertisingPayment(request, response);
