@@ -1993,7 +1993,7 @@ async function handleAdminUsers(request,response){
       jsonResponse(response,201,{invited:true,user:{id:user.id,email:user.email||email,created_at:user.created_at||null,banned_until:user.banned_until||null,role:'member'}});
       return true;
     }
-    if(!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(id)){jsonResponse(response,400,{error:'Invalid member account ID.'});return true;}
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)){jsonResponse(response,400,{error:'Invalid member account ID.'});return true;}
     if(id===admin.id){jsonResponse(response,400,{error:'You cannot suspend or delete your own administrator account here.'});return true;}
     const target=await supabaseRequest(token,'auth/v1/admin/users/'+encodeURIComponent(id),{timeoutMs:15000});
     if(!target.ok){jsonResponse(response,target.status===404?404:502,{error:'Member account could not be verified.'});return true;}
