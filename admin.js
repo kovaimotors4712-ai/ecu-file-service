@@ -755,6 +755,54 @@
     }catch(error){adminRequestRows=[];list.replaceChildren();const empty=document.createElement('p');empty.className='admin-message admin-error';empty.textContent='Customer requests could not load. Apply the forum live desk migration after reviewing it, then refresh.';list.append(empty);status.textContent=error.message||'Request inbox unavailable.';status.classList.add('admin-error');updateAdminFolderBadges();}
   }
 
+
+  const memberList=document.querySelector('#member-list');
+  const memberMessage=document.querySelector('#member-management-message');
+  const memberSearch=document.querySelector('#member-search');
+  const inviteForm=document.querySelector('#member-invite-form');
+  let memberUsers=[];
+  function memberStatus(user){return user.banned_until&&new Date(user.banned_until).getTime()>Date.now()?'Suspended':'Active';}
+  async function memberRequest(method,body){
+    const token=await backend.getAccessToken();
+    const response=await fetch('/api/admin/users',{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+    const result=await parseJson(response);
+    if(!response.ok)throw new Error(result.error||'Member action failed.');
+    return result;
+  }
+  function renderMembers(){
+    const q=String(memberSearch?.value||'').trim().toLowerCase();
+    const rows=memberUsers.filter(u=>(u.email+' '+u.id).toLowerCase().includes(q));
+    if(!rows.length){memberList.innerHTML='<p>No members match this search.</p>';return;}
+    memberList.innerHTML=rows.map(u=>{
+      const status=memberStatus(u),safeId=escape(u.id),safeEmail=escape(u.email||'(no email)');
+      const created=u.created_at?new Date(u.created_at).toLocaleDateString():'—';
+      const last=u.last_sign_in_at?new Date(u.last_sign_in_at).toLocaleDateString():'Never';
+      return '<article style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="overflow-wrap:anywhere">'+safeEmail+'</strong><span>'+status+' · '+(u.role==='admin'?'Administrator':'Member')+'</span></div><small>Created '+created+' · Last sign-in '+last+'</small><small style="overflow-wrap:anywhere;color:#68756f">ID: '+safeId+'</small>'+(u.role==='admin'?'<p>Protected administrator account</p>':'<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="button button-ghost" data-member-action="'+(status==='Suspended'?'unban':'ban')+'" data-member-id="'+safeId+'">'+(status==='Suspended'?'Restore access':'Suspend access')+'</button><button type="button" class="button button-ghost" data-member-action="delete" data-member-id="'+safeId+'" style="border-color:#b91c1c;color:#b91c1c">Delete account</button></div>')+'</article>';
+    }).join('');
+  }
+  async function loadMembers(){
+    memberList.textContent='Loading member accounts…';memberMessage.textContent='';
+    try{const result=await memberRequest('GET');memberUsers=result.users||[];renderMembers();memberMessage.textContent='Loaded '+memberUsers.length+' member accounts (page 1; 100 per page).';}
+    catch(error){memberList.textContent='Member accounts could not be loaded.';memberMessage.textContent=error.message;memberMessage.classList.add('admin-error');}
+  }
+  inviteForm.addEventListener('submit',async function(event){
+    event.preventDefault();const button=inviteForm.querySelector('button[type="submit"]');button.disabled=true;memberMessage.classList.remove('admin-error');
+    try{const email=document.querySelector('#member-invite-email').value.trim();await memberRequest('POST',{email});inviteForm.reset();memberMessage.textContent='Invitation sent to '+email+'.';await loadMembers();}
+    catch(error){memberMessage.textContent=error.message;memberMessage.classList.add('admin-error');}
+    finally{button.disabled=false;}
+  });
+  memberList.addEventListener('click',async function(event){
+    const button=event.target.closest('button[data-member-action]');if(!button)return;
+    const id=button.dataset.memberId,action=button.dataset.memberAction;
+    if(action==='delete'&&!confirm('Permanently delete this member account? This may affect their sign-in and related records.'))return;
+    if(action!=='delete'&&!confirm(action==='ban'?'Suspend this member’s sign-in access?':'Restore this member’s sign-in access?'))return;
+    button.disabled=true;memberMessage.classList.remove('admin-error');
+    try{await memberRequest(action==='delete'?'DELETE':'PATCH',{id,action});memberMessage.textContent=action==='delete'?'Member account deleted.':action==='ban'?'Member access suspended.':'Member access restored.';await loadMembers();}
+    catch(error){memberMessage.textContent=error.message;memberMessage.classList.add('admin-error');button.disabled=false;}
+  });
+  if(memberSearch)memberSearch.addEventListener('input',renderMembers);
+  document.querySelector('#refresh-members').addEventListener('click',loadMembers);
+
   async function enterAdmin(){
     const session = backend.getSession();
     if (!session?.user) { setSignedOut(); return; }
@@ -773,6 +821,7 @@
     await loadAdvertisingQuotes();
     await loadSiteContent();
     await loadSoftwareProducts();
+    await loadMembers();
     await loadAdminCustomerRequests();
     await loadPublicContactSettings();
     subscribeRealtime();
