@@ -1,15 +1,11 @@
 # Allow Google to crawl public website pages.
 User-agent: Googlebot
 Allow: /
-Disallow: /admin
-Disallow: /admin.html
 Disallow: /api/
 
 # Allow other search engines to crawl public website pages.
 User-agent: *
 Allow: /
-Disallow: /admin
-Disallow: /admin.html
 Disallow: /api/
 
 Sitemap: https://ecufileservice.in/sitemap.xml
