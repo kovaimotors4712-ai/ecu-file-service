@@ -2102,6 +2102,10 @@ function createHttpServer() {
     try { pathname = decodeURIComponent(requestUrl.pathname); } catch { response.writeHead(400).end('Bad request'); return; }
     if (pathname === '/robots.txt') {
       const robotsBody = [
+        'User-agent: Google-InspectionTool',
+        'Allow: /',
+        'Disallow: /api/',
+        '',
         'User-agent: Googlebot',
         'Allow: /',
         'Disallow: /api/',
