@@ -1,4 +1,9 @@
-# Allow Google to crawl public website pages.
+# Explicitly allow Google's URL Inspection crawler to access public pages.
+User-agent: Google-InspectionTool
+Allow: /
+Disallow: /api/
+
+# Allow Googlebot to crawl public website pages.
 User-agent: Googlebot
 Allow: /
 Disallow: /api/
