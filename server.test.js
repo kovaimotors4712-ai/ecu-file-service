@@ -590,6 +590,11 @@ test('identical file and vehicle submissions create independent checkout intents
   assert.equal(retry.intentId, first.intentId);
   assert.equal(retry.objectPath, first.objectPath);
 
+  const changedRequest = { ...first.request, selectedServices: [...first.request.selectedServices, 'DPF OFF'] };
+  const reusedAttempt = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request:changedRequest, clientAttemptId:attemptA } });
+  assert.equal(reusedAttempt.response.status, 409);
+  assert.match(reusedAttempt.payload.error, /already used for different request details/i);
+
   const second = await createAndStageIntent({}, crypto.randomUUID());
   assert.notEqual(second.intentId, first.intentId);
   assert.notEqual(second.objectPath, first.objectPath);
