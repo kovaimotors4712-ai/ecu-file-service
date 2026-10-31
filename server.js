@@ -1394,11 +1394,11 @@ async function handlePublicSiteContent(request, response) {
 }
 async function handlePublicSiteSettings(request, response) {
   if (request.method !== 'GET') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
-  if (!supabaseServiceRoleKey) { jsonResponse(response, 200, { settings:{ contact_phone:'', telegram_url:'', contact_email:'' } }); return true; }
-  const result = await supabaseRequest(serviceToken(), 'rest/v1/site_public_settings?select=contact_phone,telegram_url,contact_email&id=eq.true&limit=1', { timeoutMs:12000 });
-  if (!result.ok) { jsonResponse(response, 200, { settings:{ contact_phone:'', telegram_url:'', contact_email:'' } }); return true; }
+  if (!supabaseServiceRoleKey) { jsonResponse(response, 200, { settings:{ whatsapp_url:'' } }); return true; }
+  const result = await supabaseRequest(serviceToken(), 'rest/v1/site_public_settings?select=whatsapp_url&id=eq.true&limit=1', { timeoutMs:12000 });
+  if (!result.ok) { jsonResponse(response, 200, { settings:{ whatsapp_url:'' } }); return true; }
   const row = (await result.json())?.[0] || {};
-  jsonResponse(response, 200, { settings:{ contact_phone:row.contact_phone||'', telegram_url:row.telegram_url||'', contact_email:row.contact_email||'' } });
+  jsonResponse(response, 200, { settings:{ whatsapp_url:row.whatsapp_url||'' } });
   return true;
 }
 async function handleAdminSiteSettings(request, response) {
@@ -1407,39 +1407,29 @@ async function handleAdminSiteSettings(request, response) {
   if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'Public contact settings are unavailable.' }); return true; }
   const token = serviceToken();
   if (request.method === 'GET') {
-    const result = await supabaseRequest(token, 'rest/v1/site_public_settings?select=contact_phone,telegram_url,contact_email&id=eq.true&limit=1', { timeoutMs:12000 });
-    if (!result.ok) { jsonResponse(response, 502, { error:'Contact settings could not be loaded.' }); return true; }
+    const result = await supabaseRequest(token, 'rest/v1/site_public_settings?select=whatsapp_url&id=eq.true&limit=1', { timeoutMs:12000 });
+    if (!result.ok) { jsonResponse(response, 502, { error:'WhatsApp settings could not be loaded.' }); return true; }
     const row=(await result.json())?.[0]||{};
-    jsonResponse(response,200,{settings:{contact_phone:row.contact_phone||'',telegram_url:row.telegram_url||'',contact_email:row.contact_email||''}});return true;
+    jsonResponse(response,200,{settings:{whatsapp_url:row.whatsapp_url||''}});return true;
   }
   if (request.method === 'PATCH') {
     try {
       const body=await readJson(request,4096);
-      const phone=cleanSiteText(body.contact_phone,40);
-      const telegramRaw=cleanSiteText(body.telegram_url,500);
-      let telegram='';
-      if (telegramRaw) {
+      const raw=cleanSiteText(body.whatsapp_url,300);
+      let whatsapp='';
+      if (raw) {
         let parsed;
-        try { parsed = new URL(/^https:\/\//i.test(telegramRaw) ? telegramRaw : 'https://' + telegramRaw); }
-        catch { throw Object.assign(new Error('Enter a valid Telegram username or https://t.me link.'),{statusCode:400}); }
-        const host=parsed.hostname.toLowerCase().replace(/^www\./,'');
-        if (parsed.protocol!=='https:' || !['t.me','telegram.me'].includes(host) || parsed.username || parsed.password) {
-          throw Object.assign(new Error('Use a Telegram link such as https://t.me/your_channel or https://t.me/+invitecode.'),{statusCode:400});
+        try { parsed=new URL(raw); } catch { throw Object.assign(new Error('Enter a valid WhatsApp link such as https://wa.me/91XXXXXXXXXX.'),{statusCode:400}); }
+        if (parsed.protocol!=='https:' || parsed.hostname.toLowerCase()!=='wa.me' || parsed.username || parsed.password || !/^[0-9]{7,15}$/.test(parsed.pathname.slice(1)) || parsed.hash || parsed.search) {
+          throw Object.assign(new Error('Use a WhatsApp link in this format: https://wa.me/ followed by 7 to 15 digits.'),{statusCode:400});
         }
-        parsed.hostname='t.me';
-        parsed.hash='';
-        telegram=parsed.href.replace(/\/$/,'');
+        whatsapp='https://wa.me/'+parsed.pathname.slice(1);
       }
-      const email=cleanSiteText(body.contact_email,254).toLowerCase();
-      if (telegram) { let parsed; try { parsed=new URL(telegram); } catch { throw Object.assign(new Error('Enter a valid Telegram URL.'),{statusCode:400}); } if (parsed.protocol!=='https:' || !['t.me','telegram.me','www.t.me','www.telegram.me'].includes(parsed.hostname.toLowerCase()) || parsed.username || parsed.password) throw Object.assign(new Error('Telegram link must use an HTTPS t.me or telegram.me address.'),{statusCode:400}); }
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw Object.assign(new Error('Enter a valid contact email address.'),{statusCode:400});
-      if (phone && phone.replace(/[^\d]/g,'').length<7) throw Object.assign(new Error('Enter a valid phone number, or leave it empty.'),{statusCode:400});
-      if (!phone && !telegram && !email) throw Object.assign(new Error('Enter at least one public contact method.'),{statusCode:400});
-      const payload={id:true,contact_phone:phone,telegram_url:telegram,contact_email:email,updated_at:new Date().toISOString(),updated_by:admin.id};
+      const payload={id:true,whatsapp_url:whatsapp,updated_at:new Date().toISOString(),updated_by:admin.id};
       const result=await supabaseRequest(token,'rest/v1/site_public_settings?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=representation',body:payload,timeoutMs:12000});
-      if(!result.ok){jsonResponse(response,502,{error:'Contact settings could not be saved.'});return true;}
-      jsonResponse(response,200,{settings:{contact_phone:phone,telegram_url:telegram,contact_email:email}});return true;
-    } catch(error) { jsonResponse(response,error.statusCode||400,{error:error.message||'Invalid contact settings.'});return true; }
+      if(!result.ok){jsonResponse(response,502,{error:'WhatsApp link could not be saved.'});return true;}
+      jsonResponse(response,200,{settings:{whatsapp_url:whatsapp}});return true;
+    } catch(error) { jsonResponse(response,error.statusCode||400,{error:error.message||'Invalid WhatsApp link.'});return true; }
   }
   jsonResponse(response,405,{error:'Method Not Allowed'});return true;
 }

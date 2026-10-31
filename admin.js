@@ -475,15 +475,13 @@
   async function loadPublicContactSettings(){
     if(!publicContactForm)return;
     try{const result=await adminApi('/api/admin/site-settings');const s=result.settings||{};
-      publicContactForm.elements.namedItem('contact_phone').value=s.contact_phone||'';
-      publicContactForm.elements.namedItem('telegram_url').value=s.telegram_url||'';
-      publicContactForm.elements.namedItem('contact_email').value=s.contact_email||'';
+      publicContactForm.elements.namedItem('whatsapp_url').value=s.whatsapp_url||'';
       publicContactMessage.textContent='Current public contact details loaded.';
     }catch(error){publicContactMessage.textContent=error.message;publicContactMessage.classList.add('admin-error');}
   }
   publicContactForm?.addEventListener('submit',async event=>{
     event.preventDefault();const button=publicContactForm.querySelector('button[type="submit"]');button.disabled=true;publicContactMessage.classList.remove('admin-error');publicContactMessage.textContent='Saving…';
-    try{const data=new FormData(publicContactForm);const result=await adminApi('/api/admin/site-settings',{method:'PATCH',body:JSON.stringify({contact_phone:String(data.get('contact_phone')||'').trim(),telegram_url:String(data.get('telegram_url')||'').trim(),contact_email:String(data.get('contact_email')||'').trim()})});publicContactForm.elements.namedItem('telegram_url').value=result.settings?.telegram_url||'';publicContactForm.elements.namedItem('contact_phone').value=result.settings?.contact_phone||'';publicContactForm.elements.namedItem('contact_email').value=result.settings?.contact_email||'';publicContactMessage.textContent='Saved successfully. Reload the homepage to verify each contact link.';}
+    try{const data=new FormData(publicContactForm);const result=await adminApi('/api/admin/site-settings',{method:'PATCH',body:JSON.stringify({whatsapp_url:String(data.get('whatsapp_url')||'').trim()})});publicContactForm.elements.namedItem('whatsapp_url').value=result.settings?.whatsapp_url||'';publicContactMessage.textContent='Saved successfully. Reload the homepage to verify the WhatsApp link.';}
     catch(error){publicContactMessage.textContent=error.message;publicContactMessage.classList.add('admin-error');}
     finally{button.disabled=false;}
   });
