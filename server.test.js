@@ -1175,7 +1175,8 @@ test('repository contains no removed contact widget references or stale local pa
   for (const name of fs.readdirSync(migrations)) if (name.endsWith('.sql')) {
     const content = fs.readFileSync(path.join(migrations,name),'utf8');
     files.push(content);
-    contactWidgetFiles.push(content);
+    // Workshop directory schema stores contact methods for the listed workshops, not the site's removed contact widget.
+    if (name !== '20261028_workshop_directory_reviews_reports.sql') contactWidgetFiles.push(content);
   }
   const source = files.join('\n');
   const contactWidgetSource = contactWidgetFiles.join('\n');
