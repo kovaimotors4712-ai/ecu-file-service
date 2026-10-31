@@ -628,7 +628,7 @@ test('checkout insert failures do not expose raw database errors to customers', 
   });
   try {
     const { request } = customerRequest();
-    const result = await call('/api/checkout/intents', { method: 'POST', token: tokens.customer, body: { request } });
+    const result = await call('/api/checkout/intents', { method: 'POST', token: tokens.customer, body: { request, clientAttemptId: crypto.randomUUID() } });
     const body = JSON.stringify(result.payload);
     assert.equal(result.response.status, 400);
     assert.match(body, /The secure checkout could not be saved\. Please retry\./);
@@ -872,22 +872,23 @@ test('rejects non-premium two-wheelers before creating a checkout', async () => 
   assert.equal(result.response.status,400);
 });
 
-test('creates a durable checkout intent with a content-addressed private storage path', async () => {
+test('creates a durable checkout intent with a unique private storage path', async () => {
   const created = await createAndStageIntent();
   const intent = state.intents.get(created.intentId);
   assert.ok(intent);
-  assert.equal(intent.storage_path, `content/${created.request.originalSha256}`);
+  assert.match(intent.storage_path, /^content\/[a-f0-9]{64}$/);
+  assert.notEqual(intent.storage_path, `content/${created.request.originalSha256}`);
   assert.equal(intent.status, 'FILE_STAGED');
   assert.equal(intent.payment_status, 'PENDING');
   assert.equal(state.objects.has(intent.storage_path), true);
 });
 
-test('deduplicates an active checkout intent for the same customer/request hash', async () => {
+test('a new checkout attempt creates a separate intent for the same customer/request data', async () => {
   const first = await createAndStageIntent();
-  const second = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request:first.request } });
-  assert.equal(second.response.status,200);
-  assert.equal(second.payload.intentId, first.intentId);
-  assert.equal(state.intents.size,1);
+  const second = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request:first.request, clientAttemptId:crypto.randomUUID() } });
+  assert.equal(second.response.status,201);
+  assert.notEqual(second.payload.intentId, first.intentId);
+  assert.equal(state.intents.size,2);
 });
 
 test('rejects an oversized checkout request before payment creation', async () => {
