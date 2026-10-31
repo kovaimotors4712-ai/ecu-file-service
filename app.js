@@ -138,6 +138,7 @@
   let checkoutStarting = false;
   let paymentRecoveryRequired = false;
   let activeIntent = null;
+  let pendingCheckoutAttemptId = null;
   let activeProvider = null;
   let razorpayScriptPromise = null;
   let fileStagedInStorage = false;
@@ -269,14 +270,14 @@
   brandInput.addEventListener('input',()=>{renderBrands(brandInput.value);brandInput.setAttribute('aria-expanded','true');});
   brandInput.addEventListener('focus',()=>{renderBrands(brandInput.value);brandInput.setAttribute('aria-expanded','true');});
   brandInput.addEventListener('keydown',event=>{const options=[...brandResults.querySelectorAll('.brand-option')]; if (!options.length) return; if (event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();activeBrandOption=(activeBrandOption+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;options.forEach((o,i)=>o.classList.toggle('keyboard-active',i===activeBrandOption));options[activeBrandOption]?.scrollIntoView({block:'nearest'});} else if(event.key==='Enter'&&activeBrandOption>=0){event.preventDefault();options[activeBrandOption].click();} else if(event.key==='Escape') closeBrandResults();});
-  brandResults.addEventListener('click',event=>{const button=event.target.closest('.brand-option');if(!button)return;brandInput.value=button.dataset.brand;closeBrandResults();renderModelSuggestions();updateSummary();});
+  brandResults.addEventListener('click',event=>{const button=event.target.closest('.brand-option');if(!button)return;pendingCheckoutAttemptId=null;brandInput.value=button.dataset.brand;closeBrandResults();renderModelSuggestions();updateSummary();});
   document.addEventListener('click',event=>{if(!event.target.closest('.brand-search-wrap'))closeBrandResults();});
-  vehicleTypeSelect?.addEventListener('change',()=>{const allowed=brandsForCurrentVehicleType();if(brandInput.value && !allowed.includes(brandInput.value)){brandInput.value='';if(vehicleModelInput)vehicleModelInput.value='';}renderBrands(brandInput.value);renderModelSuggestions();updateSummary();});
-  brandInput.addEventListener('change',()=>{renderModelSuggestions();});
-  document.querySelectorAll('input[name="category"]').forEach(radio=>radio.addEventListener('change',()=>{document.querySelectorAll('.choice-card').forEach(card=>card.classList.toggle('selected',card.querySelector('input')?.checked));fileStagedInStorage=false;activeIntent=null;originalFileSha256='';updateSummary();}));
-  document.querySelectorAll('input[name="service"],#vehicle-type,#vehicle-model,#vehicle-year,#ecu-maker,#ecu-model,#reading-tool,#customer-name,#customer-phone,#customer-email,#request-notes,#airbag-module-details').forEach(el=>el.addEventListener('input',updateSummary));
-  document.querySelector('#original-file').addEventListener('change',()=>{fileStagedInStorage=false;activeIntent=null;originalFileSha256=''; const label=document.querySelector('.file-selected'); if(label) label.textContent=fileInput.files[0] ? `${fileInput.files[0].name} · ${formatSize(fileInput.files[0].size)}` : ''; updateSummary();});
-  for (const [input, labelSelector] of [[modulePhotoInput, '.module-photo-selected'], [partNumberPhotoInput, '.part-photo-selected']]) input?.addEventListener('change',()=>{fileStagedInStorage=false;activeIntent=null;const label=document.querySelector(labelSelector);if(label)label.textContent=input.files[0]?`${input.files[0].name} · ${formatSize(input.files[0].size)}`:'';updateSummary();});
+  vehicleTypeSelect?.addEventListener('change',()=>{pendingCheckoutAttemptId=null;const allowed=brandsForCurrentVehicleType();if(brandInput.value && !allowed.includes(brandInput.value)){brandInput.value='';if(vehicleModelInput)vehicleModelInput.value='';}renderBrands(brandInput.value);renderModelSuggestions();updateSummary();});
+  brandInput.addEventListener('change',()=>{pendingCheckoutAttemptId=null;renderModelSuggestions();});
+  document.querySelectorAll('input[name="category"]').forEach(radio=>radio.addEventListener('change',()=>{document.querySelectorAll('.choice-card').forEach(card=>card.classList.toggle('selected',card.querySelector('input')?.checked));fileStagedInStorage=false;activeIntent=null;pendingCheckoutAttemptId=null;originalFileSha256='';updateSummary();}));
+  document.querySelectorAll('input[name="service"],#vehicle-type,#vehicle-model,#vehicle-year,#ecu-maker,#ecu-model,#reading-tool,#customer-name,#customer-phone,#customer-email,#request-notes,#airbag-module-details').forEach(el=>el.addEventListener('input',()=>{pendingCheckoutAttemptId=null;updateSummary();}));
+  document.querySelector('#original-file').addEventListener('change',()=>{fileStagedInStorage=false;activeIntent=null;pendingCheckoutAttemptId=null;originalFileSha256=''; const label=document.querySelector('.file-selected'); if(label) label.textContent=fileInput.files[0] ? `${fileInput.files[0].name} · ${formatSize(fileInput.files[0].size)}` : ''; updateSummary();});
+  for (const [input, labelSelector] of [[modulePhotoInput, '.module-photo-selected'], [partNumberPhotoInput, '.part-photo-selected']]) input?.addEventListener('change',()=>{fileStagedInStorage=false;activeIntent=null;pendingCheckoutAttemptId=null;const label=document.querySelector(labelSelector);if(label)label.textContent=input.files[0]?`${input.files[0].name} · ${formatSize(input.files[0].size)}`:'';updateSummary();});
   function formatSize(bytes){return bytes<1024*1024?`${Math.max(1,Math.round(bytes/1024))} KB`:`${(bytes/(1024*1024)).toFixed(1)} MB`;}
 
   function loadRazorpayCheckout(timeoutMs=12000){
@@ -298,7 +299,10 @@
       const photo = input?.files?.[0];
       if (photo) {
         const sha256 = await hashFile(photo);
-        return { name: photo.name.slice(0,255), mime: photo.type, size: photo.size, sha256, storagePath: `content/${sha256}` };
+        const name = photo.name.slice(0,255);
+        const reusablePath = saved && saved.name === name && saved.mime === photo.type && Number(saved.size) === photo.size && saved.sha256 === sha256 && /^content\/[a-f0-9]{64}$/.test(saved.storagePath || '');
+        const storagePath = reusablePath ? saved.storagePath : `content/${[...crypto.getRandomValues(new Uint8Array(32))].map(v=>v.toString(16).padStart(2,'0')).join('')}`;
+        return { name, mime: photo.type, size: photo.size, sha256, storagePath };
       }
       return saved && typeof saved === 'object' ? saved : null;
     }
@@ -336,11 +340,11 @@
     originalFileSha256=request.originalSha256;
     if (request.category === 'AIRBAG') {
       for (const [meta, label] of [[request.modulePhoto,'module photo'],[request.partNumberPhoto,'part-number photo']]) {
-        if (!meta || !meta.name || !allowedPhotoTypes.has(meta.mime) || !Number.isSafeInteger(meta.size) || meta.size < 1 || meta.size > maxAirbagPhotoBytes || !/^[a-f0-9]{64}$/.test(meta.sha256 || '') || meta.storagePath !== `content/${meta.sha256}`) throw new Error(`Choose a valid airbag ${label} (JPG, PNG or WEBP, maximum 10 MB).`);
+        if (!meta || !meta.name || !allowedPhotoTypes.has(meta.mime) || !Number.isSafeInteger(meta.size) || meta.size < 1 || meta.size > maxAirbagPhotoBytes || !/^[a-f0-9]{64}$/.test(meta.sha256 || '') || !/^content\/[a-f0-9]{64}$/.test(meta.storagePath || '')) throw new Error(`Choose a valid airbag ${label} (JPG, PNG or WEBP, maximum 10 MB).`);
       }
     }
     const token=await backend.getAccessToken(); if(!token) throw new Error('Your customer session expired. Sign in again.');
-    const created=await fetchJson('/api/checkout/intents',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({request})},30000);
+    const created=await fetchJson('/api/checkout/intents',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({request,clientAttemptId:(pendingCheckoutAttemptId ||= crypto.randomUUID())})},30000);
     if(!created.response.ok) throw new Error(created.result?.error||'Secure checkout could not be saved.');
     activeIntent={id:created.result.intentId,status:created.result.status,amount_paise:created.result.amount,currency:created.result.currency,storage_path:created.result.storagePath,expires_at:created.result.expiresAt,request_sha256:created.result.requestSha256,original_sha256:request.originalSha256,original_name:file.name,original_size:file.size,request_json:request};
     const encoded=activeIntent.storage_path.split('/').map(encodeURIComponent).join('/');
@@ -352,7 +356,7 @@
     }
     const staged=await fetchJson(`/api/checkout/intents/${encodeURIComponent(activeIntent.id)}/stage`,{method:'POST',headers:{Authorization:`Bearer ${token}`}},30000);
     if(!staged.response.ok) throw new Error(staged.result?.error||'Private file staging could not be confirmed.');
-    activeIntent={...activeIntent,status:'FILE_STAGED'};fileStagedInStorage=true;updateSummary();return activeIntent;
+    activeIntent={...activeIntent,status:'FILE_STAGED'};pendingCheckoutAttemptId=null;fileStagedInStorage=true;updateSummary();return activeIntent;
   }
 
   async function startRazorpay(intent) {
@@ -411,12 +415,13 @@
   document.querySelectorAll('.button-back').forEach(button=>button.addEventListener('click',()=>setPage(Math.max(0,currentPage-1))));
   document.querySelector('#pay-razorpay')?.addEventListener('click',()=>beginPayment('razorpay'));
   document.querySelector('#pay-paypal')?.addEventListener('click',()=>beginPayment('paypal'));
-  document.querySelector('.start-over')?.addEventListener('click',()=>{form.reset();activeIntent=null;fileStagedInStorage=false;paymentRecoveryRequired=false;originalFileSha256='';document.querySelectorAll('input[name="category"]').forEach(r=>r.checked=r.value==='ECU');document.querySelectorAll('.choice-card').forEach((card,i)=>card.classList.toggle('selected',i===0));const fs=document.querySelector('.file-selected');if(fs)fs.textContent='';document.querySelector('.module-photo-selected').textContent='';document.querySelector('.part-photo-selected').textContent='';setPage(0);updateSummary();});
+  document.querySelector('.start-over')?.addEventListener('click',()=>{form.reset();activeIntent=null;pendingCheckoutAttemptId=null;fileStagedInStorage=false;paymentRecoveryRequired=false;originalFileSha256='';document.querySelectorAll('input[name="category"]').forEach(r=>r.checked=r.value==='ECU');document.querySelectorAll('.choice-card').forEach((card,i)=>card.classList.toggle('selected',i===0));const fs=document.querySelector('.file-selected');if(fs)fs.textContent='';document.querySelector('.module-photo-selected').textContent='';document.querySelector('.part-photo-selected').textContent='';setPage(0);updateSummary();});
   window.addEventListener('efsi:resume-checkout',event=>resumeFromIntent(event.detail));
   fetch('/api/health',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(health=>{providerReadiness={razorpay:Boolean(health?.paymentReadiness?.razorpay),paypal:false};paymentReady=Boolean(health?.paymentConfigured);const status=document.querySelector('.verification-status');const gateways=document.querySelector('.payment-gateway-note');if(gateways)gateways.textContent=health?.paymentReadiness?.razorpay?'Razorpay secure checkout is available.':'Secure payment is not configured yet.';updatePaymentButtons();}).catch(()=>{paymentReady=false;updatePaymentButtons();});
   fetch('/api/pricing',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(pricing=>{if(!pricing)throw new Error('pricing');fileVerificationPricePaise=pricing.fileVerificationPricePaise;const fee=formatINR(fileVerificationPricePaise);verificationPriceLabel.textContent=fee;document.querySelectorAll('[data-fee-inline]').forEach(el=>el.textContent=fee);updateSummary();}).catch(()=>{verificationPriceLabel.textContent='Price unavailable';document.querySelector('.verification-status').dataset.error='true';document.querySelector('.verification-status').textContent='The verification fee could not be loaded. Reload and retry.';});
   document.querySelectorAll('[data-quick-category]').forEach(button => button.addEventListener('click', () => {
     const category = button.dataset.quickCategory;
+    pendingCheckoutAttemptId=null;
     const radio = document.querySelector(`input[name="category"][value="${category}"]`);
     if (radio) {
       radio.checked = true;

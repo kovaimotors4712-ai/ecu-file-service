@@ -322,7 +322,7 @@ function normalizePaymentRequest(value) {
       const size = Number(photo?.size);
       const sha256 = clean(photo?.sha256).toLowerCase();
       const storagePath = clean(photo?.storagePath);
-      if (!name || !allowedAirbagPhotoMimes.has(mime) || !Number.isSafeInteger(size) || size < 1 || size > maxAirbagPhotoBytes || !/^[a-f0-9]{64}$/.test(sha256) || storagePath !== `content/${sha256}`) {
+      if (!name || !allowedAirbagPhotoMimes.has(mime) || !Number.isSafeInteger(size) || size < 1 || size > maxAirbagPhotoBytes || !/^[a-f0-9]{64}$/.test(sha256) || !/^content\/[a-f0-9]{64}$/.test(storagePath)) {
         throw new Error(`Select a valid airbag ${label} (JPG, PNG or WEBP up to 10 MB).`);
       }
       return { name, mime, size, sha256, storagePath };
@@ -333,7 +333,7 @@ function normalizePaymentRequest(value) {
   return result;
 }
 
-function intentStoragePath(customerId, sha256) { void customerId; return `content/${sha256}`; }
+function intentStoragePath() { return `content/${crypto.randomBytes(32).toString('hex')}`; }
 
 async function fetchIntent(customer, intentId) {
   if (!/^[0-9a-f-]{36}$/i.test(String(intentId || ''))) return null;
@@ -344,36 +344,27 @@ async function fetchIntent(customer, intentId) {
   return Array.isArray(rows) ? rows[0] || null : null;
 }
 
-async function createCheckoutIntent(customer, order) {
-  const token = serviceToken();
-  const expectedHash = orderHash(order);
-  const pricing = readPricing();
-  const existingResponse = await supabaseRequest(token, `rest/v1/checkout_intents?select=id,status,amount_paise,currency,request_sha256,original_name,original_size,original_sha256,storage_path,payment_provider,provider_order_id,payment_status,expires_at&customer_id=eq.${encodeURIComponent(customer.id)}&request_sha256=eq.${expectedHash}&status=in.(DRAFT,FILE_STAGED,PAYMENT_PENDING)&order=created_at.desc&limit=1`, { timeoutMs: 15000 });
-  if (existingResponse.ok) {
-    const rows = await existingResponse.json();
-    if (rows?.[0]) return rows[0];
+async function createCheckoutIntent(customer, order, clientAttemptId) {
+  const token = serviceToken(), expectedHash = orderHash(order), pricing = readPricing();
+  if (!/^[0-9a-f-]{36}$/i.test(String(clientAttemptId || ''))) throw new Error('A valid checkout attempt identifier is required.');
+  const attemptFilter = `customer_id=eq.${encodeURIComponent(customer.id)}&client_attempt_id=eq.${encodeURIComponent(clientAttemptId)}`;
+  const existing = await supabaseRequest(token, `rest/v1/checkout_intents?select=id,status,amount_paise,currency,request_sha256,original_name,original_size,original_sha256,storage_path,payment_provider,provider_order_id,payment_status,expires_at&${attemptFilter}&limit=1`, { timeoutMs:15000 });
+  if (existing.ok) {
+    const rows=await existing.json();
+    if(rows?.[0]) {
+      if (rows[0].request_sha256 !== expectedHash) { const conflict = new Error('This checkout attempt was already used for different request details. Start a new checkout.'); conflict.statusCode = 409; throw conflict; }
+      return rows[0];
+    }
   }
-  const id = crypto.randomUUID();
-  const payload = {
-    id, customer_id: customer.id, status: 'DRAFT', request_json: order, request_sha256: expectedHash,
-    original_name: order.originalName, original_mime: order.originalMime, original_size: order.originalSize, original_sha256: order.originalSha256,
-    storage_path: intentStoragePath(customer.id, order.originalSha256), amount_paise: pricing.fileVerificationPricePaise, currency: pricing.currency,
-    payment_status: 'PENDING', expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
-  };
-  const response = await supabaseRequest(token, 'rest/v1/checkout_intents', { method: 'POST', prefer: 'return=representation', body: payload, timeoutMs: 15000 });
-  if (response.status === 409) {
-    const retry = await supabaseRequest(token, `rest/v1/checkout_intents?select=id,status,amount_paise,currency,request_sha256,original_name,original_mime,original_size,original_sha256,storage_path,payment_provider,provider_order_id,provider_payment_id,payment_status,expires_at,order_id,created_at,updated_at&customer_id=eq.${encodeURIComponent(customer.id)}&request_sha256=eq.${expectedHash}&status=in.(DRAFT,FILE_STAGED,PAYMENT_PENDING)&order=created_at.desc&limit=1`, { timeoutMs: 15000 });
-    if (retry.ok) { const rows = await retry.json(); if (rows?.[0]) return rows[0]; }
-  }
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    const errorCode = typeof errorData?.code === 'string' ? errorData.code.slice(0, 32) : 'UNKNOWN';
-    console.error('[checkout] Supabase insert rejected', { status: response.status, code: errorCode });
-    // Never return PostgREST details, schema names, constraint text or other internals to the customer.
-    throw new Error('The secure checkout could not be saved. Please retry.');
-  }
-  const rows = await response.json();
-  return rows?.[0] || payload;
+  const id=crypto.randomUUID();
+  const payload={id,customer_id:customer.id,client_attempt_id:clientAttemptId,status:'DRAFT',request_json:order,request_sha256:expectedHash,
+    original_name:order.originalName,original_mime:order.originalMime,original_size:order.originalSize,original_sha256:order.originalSha256,
+    storage_path:intentStoragePath(),amount_paise:pricing.fileVerificationPricePaise,currency:pricing.currency,payment_status:'PENDING',
+    expires_at:new Date(Date.now()+48*60*60*1000).toISOString()};
+  const response=await supabaseRequest(token,'rest/v1/checkout_intents',{method:'POST',prefer:'return=representation',body:payload,timeoutMs:15000});
+  if(response.status===409){const retry=await supabaseRequest(token,`rest/v1/checkout_intents?select=id,status,amount_paise,currency,request_sha256,original_name,original_mime,original_size,original_sha256,storage_path,payment_provider,provider_order_id,provider_payment_id,payment_status,expires_at,order_id,created_at,updated_at&${attemptFilter}&limit=1`,{timeoutMs:15000});if(retry.ok){const rows=await retry.json();if(rows?.[0])return rows[0];}}
+  if(!response.ok){const errorData=await response.json().catch(()=>null);const errorCode=typeof errorData?.code==='string'?errorData.code.slice(0,32):'UNKNOWN';console.error('[checkout] Supabase insert rejected',{status:response.status,code:errorCode});throw new Error('The secure checkout could not be saved. Please retry.');}
+  const rows=await response.json();return rows?.[0]||payload;
 }
 
 async function handleCreateCheckoutIntent(request, response) {
@@ -385,7 +376,8 @@ async function handleCreateCheckoutIntent(request, response) {
     const body = await readJson(request);
     const order = normalizePaymentRequest(body?.request);
     console.info('[checkout] Request accepted for validation:', JSON.stringify({ category: order.category, originalSize: order.originalSize, serviceCount: order.selectedServices.length, hasEmail: Boolean(order.contactEmail), hasAirbagPhotos: Boolean(order.modulePhoto && order.partNumberPhoto) }));
-    const intent = await createCheckoutIntent(customer, order);
+    const clientAttemptId = String(body?.clientAttemptId || '');
+    const intent = await createCheckoutIntent(customer, order, clientAttemptId);
     console.info('[checkout] Intent saved:', intent.id);
     jsonResponse(response, 200, { intentId: intent.id, status: intent.status, amount: intent.amount_paise, currency: intent.currency, storagePath: intent.storage_path, expiresAt: intent.expires_at, requestSha256: intent.request_sha256 });
   } catch (error) {
@@ -448,7 +440,7 @@ function matchesAirbagPhotoSignature(bytes, mime) {
 async function verifyStagedAirbagPhoto(intent, photo, label) {
   if (!photo || !allowedAirbagPhotoMimes.has(String(photo.mime || '').toLowerCase()) ||
       !Number.isSafeInteger(Number(photo.size)) || Number(photo.size) < 1 || Number(photo.size) > maxAirbagPhotoBytes ||
-      !/^[a-f0-9]{64}$/.test(String(photo.sha256 || '')) || photo.storagePath !== `content/${photo.sha256}`) {
+      !/^[a-f0-9]{64}$/.test(String(photo.sha256 || '')) || !/^content\/[a-f0-9]{64}$/.test(String(photo.storagePath || ''))) {
     return { ok:false, status:400, error:`The ${label} metadata is invalid. Upload the photo again.` };
   }
   const encoded = photo.storagePath.split('/').map(encodeURIComponent).join('/');

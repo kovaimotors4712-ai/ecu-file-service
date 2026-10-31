@@ -136,9 +136,11 @@ function filteredRows(rows, searchParams) {
   const id = eq('id');
   const customer = eq('customer_id');
   const requestSha = eq('request_sha256');
+  const attemptId = eq('client_attempt_id');
   if (id) rows = rows.filter(row => row.id === id);
   if (customer) rows = rows.filter(row => row.customer_id === customer);
   if (requestSha) rows = rows.filter(row => row.request_sha256 === requestSha);
+  if (attemptId) rows = rows.filter(row => row.client_attempt_id === attemptId);
   return rows;
 }
 
@@ -568,10 +570,10 @@ function customerRequest() {
   return { request, fileText };
 }
 
-async function createAndStageIntent(overrides = {}) {
+async function createAndStageIntent(overrides = {}, clientAttemptId = crypto.randomUUID()) {
   const { request, fileText } = customerRequest();
   Object.assign(request, overrides);
-  const create = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request } });
+  const create = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request, clientAttemptId } });
   assert.equal(create.response.status, 200);
   const objectPath = create.payload.storagePath;
   state.objects.set(objectPath, fileText);
@@ -580,6 +582,31 @@ async function createAndStageIntent(overrides = {}) {
   assert.equal(stage.response.status, 200);
   return { intentId:create.payload.intentId, objectPath, request, fileText };
 }
+
+test('identical file and vehicle submissions create independent checkout intents while retries reuse one attempt', async () => {
+  const attemptA = crypto.randomUUID();
+  const first = await createAndStageIntent({}, attemptA);
+  const retry = await createAndStageIntent({}, attemptA);
+  assert.equal(retry.intentId, first.intentId);
+  assert.equal(retry.objectPath, first.objectPath);
+
+  const changedRequest = { ...first.request, selectedServices: [...first.request.selectedServices, 'DPF OFF'] };
+  const reusedAttempt = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request:changedRequest, clientAttemptId:attemptA } });
+  assert.equal(reusedAttempt.response.status, 409);
+  assert.match(reusedAttempt.payload.error, /already used for different request details/i);
+
+  const second = await createAndStageIntent({}, crypto.randomUUID());
+  assert.notEqual(second.intentId, first.intentId);
+  assert.notEqual(second.objectPath, first.objectPath);
+  assert.equal(first.fileText, second.fileText);
+
+  const third = await createAndStageIntent({ selectedServices:[...first.request.selectedServices, 'DPF OFF'] }, crypto.randomUUID());
+  assert.notEqual(third.intentId, first.intentId);
+  assert.notEqual(third.objectPath, first.objectPath);
+  assert.equal(third.fileText, first.fileText);
+  assert.deepEqual(third.request.selectedServices, [...first.request.selectedServices, 'DPF OFF']);
+  assert.equal(state.intents.size, 3);
+});
 
 async function paidRazorpayIntent(overrides = {}) {
   const created = await createAndStageIntent(overrides);
@@ -612,7 +639,7 @@ test('checkout insert failures do not expose raw database errors to customers', 
   });
   try {
     const { request } = customerRequest();
-    const result = await call('/api/checkout/intents', { method: 'POST', token: tokens.customer, body: { request } });
+    const result = await call('/api/checkout/intents', { method: 'POST', token: tokens.customer, body: { request, clientAttemptId: crypto.randomUUID() } });
     const body = JSON.stringify(result.payload);
     assert.equal(result.response.status, 400);
     assert.match(body, /The secure checkout could not be saved\. Please retry\./);
@@ -856,22 +883,23 @@ test('rejects non-premium two-wheelers before creating a checkout', async () => 
   assert.equal(result.response.status,400);
 });
 
-test('creates a durable checkout intent with a content-addressed private storage path', async () => {
+test('creates a durable checkout intent with a unique private storage path', async () => {
   const created = await createAndStageIntent();
   const intent = state.intents.get(created.intentId);
   assert.ok(intent);
-  assert.equal(intent.storage_path, `content/${created.request.originalSha256}`);
+  assert.match(intent.storage_path, /^content\/[a-f0-9]{64}$/);
+  assert.notEqual(intent.storage_path, `content/${created.request.originalSha256}`);
   assert.equal(intent.status, 'FILE_STAGED');
   assert.equal(intent.payment_status, 'PENDING');
   assert.equal(state.objects.has(intent.storage_path), true);
 });
 
-test('deduplicates an active checkout intent for the same customer/request hash', async () => {
+test('a new checkout attempt creates a separate intent for the same customer/request data', async () => {
   const first = await createAndStageIntent();
-  const second = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request:first.request } });
+  const second = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request:first.request, clientAttemptId:crypto.randomUUID() } });
   assert.equal(second.response.status,200);
-  assert.equal(second.payload.intentId, first.intentId);
-  assert.equal(state.intents.size,1);
+  assert.notEqual(second.payload.intentId, first.intentId);
+  assert.equal(state.intents.size,2);
 });
 
 test('rejects an oversized checkout request before payment creation', async () => {
