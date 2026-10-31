@@ -568,10 +568,10 @@ function customerRequest() {
   return { request, fileText };
 }
 
-async function createAndStageIntent(overrides = {}) {
+async function createAndStageIntent(overrides = {}, clientAttemptId = crypto.randomUUID()) {
   const { request, fileText } = customerRequest();
   Object.assign(request, overrides);
-  const create = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request } });
+  const create = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request, clientAttemptId } });
   assert.equal(create.response.status, 200);
   const objectPath = create.payload.storagePath;
   state.objects.set(objectPath, fileText);
@@ -580,6 +580,20 @@ async function createAndStageIntent(overrides = {}) {
   assert.equal(stage.response.status, 200);
   return { intentId:create.payload.intentId, objectPath, request, fileText };
 }
+
+test('identical file and vehicle submissions create independent checkout intents while retries reuse one attempt', async () => {
+  const attemptA = crypto.randomUUID();
+  const first = await createAndStageIntent({}, attemptA);
+  const retry = await createAndStageIntent({}, attemptA);
+  assert.equal(retry.intentId, first.intentId);
+  assert.equal(retry.objectPath, first.objectPath);
+
+  const second = await createAndStageIntent({}, crypto.randomUUID());
+  assert.notEqual(second.intentId, first.intentId);
+  assert.notEqual(second.objectPath, first.objectPath);
+  assert.equal(first.fileText, second.fileText);
+  assert.equal(state.intents.size, 2);
+});
 
 async function paidRazorpayIntent(overrides = {}) {
   const created = await createAndStageIntent(overrides);
