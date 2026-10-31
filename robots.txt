@@ -1,6 +1,7 @@
 # Explicitly allow Google's URL Inspection crawler to access public pages.
 User-agent: Google-InspectionTool
 Allow: /
+Allow: /ecu-file-services.html
 Disallow: /admin
 Disallow: /admin.html
 Disallow: /api/
@@ -8,6 +9,7 @@ Disallow: /api/
 # Allow Googlebot to crawl public website pages.
 User-agent: Googlebot
 Allow: /
+Allow: /ecu-file-services.html
 Disallow: /admin
 Disallow: /admin.html
 Disallow: /api/
@@ -15,6 +17,7 @@ Disallow: /api/
 # Allow other search engines to crawl public website pages.
 User-agent: *
 Allow: /
+Allow: /ecu-file-services.html
 Disallow: /admin
 Disallow: /admin.html
 Disallow: /api/
