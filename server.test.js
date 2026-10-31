@@ -136,9 +136,11 @@ function filteredRows(rows, searchParams) {
   const id = eq('id');
   const customer = eq('customer_id');
   const requestSha = eq('request_sha256');
+  const attemptId = eq('client_attempt_id');
   if (id) rows = rows.filter(row => row.id === id);
   if (customer) rows = rows.filter(row => row.customer_id === customer);
   if (requestSha) rows = rows.filter(row => row.request_sha256 === requestSha);
+  if (attemptId) rows = rows.filter(row => row.client_attempt_id === attemptId);
   return rows;
 }
 
