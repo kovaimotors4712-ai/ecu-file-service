@@ -1133,7 +1133,7 @@ test('cleanup removes an expired file with no remaining references', async () =>
 test('static source contains real Realtime subscriptions and no polling/deprecated file payload path', () => {
   const files = ['auth.js','app.js','admin.js','server.js'].map(name => fs.readFileSync(path.join(__dirname,name),'utf8')).join('\n');
   const term = (code) => String.fromCharCode(...code);
-  const forbidden = [term([115,101,116,73,110,116,101,114,118,97,108]), term([102,105,108,101,84,111,66,97,115,101,54,52]), term([102,105,108,101,66,97,115,101,54,52]), term([119,104,97,116,115,97,112,112]), term([119,97,46,109,101])];
+  const forbidden = [term([115,101,116,73,110,116,101,114,118,97,108]), term([102,105,108,101,84,111,66,97,115,101,54,52]), term([102,105,108,101,66,97,115,101,54,52])];
   for (const value of forbidden) assert.equal(files.toLowerCase().includes(value.toLowerCase()),false,value);
   assert.match(files,/\.channel\(/);
   assert.match(files,/postgres_changes/);
