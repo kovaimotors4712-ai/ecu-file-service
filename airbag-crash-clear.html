@@ -76,9 +76,23 @@
 
     <section class="process-section" id="how-it-works"><div class="process-inner"><div class="eyebrow"><span class="eyebrow-line"></span> HOW IT WORKS</div><h2>Simple steps for<br><span>airbag file reset.</span></h2><a class="button button-ghost" href="index.html#order">Start your order <span>↘</span></a></div><div class="steps"><article><span class="step-index">01</span><div class="step-symbol">⌕</div><h3>Select Airbag System</h3><p>Choose the Airbag category when starting your file request form.</p></article><article><span class="step-index">02</span><div class="step-symbol">⇧</div><h3>Upload Dump File</h3><p>Attach the original EEPROM, flash, or module readout file.</p></article><article><span class="step-index">03</span><div class="step-symbol">↗</div><h3>Get Cleared File</h3><p>Receive your tested crash-cleared file ready to write back to the module.</p></article></div></div></section>
 
-    <section class="contact-banner"><div><span class="eyebrow"><span class="eyebrow-line"></span> TECHNICAL SUPPORT</span><h2>Questions about an<br><span>airbag module?</span></h2></div><div class="contact-buttons"><a href="https://t.me/ECUFileServiceIndia" class="contact-button" target="_blank" rel="noreferrer"><span class="contact-button-icon">➤</span><span><small>TELEGRAM</small><b>Message our channel</b></span><span class="contact-arrow">↗</span></a></div></section>
+    <section class="contact-banner"><div><span class="eyebrow"><span class="eyebrow-line"></span> TECHNICAL SUPPORT</span><h2>Questions about an<br><span>airbag module?</span></h2></div><div class="contact-buttons" id="public-contact-links"><a href="/contact.html" class="contact-button"><span class="contact-button-icon">↗</span><span><small>PRIVATE SUPPORT</small><b>Send a private support request</b></span><span class="contact-arrow">↗</span></a></div></section>
   </main>
   <footer class="site-footer"><a class="brand footer-brand" href="index.html"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 10h26v20H7z"/><path d="M12 15h5v10h-5zm11 0h5m-5 5h5m-5 5h5M3 15h4m-4 5h4m-4 5h4m26-10h4m-4 5h4m-4 5h4"/></svg></span><span class="brand-name">ECU FILE SERVICE INDIA</span></a><span class="footer-copy">Professional file support for automotive specialists.</span><span class="footer-right">© <span id="year"></span> ECU FILE SERVICE INDIA <span class="footer-dot">·</span> BUILT FOR THE WORKSHOP</span></footer>
+  <script>
+  (function(){
+    const target=document.getElementById('public-contact-links');
+    if(!target)return;
+    fetch('/api/site-settings',{headers:{Accept:'application/json'},cache:'no-store'}).then(async response=>{
+      if(!response.ok)throw new Error('settings unavailable');
+      const data=await response.json();
+      const raw=String(data.settings?.whatsapp_url||'').trim();
+      let url='';
+      try{const parsed=new URL(raw);if(parsed.protocol==='https:'&&parsed.hostname==='wa.me'&&/^[0-9]{7,15}$/.test(parsed.pathname.slice(1))&&!parsed.search&&!parsed.hash)url=parsed.href;}catch(_){}
+      if(url){const link=document.createElement('a');link.className='contact-button';link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.innerHTML='<span class="contact-button-icon">➤</span><span><small>WHATSAPP</small><b>Message us on WhatsApp</b></span><span class="contact-arrow">↗</span>';target.replaceChildren(link);}
+    }).catch(()=>{});
+  })();
+</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase.js"></script><script src="auth.js"></script><script src="app.js"></script>
 </body>
 </html>

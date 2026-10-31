@@ -1175,6 +1175,13 @@ test('public homepage contact is WhatsApp-only and retains a private support fal
   assert.match(publicSettings,/select=whatsapp_url/);
   assert.match(publicSettings,/whatsapp_url:whatsapp/);
   assert.doesNotMatch(publicSettings,/contact_phone|telegram_url|contact_email/);
+  for (const page of ['airbag-crash-clear.html','ecu-file-services.html']) {
+    const html=fs.readFileSync(path.join(__dirname,page),'utf8');
+    assert.ok(html.includes('public-contact-links'),page+' contact slot');
+    assert.ok(html.includes('whatsapp_url'),page+' WhatsApp settings');
+    assert.ok(html.includes('WHATSAPP'),page+' WhatsApp label');
+    assert.ok(!html.includes('t.me/ECUFileServiceIndia'),page+' legacy Telegram removed');
+  }
 });
 test('repository contains no stale local payment-state instructions', () => {
   const files = [];
