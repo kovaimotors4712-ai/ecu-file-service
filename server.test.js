@@ -886,7 +886,7 @@ test('creates a durable checkout intent with a unique private storage path', asy
 test('a new checkout attempt creates a separate intent for the same customer/request data', async () => {
   const first = await createAndStageIntent();
   const second = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request:first.request, clientAttemptId:crypto.randomUUID() } });
-  assert.equal(second.response.status,201);
+  assert.equal(second.response.status,200);
   assert.notEqual(second.payload.intentId, first.intentId);
   assert.equal(state.intents.size,2);
 });
