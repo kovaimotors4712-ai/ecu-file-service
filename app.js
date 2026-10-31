@@ -299,7 +299,10 @@
       const photo = input?.files?.[0];
       if (photo) {
         const sha256 = await hashFile(photo);
-        return { name: photo.name.slice(0,255), mime: photo.type, size: photo.size, sha256, storagePath: `content/${[...crypto.getRandomValues(new Uint8Array(32))].map(v=>v.toString(16).padStart(2,'0')).join('')}` };
+        const name = photo.name.slice(0,255);
+        const reusablePath = saved && saved.name === name && saved.mime === photo.type && Number(saved.size) === photo.size && saved.sha256 === sha256 && /^content\/[a-f0-9]{64}$/.test(saved.storagePath || '');
+        const storagePath = reusablePath ? saved.storagePath : `content/${[...crypto.getRandomValues(new Uint8Array(32))].map(v=>v.toString(16).padStart(2,'0')).join('')}`;
+        return { name, mime: photo.type, size: photo.size, sha256, storagePath };
       }
       return saved && typeof saved === 'object' ? saved : null;
     }
