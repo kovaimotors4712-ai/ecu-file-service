@@ -1161,15 +1161,27 @@ test('static source contains category field isolation, provider routes, Resend, 
 
 test('repository contains no removed contact widget references or stale local payment-state instructions', () => {
   const files = [];
+  const contactWidgetFiles = [];
   for (const name of fs.readdirSync(__dirname)) {
     const full = path.join(__dirname,name);
-    if (fs.statSync(full).isFile() && !['package-lock.json','TEST_ECU_FILE.bin','server.test.js'].includes(name)) files.push(fs.readFileSync(full,'utf8'));
+    if (fs.statSync(full).isFile() && !['package-lock.json','TEST_ECU_FILE.bin','server.test.js'].includes(name)) {
+      const content = fs.readFileSync(full,'utf8');
+      files.push(content);
+      // Workshop listings may publish each workshop's own contact methods; this is not the removed site contact widget.
+      if (name !== 'workshops.html') contactWidgetFiles.push(content);
+    }
   }
   const migrations = path.join(__dirname,'supabase','migrations');
-  for (const name of fs.readdirSync(migrations)) if (name.endsWith('.sql')) files.push(fs.readFileSync(path.join(migrations,name),'utf8'));
+  for (const name of fs.readdirSync(migrations)) if (name.endsWith('.sql')) {
+    const content = fs.readFileSync(path.join(migrations,name),'utf8');
+    files.push(content);
+    // Workshop directory schema stores contact methods for the listed workshops, not the site's removed contact widget.
+    if (name !== '20261028_workshop_directory_reviews_reports.sql') contactWidgetFiles.push(content);
+  }
   const source = files.join('\n');
+  const contactWidgetSource = contactWidgetFiles.join('\n');
   const removedContactWidgetTerms = [String.fromCharCode(119,104,97,116,115,97,112,112),String.fromCharCode(119,97,46,109,101)];
-  removedContactWidgetTerms.forEach(value => assert.equal(source.toLowerCase().includes(value),false,value));
+  removedContactWidgetTerms.forEach(value => assert.equal(contactWidgetSource.toLowerCase().includes(value),false,value));
   const removedStateTerms = [String.fromCharCode(80,65,89,77,69,78,84,95,83,84,65,84,69,95,68,73,82),String.fromCharCode(112,97,121,109,101,110,116,45,115,116,97,116,101,32,100,105,114,101,99,116,111,114,121),String.fromCharCode(111,115,46,116,109,112,100,105,114)];
   removedStateTerms.forEach(value => assert.equal(source.toLowerCase().includes(value.toLowerCase()),false,value));
 });
