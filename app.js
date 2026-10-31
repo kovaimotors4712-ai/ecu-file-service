@@ -270,7 +270,7 @@
   brandInput.addEventListener('input',()=>{renderBrands(brandInput.value);brandInput.setAttribute('aria-expanded','true');});
   brandInput.addEventListener('focus',()=>{renderBrands(brandInput.value);brandInput.setAttribute('aria-expanded','true');});
   brandInput.addEventListener('keydown',event=>{const options=[...brandResults.querySelectorAll('.brand-option')]; if (!options.length) return; if (event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();activeBrandOption=(activeBrandOption+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;options.forEach((o,i)=>o.classList.toggle('keyboard-active',i===activeBrandOption));options[activeBrandOption]?.scrollIntoView({block:'nearest'});} else if(event.key==='Enter'&&activeBrandOption>=0){event.preventDefault();options[activeBrandOption].click();} else if(event.key==='Escape') closeBrandResults();});
-  brandResults.addEventListener('click',event=>{const button=event.target.closest('.brand-option');if(!button)return;brandInput.value=button.dataset.brand;closeBrandResults();renderModelSuggestions();updateSummary();});
+  brandResults.addEventListener('click',event=>{const button=event.target.closest('.brand-option');if(!button)return;pendingCheckoutAttemptId=null;brandInput.value=button.dataset.brand;closeBrandResults();renderModelSuggestions();updateSummary();});
   document.addEventListener('click',event=>{if(!event.target.closest('.brand-search-wrap'))closeBrandResults();});
   vehicleTypeSelect?.addEventListener('change',()=>{pendingCheckoutAttemptId=null;const allowed=brandsForCurrentVehicleType();if(brandInput.value && !allowed.includes(brandInput.value)){brandInput.value='';if(vehicleModelInput)vehicleModelInput.value='';}renderBrands(brandInput.value);renderModelSuggestions();updateSummary();});
   brandInput.addEventListener('change',()=>{pendingCheckoutAttemptId=null;renderModelSuggestions();});
@@ -421,6 +421,7 @@
   fetch('/api/pricing',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(pricing=>{if(!pricing)throw new Error('pricing');fileVerificationPricePaise=pricing.fileVerificationPricePaise;const fee=formatINR(fileVerificationPricePaise);verificationPriceLabel.textContent=fee;document.querySelectorAll('[data-fee-inline]').forEach(el=>el.textContent=fee);updateSummary();}).catch(()=>{verificationPriceLabel.textContent='Price unavailable';document.querySelector('.verification-status').dataset.error='true';document.querySelector('.verification-status').textContent='The verification fee could not be loaded. Reload and retry.';});
   document.querySelectorAll('[data-quick-category]').forEach(button => button.addEventListener('click', () => {
     const category = button.dataset.quickCategory;
+    pendingCheckoutAttemptId=null;
     const radio = document.querySelector(`input[name="category"][value="${category}"]`);
     if (radio) {
       radio.checked = true;
