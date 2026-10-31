@@ -138,6 +138,7 @@
   let checkoutStarting = false;
   let paymentRecoveryRequired = false;
   let activeIntent = null;
+  let pendingCheckoutAttemptId = null;
   let activeProvider = null;
   let razorpayScriptPromise = null;
   let fileStagedInStorage = false;
@@ -298,7 +299,7 @@
       const photo = input?.files?.[0];
       if (photo) {
         const sha256 = await hashFile(photo);
-        return { name: photo.name.slice(0,255), mime: photo.type, size: photo.size, sha256, storagePath: `content/${sha256}` };
+        return { name: photo.name.slice(0,255), mime: photo.type, size: photo.size, sha256, storagePath: `content/${[...crypto.getRandomValues(new Uint8Array(32))].map(v=>v.toString(16).padStart(2,'0')).join('')}` };
       }
       return saved && typeof saved === 'object' ? saved : null;
     }
@@ -336,11 +337,11 @@
     originalFileSha256=request.originalSha256;
     if (request.category === 'AIRBAG') {
       for (const [meta, label] of [[request.modulePhoto,'module photo'],[request.partNumberPhoto,'part-number photo']]) {
-        if (!meta || !meta.name || !allowedPhotoTypes.has(meta.mime) || !Number.isSafeInteger(meta.size) || meta.size < 1 || meta.size > maxAirbagPhotoBytes || !/^[a-f0-9]{64}$/.test(meta.sha256 || '') || meta.storagePath !== `content/${meta.sha256}`) throw new Error(`Choose a valid airbag ${label} (JPG, PNG or WEBP, maximum 10 MB).`);
+        if (!meta || !meta.name || !allowedPhotoTypes.has(meta.mime) || !Number.isSafeInteger(meta.size) || meta.size < 1 || meta.size > maxAirbagPhotoBytes || !/^[a-f0-9]{64}$/.test(meta.sha256 || '') || !/^content\/[a-f0-9]{64}$/.test(meta.storagePath || '')) throw new Error(`Choose a valid airbag ${label} (JPG, PNG or WEBP, maximum 10 MB).`);
       }
     }
     const token=await backend.getAccessToken(); if(!token) throw new Error('Your customer session expired. Sign in again.');
-    const created=await fetchJson('/api/checkout/intents',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({request})},30000);
+    const created=await fetchJson('/api/checkout/intents',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({request,clientAttemptId:(pendingCheckoutAttemptId ||= crypto.randomUUID())})},30000);
     if(!created.response.ok) throw new Error(created.result?.error||'Secure checkout could not be saved.');
     activeIntent={id:created.result.intentId,status:created.result.status,amount_paise:created.result.amount,currency:created.result.currency,storage_path:created.result.storagePath,expires_at:created.result.expiresAt,request_sha256:created.result.requestSha256,original_sha256:request.originalSha256,original_name:file.name,original_size:file.size,request_json:request};
     const encoded=activeIntent.storage_path.split('/').map(encodeURIComponent).join('/');
@@ -352,7 +353,7 @@
     }
     const staged=await fetchJson(`/api/checkout/intents/${encodeURIComponent(activeIntent.id)}/stage`,{method:'POST',headers:{Authorization:`Bearer ${token}`}},30000);
     if(!staged.response.ok) throw new Error(staged.result?.error||'Private file staging could not be confirmed.');
-    activeIntent={...activeIntent,status:'FILE_STAGED'};fileStagedInStorage=true;updateSummary();return activeIntent;
+    activeIntent={...activeIntent,status:'FILE_STAGED'};pendingCheckoutAttemptId=null;fileStagedInStorage=true;updateSummary();return activeIntent;
   }
 
   async function startRazorpay(intent) {
