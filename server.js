@@ -349,7 +349,13 @@ async function createCheckoutIntent(customer, order, clientAttemptId) {
   if (!/^[0-9a-f-]{36}$/i.test(String(clientAttemptId || ''))) throw new Error('A valid checkout attempt identifier is required.');
   const attemptFilter = `customer_id=eq.${encodeURIComponent(customer.id)}&client_attempt_id=eq.${encodeURIComponent(clientAttemptId)}`;
   const existing = await supabaseRequest(token, `rest/v1/checkout_intents?select=id,status,amount_paise,currency,request_sha256,original_name,original_size,original_sha256,storage_path,payment_provider,provider_order_id,payment_status,expires_at&${attemptFilter}&limit=1`, { timeoutMs:15000 });
-  if (existing.ok) { const rows=await existing.json(); if(rows?.[0]) return rows[0]; }
+  if (existing.ok) {
+    const rows=await existing.json();
+    if(rows?.[0]) {
+      if (rows[0].request_sha256 !== expectedHash) { const conflict = new Error('This checkout attempt was already used for different request details. Start a new checkout.'); conflict.statusCode = 409; throw conflict; }
+      return rows[0];
+    }
+  }
   const id=crypto.randomUUID();
   const payload={id,customer_id:customer.id,client_attempt_id:clientAttemptId,status:'DRAFT',request_json:order,request_sha256:expectedHash,
     original_name:order.originalName,original_mime:order.originalMime,original_size:order.originalSize,original_sha256:order.originalSha256,
