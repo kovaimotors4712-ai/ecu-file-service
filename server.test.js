@@ -599,7 +599,13 @@ test('identical file and vehicle submissions create independent checkout intents
   assert.notEqual(second.intentId, first.intentId);
   assert.notEqual(second.objectPath, first.objectPath);
   assert.equal(first.fileText, second.fileText);
-  assert.equal(state.intents.size, 2);
+
+  const third = await createAndStageIntent({ selectedServices:[...first.request.selectedServices, 'DPF OFF'] }, crypto.randomUUID());
+  assert.notEqual(third.intentId, first.intentId);
+  assert.notEqual(third.objectPath, first.objectPath);
+  assert.equal(third.fileText, first.fileText);
+  assert.deepEqual(third.request.selectedServices, [...first.request.selectedServices, 'DPF OFF']);
+  assert.equal(state.intents.size, 3);
 });
 
 async function paidRazorpayIntent(overrides = {}) {
