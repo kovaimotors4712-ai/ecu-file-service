@@ -2034,11 +2034,15 @@ test('software payment verification is confirmed directly with Razorpay before m
 test('admin controls enforce readable contrast and cache-busted current assets', () => {
   const adminCss = fs.readFileSync(path.join(__dirname, 'admin.css'), 'utf8');
   const adminHtml = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
+  const adminJs = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
   assert.match(adminCss, /\.admin-page select option[\s\S]*?color:#111a19 !important/);
   assert.match(adminCss, /#site-content-list \.button-ghost[\s\S]*?opacity:1 !important/);
   assert.match(adminCss, /button:disabled[\s\S]*?opacity:1 !important/);
   assert.match(adminHtml, /admin\.css\?v=20261101-compact-order-folders/);
   assert.match(adminHtml, /admin\.js\?v=20261101-compact-order-folders/);
+  assert.match(adminJs, /<details class=\"admin-order-detail\">/);
+  assert.match(adminJs, /admin-order-summary-meta/);
+  assert.match(adminCss, /\.admin-order-detail>summary/);
 });
 
 
