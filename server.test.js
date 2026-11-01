@@ -2069,7 +2069,7 @@ test('customer private requests have hide-from-history controls and readable acc
   assert.match(customer, /Hide from history/);
   assert.match(css, /#customer-private-request-list \.customer-request-delete[\s\S]*?background:#8b1e1e !important/);
   assert.match(css, /#customer-private-request-history-toggle[\s\S]*?color:#17201e !important/);
-  assert.match(html, /styles\.css\?v=20261025-forum-dark-neon/);
+  assert.match(html, /styles\.css\?v=20261101-message-notifications/);
   assert.match(html, /auth\.js\?v=20261101-message-notifications/);
   assert.match(migration, /user_id = auth\.uid\(\)/);
   assert.match(migration, /software_payment_link_id is not null/);
@@ -2135,7 +2135,7 @@ test('message notifications and actionable admin summary are wired without chang
   assert.ok(customer.includes("ordersSubscriptionPending"));
   assert.ok(customer.includes("account-notification-badge"));
   assert.ok(!customer.includes("dialog.addEventListener('close', () => unsubscribeRealtime());"));
-  assert.ok(html.includes('id="account-notification-badge"'));
+  assert.ok(fs.readFileSync(path.join(__dirname,'index.html'),'utf8').includes('id="account-notification-badge"'));
   assert.match(page,/data-status-filter="Payment Pending"/);
   assert.match(admin,/card\.addEventListener\('click'/);
   assert.doesNotMatch(page,/DATE SUMMARY|RESULT SUMMARY/);
