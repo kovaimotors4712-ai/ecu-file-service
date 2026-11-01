@@ -107,6 +107,7 @@
     unsubscribeRealtime();
     ordersChannel = realtimeClient.channel(`customer-orders-${customerId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `customer_id=eq.${customerId}` }, () => loadCustomerOrders())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_messages', filter: `customer_id=eq.${customerId}` }, () => loadCustomerNotifications())
       .subscribe((status, error) => { if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.warn('Order realtime unavailable', error); });
     filesChannel = realtimeClient.channel(`customer-order-files-${customerId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_files', filter: `owner_id=eq.${customerId}` }, () => loadCustomerOrders())
@@ -237,14 +238,26 @@
     list.textContent = 'Loading notifications…';
     try {
       const rows = await rest(`notifications?select=id,order_id,message,is_read,created_at&customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.desc&limit=20`);
-      const unreadCount = rows.filter(n => !n.is_read).length;
+      const unreadMessages = await rest(`order_messages?select=id,order_id,message,created_at&customer_id=eq.${encodeURIComponent(customerId)}&sender_type=eq.admin&is_read=eq.false&order=created_at.desc&limit=20`);
+      const unreadCount = rows.filter(n => !n.is_read).length + unreadMessages.length;
       const countEl = document.querySelector('.notification-count');
       if (countEl) countEl.textContent = unreadCount > 0 ? unreadCount : '';
-      if (!Array.isArray(rows) || !rows.length) { list.innerHTML = '<small>No notifications yet.</small>'; return; }
-      list.innerHTML = rows.map(item => `<article class="notification-item ${item.is_read ? '' : 'unread'}" data-notification-id="${escapeHtml(item.id)}" data-order-id="${escapeHtml(item.order_id)}"><div><p>${escapeHtml(item.message)}</p><small>${new Date(item.created_at).toLocaleString()}</small></div>${item.is_read ? '' : '<span class="unread-dot"></span>'}</article>`).join('');
+      const statusItems = rows.map(item => ({...item, kind:'status'}));
+      const messageItems = unreadMessages.map(item => ({...item, kind:'message', message:'New reply from our team: '+item.message, is_read:false}));
+      const combined = [...statusItems,...messageItems].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,30);
+      if (!combined.length) { list.innerHTML = '<small>No notifications yet.</small>'; return; }
+      list.innerHTML = combined.map(item => item.kind==='message'
+        ? `<button type="button" class="notification-item unread" data-message-order-id="${escapeHtml(item.order_id)}"><div><p>${escapeHtml(item.message)}</p><small>${new Date(item.created_at).toLocaleString()} · Open conversation</small></div><span class="unread-dot"></span></button>`
+        : `<article class="notification-item ${item.is_read ? '' : 'unread'}" data-notification-id="${escapeHtml(item.id)}" data-order-id="${escapeHtml(item.order_id)}"><div><p>${escapeHtml(item.message)}</p><small>${new Date(item.created_at).toLocaleString()}</small></div>${item.is_read ? '' : '<span class="unread-dot"></span>'}</article>`).join('');
     } catch (error) { list.innerHTML = `<small>Notifications could not be loaded: ${escapeHtml(error.message || 'Please retry.')}</small>`; }
   }
 
+  document.querySelector('#customer-notification-list')?.addEventListener('click',function(event){
+    const button=event.target.closest('[data-message-order-id]');if(!button)return;
+    const orderId=button.dataset.messageOrderId;
+    const opener=document.querySelector('.customer-messages-open[data-order-id="'+CSS.escape(orderId)+'"]');
+    if(opener)opener.click();
+  });
   async function markNotificationRead(notificationId) {
     try {
       await rest(`notifications?id=eq.${encodeURIComponent(notificationId)}`, { method: 'PATCH', body: { is_read: true } });

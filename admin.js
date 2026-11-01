@@ -45,6 +45,7 @@
       .on('postgres_changes',{event:'*',schema:'public',table:'orders'},function(){loadOrders();})
       .on('postgres_changes',{event:'*',schema:'public',table:'order_files'},function(){loadOrders();})
       .on('postgres_changes',{event:'*',schema:'public',table:'order_attachments'},function(){loadOrders();})
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'order_messages'},function(){refreshAdminMessageNotifications();})
       .subscribe();
   }
   function unsubscribeRealtime(){try{ordersChannel&&realtimeClient?.removeChannel(ordersChannel);}catch{}ordersChannel=null;}
@@ -98,17 +99,8 @@
       if(!Array.isArray(orders))throw new Error('The orders response was not a list.');
       document.querySelector('#stat-total').textContent = orders.length;
       document.querySelector('#stat-payment-pending').textContent = orders.filter(function(o){return o.status==='Payment Pending'||o.payment_status==='PENDING';}).length;
-      document.querySelector('#stat-paid-new').textContent = orders.filter(function(o){return o.status==='New';}).length;
       document.querySelector('#stat-processing').textContent = orders.filter(function(o){return ['File Review','Processing'].includes(o.status);}).length;
       document.querySelector('#stat-completed').textContent = orders.filter(function(o){return o.status==='Completed';}).length;
-      document.querySelector('#stat-cancelled').textContent = orders.filter(function(o){return o.status==='Cancelled';}).length;
-
-      document.querySelector('#stat-date-today').textContent = orders.filter(function(o){return new Date(o.created_at).toDateString()===new Date().toDateString();}).length;
-      document.querySelector('#stat-date-7days').textContent = orders.filter(function(o){return (Date.now()-new Date(o.created_at).getTime())<=7*24*60*60*1000;}).length;
-      document.querySelector('#stat-date-30days').textContent = orders.filter(function(o){return (Date.now()-new Date(o.created_at).getTime())<=30*24*60*60*1000;}).length;
-
-      document.querySelector('#stat-result-ready').textContent = orders.filter(function(o){return (o.order_files||[]).some(function(f){return f.kind==='processed';});}).length;
-      document.querySelector('#stat-result-pending').textContent = orders.filter(function(o){return !(o.order_files||[]).some(function(f){return f.kind==='processed';});}).length;
 
       const statAll = document.querySelector('#stat-all');
       if (statAll) statAll.textContent = orders.length;
@@ -125,6 +117,16 @@
       updateAdminFolderBadges();
     }
   }
+
+  document.querySelectorAll('.admin-stat-card[data-status-filter]').forEach(function(card){
+    card.addEventListener('click',function(){
+      statusFilter.value=card.dataset.statusFilter||'all';
+      if(searchInput)searchInput.value='';
+      if(resultFilter)resultFilter.value='all';
+      renderOrders();
+      document.querySelector('#order-list')?.scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  });
 
   function renderOrders(){
     const list=document.querySelector('#order-list');
@@ -155,6 +157,10 @@
       if(statusVal!=='all'){
         if(statusVal==='New'){
           if(order.status!=='New')return false;
+        }else if(statusVal==='Payment Pending'){
+          if(order.status!=='Payment Pending'&&order.payment_status!=='PENDING')return false;
+        }else if(statusVal==='Processing'){
+          if(!['File Review','Processing'].includes(order.status))return false;
         }else if(order.status!==statusVal){
           return false;
         }
@@ -677,6 +683,30 @@
     });
     if(!pendingOrders&&!adItems&&!openRequests){const empty=document.createElement('p');empty.className='muted';empty.textContent='No pending items are currently counted. Refresh each folder to check again.';list.append(empty);}
   }
+  async function refreshAdminMessageNotifications(){
+    const list=document.querySelector('#admin-notifications-list');
+    if(!list)return;
+    try{
+      const result=await adminApi('/api/admin/orders/messages/unread');
+      const messages=Array.isArray(result.messages)?result.messages:[];
+      const count=Number(result.unreadCount)||messages.length;
+      setFolderBadge('messages',count);
+      const existing=list.querySelector('[data-admin-message-alerts]');
+      if(existing)existing.remove();
+      if(messages.length){
+        const group=document.createElement('div');group.dataset.adminMessageAlerts='true';
+        const heading=document.createElement('p');heading.className='admin-message';heading.textContent=count+' unread customer message'+(count===1?'':'s');group.append(heading);
+        messages.forEach(function(item){
+          const row=document.createElement('button');row.type='button';row.className='admin-notification-row';
+          const label=document.createElement('span');label.textContent='Order '+String(item.order_id||'').slice(0,8).toUpperCase()+': '+String(item.message||'').slice(0,90);
+          const time=document.createElement('small');time.textContent=item.created_at?new Date(item.created_at).toLocaleString():'';
+          row.append(label,time);row.addEventListener('click',function(){window.openAdminMessages(item.order_id);});group.append(row);
+        });
+        list.prepend(group);
+      }
+      if(!messages.length&&!list.querySelector('.admin-notification-row')){const empty=document.createElement('p');empty.className='muted';empty.textContent='No unread customer messages.';list.append(empty);}
+    }catch(error){console.warn('Admin message notifications unavailable:',error.message);}
+  }
   function setupAdminFolders() {
     const dashboard=document.querySelector('#admin-dashboard');if(!dashboard||dashboard.dataset.folderized==='true')return;
     const title=dashboard.querySelector('.admin-title');if(!title)return;dashboard.dataset.folderized='true';
@@ -858,6 +888,7 @@
     await loadAdminCustomerRequests();
     await loadPublicContactSettings();
     subscribeRealtime();
+    await refreshAdminMessageNotifications();
   }
 
   document.querySelector('#admin-auth').addEventListener('submit', async function(event) {

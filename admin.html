@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="admin.css?v=20261101-compact-order-folders">
+  <link rel="stylesheet" href="admin.css?v=20261101-message-summary">
 </head>
 <body class="admin-body">
   <header class="site-header admin-header">
@@ -136,29 +136,12 @@
         </select>
       </div>
       <div class="admin-analytics-section">
-        <span class="form-kicker">SUMMARY CARDS</span>
+        <span class="form-kicker">ORDER SUMMARY · SELECT A CARD TO FILTER</span>
         <div class="admin-stats">
-          <div><small>TOTAL ORDERS</small><b id="stat-total">0</b></div>
-          <div><small>PAYMENT PENDING</small><b id="stat-payment-pending">0</b></div>
-          <div><small>PAID / NEW</small><b id="stat-paid-new">0</b></div>
-          <div><small>PROCESSING</small><b id="stat-processing">0</b></div>
-          <div><small>COMPLETED</small><b id="stat-completed">0</b></div>
-          <div><small>CANCELLED</small><b id="stat-cancelled">0</b></div>
-        </div>
-      </div>
-      <div class="admin-analytics-section">
-        <span class="form-kicker">DATE SUMMARY</span>
-        <div class="admin-stats admin-stats-3">
-          <div><small>TODAY</small><b id="stat-date-today">0</b></div>
-          <div><small>LAST 7 DAYS</small><b id="stat-date-7days">0</b></div>
-          <div><small>LAST 30 DAYS</small><b id="stat-date-30days">0</b></div>
-        </div>
-      </div>
-      <div class="admin-analytics-section">
-        <span class="form-kicker">RESULT SUMMARY</span>
-        <div class="admin-stats admin-stats-2">
-          <div><small>RESULTS READY</small><b id="stat-result-ready">0</b></div>
-          <div><small>RESULTS PENDING</small><b id="stat-result-pending">0</b></div>
+          <button class="admin-stat-card" type="button" data-status-filter="all"><small>TOTAL ORDERS</small><b id="stat-total">0</b></button>
+          <button class="admin-stat-card" type="button" data-status-filter="Payment Pending"><small>PAYMENT PENDING</small><b id="stat-payment-pending">0</b></button>
+          <button class="admin-stat-card" type="button" data-status-filter="Processing"><small>PROCESSING</small><b id="stat-processing">0</b></button>
+          <button class="admin-stat-card" type="button" data-status-filter="Completed"><small>COMPLETED</small><b id="stat-completed">0</b></button>
         </div>
       </div>
       <p id="orders-message" class="admin-message" role="status"></p>
@@ -168,6 +151,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js"></script>
   <script src="auth.js?v=20261025-admin-actions"></script>
-  <script src="admin.js?v=20261101-compact-order-folders"></script>
+  <script src="admin.js?v=20261101-message-summary"></script>
 </body>
 </html>

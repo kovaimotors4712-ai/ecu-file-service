@@ -1159,6 +1159,18 @@ async function handleAdminReply(request, response) {
   return true;
 }
 
+async function handleAdminUnreadMessageNotifications(request, response) {
+  try {
+    const admin = await requireAdmin(request);
+    if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
+    const result = await supabaseRequest(admin.token, 'rest/v1/order_messages?select=id,order_id,customer_id,message,created_at&sender_type=eq.customer&is_read=eq.false&order=created_at.desc&limit=50', { timeoutMs: 15000 });
+    if (!result.ok) { jsonResponse(response, 502, { error: 'Unread customer messages could not be loaded.' }); return true; }
+    const messages = await result.json().catch(() => []);
+    jsonResponse(response, 200, { messages: Array.isArray(messages) ? messages : [], unreadCount: Array.isArray(messages) ? messages.length : 0 });
+  } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Unread messages could not be loaded.' }); }
+  return true;
+}
+
 async function handlePricing(request, response) {
   if (request.method === 'GET') {
     try { jsonResponse(response, 200, readPricing()); } catch { jsonResponse(response, 500, { error: 'Pricing configuration could not be loaded.' }); }
@@ -2036,6 +2048,7 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/orders/messages' && request.method === 'POST') return handleSendMessage(request, response);
   if (url.pathname === '/api/admin/orders/messages' && request.method === 'GET') return handleAdminGetMessages(request, response, url);
   if (url.pathname === '/api/admin/orders/messages/reply' && request.method === 'POST') return handleAdminReply(request, response);
+  if (url.pathname === '/api/admin/orders/messages/unread' && request.method === 'GET') return handleAdminUnreadMessageNotifications(request, response);
 
   const proxyRoute = url.pathname.match(/^\/api\/supabase\/(auth\/v1|rest\/v1|storage\/v1)(\/.*)?$/);
   if (!proxyRoute) return false;
