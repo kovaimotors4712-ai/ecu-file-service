@@ -1484,6 +1484,14 @@ test('regression test: role="admin" is preserved when getUser() returns a user w
   assert.equal(capturedSession.user.app_metadata.role, 'admin');
 });
 
+test('SEO: duplicate /index.html homepage permanently redirects to the canonical root URL', async () => {
+  const result = await call('/index.html?utm_source=test');
+  assert.equal(result.response.status, 301);
+  assert.equal(result.response.headers.get('location'), '/?utm_source=test');
+  const head = await fetch(`${baseUrl}/index.html`, { method: 'HEAD', redirect: 'manual' });
+  assert.equal(head.status, 301);
+});
+
 test('regression test: index.html references auth.js with version parameter and server serves static assets correctly', async () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   assert.ok(indexHtml.includes('auth.js?v=20261101-message-notifications'));
