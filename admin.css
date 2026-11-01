@@ -281,3 +281,11 @@
  .admin-upload-wrap{display:grid;grid-template-columns:1fr}
  .admin-upload-wrap .button{width:100%}
 }
+
+/* Actionable compact summary cards */
+.admin-stats .admin-stat-card{appearance:none;width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;background:#fff;border:1px solid #d7e0d1;border-radius:8px;padding:13px 16px;color:var(--ink);cursor:pointer;min-height:76px}
+.admin-stats .admin-stat-card:hover{background:#f0f5e6;border-color:#8ba34b;transform:translateY(-1px)}
+.admin-stats .admin-stat-card:focus-visible{outline:3px solid #829a32;outline-offset:2px}
+.admin-stats .admin-stat-card small{margin:0}
+.admin-stats .admin-stat-card b{font-size:23px}
+@media(max-width:640px){.admin-stats .admin-stat-card{min-height:62px}}
