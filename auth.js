@@ -117,16 +117,27 @@
     const trigger = document.querySelector('#account-trigger');
     const signout = document.querySelector('.account-signout');
     const email = session?.user?.email;
-    if (trigger) trigger.textContent = email ? `Account · ${email}` : 'My account';
-    if (signout) signout.hidden = !email;
+    const signedIn = Boolean(email);
+    if (trigger) trigger.textContent = signedIn ? 'My account · Signed in' : 'My account';
+    if (signout) signout.hidden = !signedIn;
+    if (authTabs) authTabs.hidden = signedIn;
+    if (form) form.hidden = signedIn;
+    if (resetForm && signedIn) resetForm.hidden = true;
+    const resetLink = document.querySelector('.auth-reset');
+    if (resetLink) resetLink.hidden = signedIn;
+    if (accountTitle && signedIn) accountTitle.textContent = 'You’re signed in';
+    if (accountIntro && signedIn) accountIntro.textContent = 'Your account is active. Check your orders, payment status, saved checkouts and updates from our team below.';
+    if (accountTitle && !signedIn && !resetForm?.hidden && authEvent === 'PASSWORD_RECOVERY') accountTitle.textContent = 'Set a new password';
+    if (!signedIn && accountTitle && !authEvent) accountTitle.textContent = 'Sign in to your account';
+    if (!signedIn && accountIntro && !authEvent) accountIntro.textContent = 'Sign in to view your orders, payment status and messages. New here? Create an account.';
     const ordersPanel = document.querySelector('#customer-orders');
     const pendingPanel = document.querySelector('#pending-checkouts');
     const notificationPanel = document.querySelector('#customer-notifications');
-    if (ordersPanel) ordersPanel.hidden = !email;
-    const privateRequestsPanel=document.querySelector('#customer-private-requests');if(privateRequestsPanel)privateRequestsPanel.hidden=!email;
-    if (pendingPanel) pendingPanel.hidden = !email;
-    if (notificationPanel) notificationPanel.hidden = !email;
-    if (email && dialog?.open) {
+    if (ordersPanel) ordersPanel.hidden = !signedIn;
+    const privateRequestsPanel=document.querySelector('#customer-private-requests');if(privateRequestsPanel)privateRequestsPanel.hidden=!signedIn;
+    if (pendingPanel) pendingPanel.hidden = !signedIn;
+    if (notificationPanel) notificationPanel.hidden = !signedIn;
+    if (signedIn && dialog?.open) {
       loadCustomerOrders(); loadPendingCheckouts(); loadCustomerNotifications(); subscribeToOrders();
       // Do not call saveSession() from renderAccountState(): it re-enters this function
       // and previously caused an unbounded getUser → saveSession → render loop.
@@ -631,7 +642,7 @@
       else throw new Error('The link did not include a valid session.');
       const user = await api.auth.getUser(); if (!user?.id) throw new Error('The session is invalid or expired.');
       saveSession({ ...session, user });
-      if (type === 'signup') { showSignIn('Account confirmed! You are now signed in.'); }
+      if (type === 'signup') { renderAccountState(); message.textContent = 'Account confirmed. You’re signed in and can view your orders below.'; }
       else { authEvent = 'PASSWORD_RECOVERY'; showPasswordReset('Enter and confirm your new password below.'); }
     } catch (error) { authEvent = null; saveSession(null); showSignIn(error.message || 'This link is invalid or expired.'); if (!dialog.open) dialog.showModal(); }
   }
