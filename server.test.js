@@ -2038,8 +2038,8 @@ test('admin controls enforce readable contrast and cache-busted current assets',
   assert.match(adminCss, /\.admin-page select option[\s\S]*?color:#111a19 !important/);
   assert.match(adminCss, /#site-content-list \.button-ghost[\s\S]*?opacity:1 !important/);
   assert.match(adminCss, /button:disabled[\s\S]*?opacity:1 !important/);
-  assert.match(adminHtml, /admin\.css\?v=20261101-compact-order-folders/);
-  assert.match(adminHtml, /admin\.js\?v=20261101-compact-order-folders/);
+  assert.match(adminHtml, /admin\.css\?v=20261101-message-summary/);
+  assert.match(adminHtml, /admin\.js\?v=20261101-message-summary/);
   assert.match(adminJs, /<details class=\"admin-order-detail\">/);
   assert.match(adminJs, /admin-order-summary-meta/);
   assert.match(adminCss, /\.admin-order-detail>summary/);
@@ -2126,7 +2126,7 @@ test('message notifications and actionable admin summary are wired without chang
   assert.match(server,/handleAdminUnreadMessageNotifications/);
   assert.match(server,/sender_type=eq\.customer&is_read=eq\.false/);
   assert.match(admin,/refreshAdminMessageNotifications/);
-  assert.match(admin,/setInterval\(refreshAdminMessageNotifications,25000\)/);
+  assert.match(admin,/table:'order_messages'/);
   assert.match(customer,/sender_type=eq\.admin&is_read=eq\.false/);
   assert.match(customer,/data-message-order-id/);
   assert.match(page,/data-status-filter="Payment Pending"/);
