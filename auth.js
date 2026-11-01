@@ -107,6 +107,7 @@
     unsubscribeRealtime();
     ordersChannel = realtimeClient.channel(`customer-orders-${customerId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `customer_id=eq.${customerId}` }, () => loadCustomerOrders())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_messages', filter: `customer_id=eq.${customerId}` }, () => loadCustomerNotifications())
       .subscribe((status, error) => { if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.warn('Order realtime unavailable', error); });
     filesChannel = realtimeClient.channel(`customer-order-files-${customerId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_files', filter: `owner_id=eq.${customerId}` }, () => loadCustomerOrders())
