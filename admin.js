@@ -23,8 +23,6 @@
   let photoPreviewObserver = null;
   let realtimeClient = null;
   let ordersChannel = null;
-  let adminMessageNotificationTimer = null;
-  let lastAdminUnreadMessageIds = new Set();
 
   function escape(value) {
     return String(value ?? '').replace(/[&<>"']/g, function(c) {
@@ -34,7 +32,7 @@
   function formatINR(paise) { return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',minimumFractionDigits:0,maximumFractionDigits:2}).format(Number(paise||0)/100); }
   async function parseJson(response){const text=await response.text();try{return text?JSON.parse(text):{};}catch{return {error:text||('Server error ('+response.status+')')};}}
   async function configured(){const response=await fetch('/api/health',{cache:'no-store'});const result=await parseJson(response);return response.ok&&Boolean(result.configured);}
-  function setSignedOut(){loginPanel.hidden=false;deniedPanel.hidden=true;dashboard.hidden=true;document.querySelector('#admin-signout').hidden=true;message.textContent='';unsubscribeRealtime();if(adminMessageNotificationTimer){clearInterval(adminMessageNotificationTimer);adminMessageNotificationTimer=null;}}
+  function setSignedOut(){loginPanel.hidden=false;deniedPanel.hidden=true;dashboard.hidden=true;document.querySelector('#admin-signout').hidden=true;message.textContent='';unsubscribeRealtime();}
   function showDenied(text){loginPanel.hidden=true;deniedPanel.hidden=false;dashboard.hidden=true;document.querySelector('#admin-signout').hidden=true;document.querySelector('#admin-denied-message').textContent=text;unsubscribeRealtime();}
 
   function subscribeRealtime(){
@@ -47,6 +45,7 @@
       .on('postgres_changes',{event:'*',schema:'public',table:'orders'},function(){loadOrders();})
       .on('postgres_changes',{event:'*',schema:'public',table:'order_files'},function(){loadOrders();})
       .on('postgres_changes',{event:'*',schema:'public',table:'order_attachments'},function(){loadOrders();})
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'order_messages'},function(){refreshAdminMessageNotifications();})
       .subscribe();
   }
   function unsubscribeRealtime(){try{ordersChannel&&realtimeClient?.removeChannel(ordersChannel);}catch{}ordersChannel=null;}
@@ -158,6 +157,10 @@
       if(statusVal!=='all'){
         if(statusVal==='New'){
           if(order.status!=='New')return false;
+        }else if(statusVal==='Payment Pending'){
+          if(order.status!=='Payment Pending'&&order.payment_status!=='PENDING')return false;
+        }else if(statusVal==='Processing'){
+          if(!['File Review','Processing'].includes(order.status))return false;
         }else if(order.status!==statusVal){
           return false;
         }
@@ -886,8 +889,6 @@
     await loadPublicContactSettings();
     subscribeRealtime();
     await refreshAdminMessageNotifications();
-    if(adminMessageNotificationTimer)clearInterval(adminMessageNotificationTimer);
-    adminMessageNotificationTimer=setInterval(refreshAdminMessageNotifications,25000);
   }
 
   document.querySelector('#admin-auth').addEventListener('submit', async function(event) {
