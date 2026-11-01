@@ -2079,6 +2079,11 @@ function createHttpServer() {
     response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     response.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
     const requestUrl = new URL(request.url, 'http://localhost');
+    // Consolidate the duplicate homepage URL onto the canonical root URL.
+    if (requestUrl.pathname === '/index.html' && (request.method === 'GET' || request.method === 'HEAD')) {
+      response.writeHead(301, { Location: `/${requestUrl.search}`, 'Cache-Control': 'public, max-age=86400' }).end();
+      return;
+    }
     const origin = request.headers.origin;
     if (origin) {
       response.setHeader('Vary', 'Origin');
