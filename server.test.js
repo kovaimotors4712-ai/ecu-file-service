@@ -1485,9 +1485,9 @@ test('regression test: role="admin" is preserved when getUser() returns a user w
 });
 
 test('SEO: duplicate /index.html homepage permanently redirects to the canonical root URL', async () => {
-  const result = await call('/index.html?utm_source=test');
-  assert.equal(result.response.status, 301);
-  assert.equal(result.response.headers.get('location'), '/?utm_source=test');
+  const response = await fetch(`${baseUrl}/index.html?utm_source=test`, { redirect: 'manual' });
+  assert.equal(response.status, 301);
+  assert.equal(response.headers.get('location'), '/?utm_source=test');
   const head = await fetch(`${baseUrl}/index.html`, { method: 'HEAD', redirect: 'manual' });
   assert.equal(head.status, 301);
 });
