@@ -1486,7 +1486,7 @@ test('regression test: role="admin" is preserved when getUser() returns a user w
 
 test('regression test: index.html references auth.js with version parameter and server serves static assets correctly', async () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-  assert.ok(indexHtml.includes('auth.js?v=20261101-hide-signin-after-login'));
+  assert.ok(indexHtml.includes('auth.js?v=20261101-message-notifications'));
   assert.ok(indexHtml.includes('app.js?v=20261025-homepage-order'));
   assert.ok(indexHtml.includes('supabase.js?v=ba583d0'));
 });
@@ -1667,7 +1667,7 @@ test('payment finalization and notification failures are visible in safe operati
 test('updated customer and admin scripts use cache-busted recovery assets', () => {
   const indexSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   const adminSource = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
-  assert.match(indexSource, /auth\.js\?v=20261101-hide-signin-after-login/);
+  assert.match(indexSource, /auth\.js\?v=20261101-message-notifications/);
   assert.match(indexSource, /app\.js\?v=20261025-homepage-order/);
   assert.match(adminSource, /auth\.js\?v=20261025-admin-actions/);
 });
@@ -1682,7 +1682,7 @@ test('saved checkout shows immediate payment-check feedback and bounded recovery
   assert.match(authSource, /Loading the saved checkout timed out/);
   assert.match(authSource, /No new payment was started/);
   const indexSource = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-  assert.match(indexSource, /auth\.js\?v=20261101-hide-signin-after-login/);
+  assert.match(indexSource, /auth\.js\?v=20261101-message-notifications/);
 });
 test('second-stage trigger permits normal first-stage paid-order inserts with default pending state', () => {
   const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261017_fix_second_stage_insert_guard.sql'), 'utf8');
@@ -2070,7 +2070,7 @@ test('customer private requests have hide-from-history controls and readable acc
   assert.match(css, /#customer-private-request-list \.customer-request-delete[\s\S]*?background:#8b1e1e !important/);
   assert.match(css, /#customer-private-request-history-toggle[\s\S]*?color:#17201e !important/);
   assert.match(html, /styles\.css\?v=20261025-forum-dark-neon/);
-  assert.match(html, /auth\.js\?v=20261101-hide-signin-after-login/);
+  assert.match(html, /auth\.js\?v=20261101-message-notifications/);
   assert.match(migration, /user_id = auth\.uid\(\)/);
   assert.match(migration, /software_payment_link_id is not null/);
   assert.match(migration, /Use Hide from history instead/);
@@ -2114,7 +2114,7 @@ test('customer account hides sign-in controls after successful login and shows s
   assert.match(customer, /You’re signed in/);
   assert.match(customer, /My account · Signed in/);
   assert.match(customer, /Account confirmed\. You’re signed in and can view your orders below\./);
-  assert.match(html, /auth\.js\?v=20261101-hide-signin-after-login/);
+  assert.match(html, /auth\.js\?v=20261101-message-notifications/);
 });
 
 
@@ -2129,6 +2129,13 @@ test('message notifications and actionable admin summary are wired without chang
   assert.match(admin,/table:'order_messages'/);
   assert.match(customer,/sender_type=eq\.admin&is_read=eq\.false/);
   assert.match(customer,/data-message-order-id/);
+  assert.ok(admin.includes("adminUnreadMessages"));
+  assert.ok(admin.includes("setFolderBadge('notifications',pendingOrders+adItems+openRequests+unreadMessages.length)"));
+  assert.ok(!admin.includes("setFolderBadge('messages'"));
+  assert.ok(customer.includes("ordersSubscriptionPending"));
+  assert.ok(customer.includes("account-notification-badge"));
+  assert.ok(!customer.includes("dialog.addEventListener('close', () => unsubscribeRealtime());"));
+  assert.ok(html.includes('id="account-notification-badge"'));
   assert.match(page,/data-status-filter="Payment Pending"/);
   assert.match(admin,/card\.addEventListener\('click'/);
   assert.doesNotMatch(page,/DATE SUMMARY|RESULT SUMMARY/);
