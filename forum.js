@@ -294,7 +294,6 @@
       profile = null;
       setMessage($('#forum-auth-message'), 'Sign in or create an account to post and reply.');
       setMessage($('#forum-username-message'), '');
-      $('#forum-request-send').disabled = true;
       $('#forum-request-list').textContent = 'Sign in to view requests.';
     }
   }
