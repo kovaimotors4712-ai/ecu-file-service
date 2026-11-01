@@ -2039,7 +2039,7 @@ test('admin controls enforce readable contrast and cache-busted current assets',
   assert.match(adminCss, /#site-content-list \.button-ghost[\s\S]*?opacity:1 !important/);
   assert.match(adminCss, /button:disabled[\s\S]*?opacity:1 !important/);
   assert.match(adminHtml, /admin\.css\?v=20261101-message-summary/);
-  assert.match(adminHtml, /admin\.js\?v=20261101-message-summary/);
+  assert.match(adminHtml, /admin\.js\?v=20261101-message-notifications/);
   assert.match(adminJs, /<details class=\"admin-order-detail\">/);
   assert.match(adminJs, /admin-order-summary-meta/);
   assert.match(adminCss, /\.admin-order-detail>summary/);
@@ -2141,4 +2141,11 @@ test('message notifications and actionable admin summary are wired without chang
   assert.doesNotMatch(page,/DATE SUMMARY|RESULT SUMMARY/);
   assert.match(server,/sender_type: 'customer'[\s\S]*?is_read: false/);
   assert.match(server,/sender_type: 'admin'[\s\S]*?is_read: false/);
+});
+
+
+test('message notification migration enables order message realtime publication', () => {
+  const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261101_order_messages_realtime_publication.sql'), 'utf8');
+  assert.ok(migration.includes('ALTER PUBLICATION supabase_realtime ADD TABLE public.order_messages;'));
+  assert.ok(migration.includes('pg_publication_tables'));
 });
