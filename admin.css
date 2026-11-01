@@ -241,3 +241,43 @@
  .admin-software-request-fields{padding:10px!important}
  .admin-software-request-fields label:has(input[type="number"]){max-width:none}
 }
+
+
+/* Compact nested customer/order folders and high-contrast file controls. */
+.admin-order-detail{border:1px solid #d9e1d4;border-radius:8px;background:#fff;overflow:hidden}
+.admin-order-detail>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;cursor:pointer;list-style:none;min-height:66px}
+.admin-order-detail>summary::-webkit-details-marker{display:none}
+.admin-order-summary-main{display:grid;gap:4px;min-width:0}
+.admin-order-summary-main b{font-size:13px;line-height:1.4;color:#17201e;overflow-wrap:anywhere}
+.admin-order-summary-main small,.admin-order-summary-meta small{font-size:10px;color:#526057;line-height:1.5}
+.admin-order-summary-meta{display:grid;justify-items:end;gap:4px;text-align:right}
+.admin-order-summary-toggle{flex:0 0 auto;padding:7px 10px;border:1px solid #879681;border-radius:5px;background:#f7f9f4;color:#17201e;font-size:11px;font-weight:800}
+.admin-order-detail>summary:hover{background:#f5f8f0}
+.admin-order-detail[open]>summary{background:#edf3e5;border-bottom:1px solid #d9e1d4}
+.admin-order-detail[open] .admin-order-summary-toggle{background:#24352b;color:#fff;border-color:#24352b}
+.admin-order-detail>article.admin-order{border:0;border-radius:0;box-shadow:none;padding:16px}
+.admin-order-grid{gap:10px}
+.admin-order-grid>div{background:#f4f7ef!important;border:1px solid #d7e0ce!important;border-radius:5px;padding:12px}
+.admin-order-grid small,.admin-order-grid b{color:#1c2922!important}
+.admin-order-grid small{font-size:9px!important;font-weight:800;letter-spacing:.06em}
+.admin-files-box{background:#f2f5ee;border:1px solid #cbd6c4;border-radius:7px;padding:12px}
+.admin-file-row{border:1px solid #cbd6c4;border-radius:5px;min-height:58px}
+.admin-file-info{flex-wrap:wrap}
+.admin-file-info span{color:#435b21;font-weight:900}
+.admin-file-info b{color:#17201e;font-size:12px}
+.admin-file-actions .button,.admin-upload-wrap .button{color:#fff!important;background:#24352b!important;border:1px solid #24352b!important;min-height:42px;font-weight:800}
+.admin-file-actions .button:hover,.admin-upload-wrap .button:hover{background:#405b35!important}
+.admin-upload-wrap{padding:12px;border:1px dashed #879681;border-radius:6px;background:#fff}
+.admin-upload-wrap input[type=file]{max-width:100%;color:#17201e;font-size:12px}
+.admin-order-footer .button-ghost,.admin-status-row select{color:#17201e!important;background:#fff!important;border:1px solid #879681!important;font-weight:800}
+@media(max-width:560px){
+ .admin-order-detail>summary{align-items:flex-start;display:grid;grid-template-columns:minmax(0,1fr) auto;padding:11px;gap:8px}
+ .admin-order-summary-meta{justify-items:start;text-align:left;grid-column:1}
+ .admin-order-summary-toggle{grid-column:2;grid-row:1/3;align-self:center}
+ .admin-order-detail>article.admin-order{padding:10px}
+ .admin-order-grid{grid-template-columns:1fr!important}
+ .admin-file-row{align-items:flex-start}
+ .admin-file-actions,.admin-file-actions .button{width:100%}
+ .admin-upload-wrap{display:grid;grid-template-columns:1fr}
+ .admin-upload-wrap .button{width:100%}
+}

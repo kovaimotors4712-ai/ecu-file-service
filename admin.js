@@ -193,7 +193,17 @@
       const payment=[order.payment_status||'PENDING',order.payment_provider||'—'].join(' · ');
       const paymentRef=order.provider_payment_id||order.razorpay_payment_id||'—';
 
-      return '<article class="admin-order" data-order-id="'+escape(order.id)+'">'+
+      const compactTitle=[order.vehicle_year,order.vehicle_brand,order.vehicle_model].filter(Boolean).join(' ')||'Vehicle details unavailable';
+      const shortId=String(order.id||'').slice(0,8).toUpperCase();
+      const originalLabel=originalFile?'Original file ready':'Original file missing';
+      const resultLabel=processedFile?'Result ready':'Result pending';
+      return '<details class="admin-order-detail">'+
+        '<summary class="admin-order-summary">'+
+          '<span class="admin-order-summary-main"><b>'+escape(compactTitle)+'</b><small>ORDER '+escape(shortId)+' · '+escape(new Date(order.created_at).toLocaleDateString('en-IN'))+'</small></span>'+
+          '<span class="admin-order-summary-meta"><span class="admin-status-badge">'+escape(order.status)+'</span><small>'+escape(originalLabel)+' · '+escape(resultLabel)+'</small></span>'+
+          '<span class="admin-order-summary-toggle" aria-hidden="true">Open</span>'+
+        '</summary>'+
+        '<article class="admin-order" data-order-id="'+escape(order.id)+'">'+
         '<div class="admin-order-head">'+
           '<div>'+
             '<span class="admin-order-id">ORDER '+escape(order.id)+'</span>'+
@@ -235,7 +245,8 @@
           '</div>'+
           '<p class="admin-message" role="status"></p>'+
         '</div>'+
-        '</article>';
+        '</article>'+
+        '</details>';
     }
 
     const customerGroups=new Map();
