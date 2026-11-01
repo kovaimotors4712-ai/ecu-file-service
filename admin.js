@@ -23,6 +23,7 @@
   let photoPreviewObserver = null;
   let realtimeClient = null;
   let ordersChannel = null;
+  let adminUnreadMessages = [];
 
   function escape(value) {
     return String(value ?? '').replace(/[&<>"']/g, function(c) {
@@ -675,37 +676,66 @@
     const openRequests=adminRequestRows.filter(function(r){return ['open','in_review','waiting_for_customer'].includes(r.status||'open');}).length;
     const adItems=document.querySelectorAll('#advertising-inquiry-list .admin-order-card').length;
     const softwareItems=document.querySelectorAll('#software-product-list .admin-order-card').length;
-    setFolderBadge('orders',pendingOrders);setFolderBadge('advertising',adItems);setFolderBadge('software',softwareItems);setFolderBadge('requirements',openRequests);setFolderBadge('notifications',pendingOrders+adItems+openRequests);
-    const list=document.querySelector('#admin-notifications-list');if(!list)return;list.replaceChildren();
-    [['orders','Customer orders awaiting work',pendingOrders],['advertising','Advertising enquiries to review',adItems],['requirements','Open customer requirements',openRequests]].forEach(function(entry){
-      const row=document.createElement('button');row.type='button';row.className='admin-notification-row';const label=document.createElement('span');label.textContent=entry[1];const count=document.createElement('strong');count.textContent=String(entry[2]);row.append(label,count);
-      row.addEventListener('click',function(){const target=document.querySelector('[data-admin-folder="'+entry[0]+'"]');if(target){target.open=true;target.scrollIntoView({behavior:'smooth',block:'start'});}});list.append(row);
-    });
-    if(!pendingOrders&&!adItems&&!openRequests){const empty=document.createElement('p');empty.className='muted';empty.textContent='No pending items are currently counted. Refresh each folder to check again.';list.append(empty);}
-  }
-  async function refreshAdminMessageNotifications(){
+    const unreadMessages=Array.isArray(adminUnreadMessages)?adminUnreadMessages:[];
+    setFolderBadge('orders',pendingOrders);
+    setFolderBadge('advertising',adItems);
+    setFolderBadge('software',softwareItems);
+    setFolderBadge('requirements',openRequests);
+    setFolderBadge('notifications',pendingOrders+adItems+openRequests+unreadMessages.length);
     const list=document.querySelector('#admin-notifications-list');
     if(!list)return;
+    list.replaceChildren();
+    if(unreadMessages.length){
+      const group=document.createElement('div');
+      group.dataset.adminMessageAlerts='true';
+      const heading=document.createElement('p');
+      heading.className='admin-message';
+      heading.textContent=unreadMessages.length+' unread customer message'+(unreadMessages.length===1?'':'s');
+      group.append(heading);
+      unreadMessages.forEach(function(item){
+        const row=document.createElement('button');
+        row.type='button';
+        row.className='admin-notification-row';
+        const label=document.createElement('span');
+        label.textContent='Order '+String(item.order_id||'').slice(0,8).toUpperCase()+': '+String(item.message||'').slice(0,90);
+        const time=document.createElement('small');
+        time.textContent=item.created_at?new Date(item.created_at).toLocaleString():'';
+        row.append(label,time);
+        row.addEventListener('click',function(){window.openAdminMessages(item.order_id);});
+        group.append(row);
+      });
+      list.append(group);
+    }
+    [['orders','Customer orders awaiting work',pendingOrders],['advertising','Advertising enquiries to review',adItems],['requirements','Open customer requirements',openRequests]].forEach(function(entry){
+      const row=document.createElement('button');
+      row.type='button';
+      row.className='admin-notification-row';
+      const label=document.createElement('span');
+      label.textContent=entry[1];
+      const count=document.createElement('strong');
+      count.textContent=String(entry[2]);
+      row.append(label,count);
+      row.addEventListener('click',function(){
+        const target=document.querySelector('[data-admin-folder="'+entry[0]+'"]');
+        if(target){target.open=true;target.scrollIntoView({behavior:'smooth',block:'start'});}
+      });
+      list.append(row);
+    });
+    if(!pendingOrders&&!adItems&&!openRequests&&!unreadMessages.length){
+      const empty=document.createElement('p');
+      empty.className='muted';
+      empty.textContent='No unread messages or pending work.';
+      list.append(empty);
+    }
+  }
+  async function refreshAdminMessageNotifications(){
     try{
       const result=await adminApi('/api/admin/orders/messages/unread');
-      const messages=Array.isArray(result.messages)?result.messages:[];
-      const count=Number(result.unreadCount)||messages.length;
-      setFolderBadge('messages',count);
-      const existing=list.querySelector('[data-admin-message-alerts]');
-      if(existing)existing.remove();
-      if(messages.length){
-        const group=document.createElement('div');group.dataset.adminMessageAlerts='true';
-        const heading=document.createElement('p');heading.className='admin-message';heading.textContent=count+' unread customer message'+(count===1?'':'s');group.append(heading);
-        messages.forEach(function(item){
-          const row=document.createElement('button');row.type='button';row.className='admin-notification-row';
-          const label=document.createElement('span');label.textContent='Order '+String(item.order_id||'').slice(0,8).toUpperCase()+': '+String(item.message||'').slice(0,90);
-          const time=document.createElement('small');time.textContent=item.created_at?new Date(item.created_at).toLocaleString():'';
-          row.append(label,time);row.addEventListener('click',function(){window.openAdminMessages(item.order_id);});group.append(row);
-        });
-        list.prepend(group);
-      }
-      if(!messages.length&&!list.querySelector('.admin-notification-row')){const empty=document.createElement('p');empty.className='muted';empty.textContent='No unread customer messages.';list.append(empty);}
-    }catch(error){console.warn('Admin message notifications unavailable:',error.message);}
+      adminUnreadMessages=Array.isArray(result.messages)?result.messages:[];
+      updateAdminFolderBadges();
+    }catch(error){
+      console.warn('Admin message notifications unavailable:',error.message);
+    }
   }
   function setupAdminFolders() {
     const dashboard=document.querySelector('#admin-dashboard');if(!dashboard||dashboard.dataset.folderized==='true')return;
@@ -950,6 +980,7 @@
           </div>
         `).join('') : '<p>No messages yet.</p>';
         list.scrollTop = list.scrollHeight;
+        await refreshAdminMessageNotifications();
       } catch (e) { list.innerHTML = `<p style="color:red">${escape(e.message)}</p>`; }
     }
 

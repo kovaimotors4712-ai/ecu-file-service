@@ -207,3 +207,5 @@ body{line-height:1.55}h1,h2,h3,p,label,button,a{overflow-wrap:break-word}button,
   outline:3px solid #3459c7;
   outline-offset:3px;
 }
+
+.account-trigger{display:inline-flex;align-items:center;gap:7px}.account-notification-badge{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#b3261e;color:#fff;font:800 9px/1 var(--sans);white-space:nowrap}.account-notification-badge[hidden]{display:none}
