@@ -2094,3 +2094,13 @@ test('private software delivery requires customer ownership and a delivered file
   assert.match(migrationSource, /software_delivery_path text/);
   assert.match(migrationSource, /software_delivery_name text/);
 });
+
+
+test('customer order flow explains the steps and offers My Account after payment', () => {
+  const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');
+  assert.match(html, /Follow the six steps:[\\s\\S]*?After payment, open My account to track your order/);
+  assert.match(html, /id="open-account-after-order"/);
+  assert.match(app, /open-account-after-order[\\s\\S]*?account-trigger/);
+  assert.match(app, /Open My account to find your order, check its status and view updates from our team/);
+});
