@@ -2116,3 +2116,22 @@ test('customer account hides sign-in controls after successful login and shows s
   assert.match(customer, /Account confirmed\. You’re signed in and can view your orders below\./);
   assert.match(html, /auth\.js\?v=20261101-hide-signin-after-login/);
 });
+
+
+test('message notifications and actionable admin summary are wired without changing message sending', () => {
+  const server=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
+  const admin=fs.readFileSync(path.join(__dirname,'admin.js'),'utf8');
+  const customer=fs.readFileSync(path.join(__dirname,'auth.js'),'utf8');
+  const page=fs.readFileSync(path.join(__dirname,'admin.html'),'utf8');
+  assert.match(server,/handleAdminUnreadMessageNotifications/);
+  assert.match(server,/sender_type=eq\.customer&is_read=eq\.false/);
+  assert.match(admin,/refreshAdminMessageNotifications/);
+  assert.match(admin,/setInterval\(refreshAdminMessageNotifications,25000\)/);
+  assert.match(customer,/sender_type=eq\.admin&is_read=eq\.false/);
+  assert.match(customer,/data-message-order-id/);
+  assert.match(page,/data-status-filter="Payment Pending"/);
+  assert.match(admin,/card\.addEventListener\('click'/);
+  assert.doesNotMatch(page,/DATE SUMMARY|RESULT SUMMARY/);
+  assert.match(server,/sender_type: 'customer'[\s\S]*?is_read: false/);
+  assert.match(server,/sender_type: 'admin'[\s\S]*?is_read: false/);
+});
