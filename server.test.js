@@ -2104,3 +2104,15 @@ test('customer order flow explains the steps and offers My Account after payment
   assert.ok(app.includes("document.querySelector('#open-account-after-order')") && app.includes("document.querySelector('#account-trigger')"));
   assert.match(app, /Open My account to find your order, check its status and view updates from our team/);
 });
+
+
+test('customer account hides sign-in controls after successful login and shows signed-in dashboard', () => {
+  const customer = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  assert.match(customer, /if \(authTabs\) authTabs\.hidden = signedIn/);
+  assert.match(customer, /if \(form\) form\.hidden = signedIn/);
+  assert.match(customer, /You’re signed in/);
+  assert.match(customer, /My account · Signed in/);
+  assert.match(customer, /Account confirmed\. You’re signed in and can view your orders below\./);
+  assert.match(html, /auth\.js\?v=20261101-hide-signin-after-login/);
+});
