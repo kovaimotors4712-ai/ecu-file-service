@@ -12,6 +12,7 @@
   let ordersChannel = null;
   let filesChannel = null;
   let realtimeClient = null;
+  let ordersSubscriptionPending = false;
 
   function readSession() {
     try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; }
@@ -89,6 +90,7 @@
     session = next;
     if (next) sessionStorage.setItem(SESSION_KEY, JSON.stringify(next)); else sessionStorage.removeItem(SESSION_KEY);
     if (previousUserId && previousUserId !== next?.user?.id) unsubscribeRealtime();
+    if (next?.access_token && realtimeClient) { try { realtimeClient.realtime.setAuth(next.access_token); } catch {} }
     renderAccountState();
   }
 
@@ -100,18 +102,29 @@
 
   async function subscribeToOrders() {
     const customerId = session?.user?.id;
-    const token = await accessToken();
-    if (!customerId || !token || !window.supabase?.createClient) return;
-    if (!realtimeClient) realtimeClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
-    try { realtimeClient.realtime.setAuth(token); } catch {}
-    unsubscribeRealtime();
-    ordersChannel = realtimeClient.channel(`customer-orders-${customerId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `customer_id=eq.${customerId}` }, () => loadCustomerOrders())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_messages', filter: `customer_id=eq.${customerId}` }, () => loadCustomerNotifications())
-      .subscribe((status, error) => { if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.warn('Order realtime unavailable', error); });
-    filesChannel = realtimeClient.channel(`customer-order-files-${customerId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_files', filter: `owner_id=eq.${customerId}` }, () => loadCustomerOrders())
-      .subscribe((status, error) => { if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.warn('File realtime unavailable', error); });
+    if (!customerId || ordersChannel || ordersSubscriptionPending || !window.supabase?.createClient) return;
+    ordersSubscriptionPending = true;
+    try {
+      const token = await accessToken();
+      if (!token || session?.user?.id !== customerId) return;
+      if (!realtimeClient) realtimeClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+      try { realtimeClient.realtime.setAuth(token); } catch {}
+      ordersChannel = realtimeClient.channel(`customer-orders-${customerId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `customer_id=eq.${customerId}` }, () => loadCustomerOrders())
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_messages', filter: `customer_id=eq.${customerId}` }, () => loadCustomerNotifications())
+        .subscribe((status, error) => {
+          if (status === 'SUBSCRIBED') loadCustomerNotifications();
+          else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.warn('Order realtime unavailable', error);
+        });
+      filesChannel = realtimeClient.channel(`customer-order-files-${customerId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'order_files', filter: `owner_id=eq.${customerId}` }, () => loadCustomerOrders())
+        .subscribe((status, error) => { if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.warn('File realtime unavailable', error); });
+    } catch (error) {
+      console.warn('Customer realtime could not be started', error);
+    } finally {
+      ordersSubscriptionPending = false;
+      if (session?.user?.id && session.user.id !== customerId && !ordersChannel) subscribeToOrders();
+    }
   }
 
   function renderAccountState() {
@@ -119,7 +132,9 @@
     const signout = document.querySelector('.account-signout');
     const email = session?.user?.email;
     const signedIn = Boolean(email);
-    if (trigger) trigger.textContent = signedIn ? 'My account · Signed in' : 'My account';
+    const triggerLabel = trigger?.querySelector('#account-trigger-label');
+    if (triggerLabel) triggerLabel.textContent = signedIn ? 'My account · Signed in' : 'My account';
+    else if (trigger) trigger.textContent = signedIn ? 'My account · Signed in' : 'My account';
     if (signout) signout.hidden = !signedIn;
     if (authTabs) authTabs.hidden = signedIn;
     if (form) form.hidden = signedIn;
@@ -138,10 +153,14 @@
     const privateRequestsPanel=document.querySelector('#customer-private-requests');if(privateRequestsPanel)privateRequestsPanel.hidden=!signedIn;
     if (pendingPanel) pendingPanel.hidden = !signedIn;
     if (notificationPanel) notificationPanel.hidden = !signedIn;
-    if (signedIn && dialog?.open) {
-      loadCustomerOrders(); loadPendingCheckouts(); loadCustomerNotifications(); subscribeToOrders();
-      // Do not call saveSession() from renderAccountState(): it re-enters this function
-      // and previously caused an unbounded getUser → saveSession → render loop.
+    if (signedIn) {
+      loadCustomerNotifications();
+      subscribeToOrders();
+      if (dialog?.open) { loadCustomerOrders(); loadPendingCheckouts(); }
+      // Keep account notifications and realtime active while the customer browses the site.
+    } else {
+      const badge = document.querySelector('#account-notification-badge');
+      if (badge) { badge.textContent = ''; badge.hidden = true; }
     }
   }
 
@@ -240,8 +259,12 @@
       const rows = await rest(`notifications?select=id,order_id,message,is_read,created_at&customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.desc&limit=20`);
       const unreadMessages = await rest(`order_messages?select=id,order_id,message,created_at&customer_id=eq.${encodeURIComponent(customerId)}&sender_type=eq.admin&is_read=eq.false&order=created_at.desc&limit=20`);
       const unreadCount = rows.filter(n => !n.is_read).length + unreadMessages.length;
-      const countEl = document.querySelector('.notification-count');
-      if (countEl) countEl.textContent = unreadCount > 0 ? unreadCount : '';
+      const countEl = document.querySelector('#account-notification-badge');
+      if (countEl) {
+        countEl.textContent = unreadCount > 99 ? '99+' : (unreadCount > 0 ? String(unreadCount) : '');
+        countEl.hidden = unreadCount === 0;
+        countEl.setAttribute('aria-label', unreadCount+' unread notification'+(unreadCount===1?'':'s'));
+      }
       const statusItems = rows.map(item => ({...item, kind:'status'}));
       const messageItems = unreadMessages.map(item => ({...item, kind:'message', message:'New reply from our team: '+item.message, is_read:false}));
       const combined = [...statusItems,...messageItems].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,30);
@@ -252,11 +275,25 @@
     } catch (error) { list.innerHTML = `<small>Notifications could not be loaded: ${escapeHtml(error.message || 'Please retry.')}</small>`; }
   }
 
-  document.querySelector('#customer-notification-list')?.addEventListener('click',function(event){
-    const button=event.target.closest('[data-message-order-id]');if(!button)return;
-    const orderId=button.dataset.messageOrderId;
-    const opener=document.querySelector('.customer-messages-open[data-order-id="'+CSS.escape(orderId)+'"]');
-    if(opener)opener.click();
+  async function openCustomerMessageNotification(orderId) {
+    if (!orderId) return;
+    if (!dialog.open) dialog.showModal();
+    await loadCustomerOrders();
+    let opener = document.querySelector('.customer-messages-open[data-order-id="'+CSS.escape(orderId)+'"]');
+    if (!opener && !showHiddenOrders) {
+      showHiddenOrders = true;
+      await loadCustomerOrders();
+      opener = document.querySelector('.customer-messages-open[data-order-id="'+CSS.escape(orderId)+'"]');
+    }
+    if (opener) opener.click();
+    else message.textContent = 'The order linked to this message is not visible in your active or hidden order history.';
+    await loadCustomerNotifications();
+  }
+
+  document.querySelector('#customer-notification-list')?.addEventListener('click',async function(event){
+    const button=event.target.closest('[data-message-order-id]');
+    if(!button)return;
+    await openCustomerMessageNotification(button.dataset.messageOrderId);
   });
   async function markNotificationRead(notificationId) {
     try {
@@ -332,7 +369,7 @@
   function showSignIn(text = '') { authTabs.hidden = false; form.hidden = false; resetForm.hidden = true; document.querySelector('.auth-reset').hidden = false; accountTitle.textContent = 'Sign in to your account'; accountIntro.textContent = 'Save requests and access your private file history.'; setMode('signin', false); message.textContent = text; }
   function showPasswordReset(text = '') { authTabs.hidden = true; form.hidden = true; resetForm.hidden = false; document.querySelector('.auth-reset').hidden = true; accountTitle.textContent = 'Set a new password'; accountIntro.textContent = 'Choose a new password for your customer account.'; message.textContent = text; if (!dialog.open) dialog.showModal(); document.querySelector('#auth-new-password').focus(); }
 
-  document.querySelector('#account-trigger').addEventListener('click', () => { dialog.showModal(); if (session?.user?.id) { loadCustomerOrders(); loadPendingCheckouts(); subscribeToOrders(); } });
+  document.querySelector('#account-trigger').addEventListener('click', () => { dialog.showModal(); if (session?.user?.id) { loadCustomerOrders(); loadPendingCheckouts(); loadCustomerNotifications(); subscribeToOrders(); } });
   function openCustomerMessagesFromHash() {
     if (!['#account-messages','#check-your-messages'].includes(window.location.hash)) return;
     if (!dialog.open) dialog.showModal();
@@ -340,6 +377,7 @@
       loadCustomerPrivateRequests();
       loadCustomerOrders();
       loadPendingCheckouts();
+      loadCustomerNotifications();
       subscribeToOrders();
       const requests = document.querySelector('#customer-private-requests');
       if (requests) { requests.hidden = false; requests.scrollIntoView({block:'start',behavior:'smooth'}); }
@@ -590,10 +628,11 @@
           </div>
         `).join('') : '<p style="color:#78847f;font-size:12px;margin:0">No messages yet. Send a message to our support team regarding this order.</p>';
         list.scrollTop = list.scrollHeight;
+        await loadCustomerNotifications();
       } catch (e) { list.innerHTML = `<p style="color:#b91c1c;font-size:12px">${escapeHtml(e.message)}</p>`; }
     }
 
-    loadMessages();
+    await loadMessages();
 
     form.addEventListener('submit', async e => {
       e.preventDefault();
@@ -612,7 +651,6 @@
     dialog.addEventListener('close', () => dialog.remove());
   }
   document.querySelector('.dialog-close').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('close', () => unsubscribeRealtime());
   dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
   document.querySelectorAll('.auth-tab').forEach(tab => tab.addEventListener('click', () => setMode(tab.dataset.mode)));
   form.addEventListener('submit', async event => {
