@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - '*.html'
+      - '.github/workflows/indexnow.yml'
       - 'sitemap.xml'
       - 'robots.txt'
       - '9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d.txt'
