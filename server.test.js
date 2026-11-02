@@ -667,6 +667,10 @@ test('serves customer and admin pages', async () => {
   assert.match(guides.response.headers.get('content-type') || '', /text\/html/);
   assert.match(guidesCss.response.headers.get('content-type') || '', /text\/css/);
   assert.match(guides.payload, /canonical.*guides\.html/);
+  assert.match(guides.payload, /"@type": "CollectionPage"/);
+  assert.match(guides.payload, /"@type": "ItemList"/);
+  assert.match(guides.payload, /ecu-fault-code-diagnosis\.html/);
+  assert.match(guides.payload, /ecu-file-identification-original-backup\.html/);
   assert.match(guides.payload, /WORKSHOP SAFETY/);
   assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
   assert.match(airbagSeo.payload,/canonical.*airbag-crash-clear\.html/);
