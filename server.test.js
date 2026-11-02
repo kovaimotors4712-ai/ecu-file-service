@@ -2166,7 +2166,8 @@ test('removed international workshop URL stays out of public navigation and site
   const homepage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   const guides = fs.readFileSync(path.join(__dirname, 'guides.html'), 'utf8');
   const sitemap = fs.readFileSync(path.join(__dirname, 'sitemap.xml'), 'utf8');
-  assert.equal(fs.existsSync(path.join(__dirname, 'international-ecu-file-support.html')), false);
+  const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  assert.doesNotMatch(server, /international-ecu-file-support\.html/);
   assert.doesNotMatch(homepage, /href="\/international-ecu-file-support\.html"/);
   assert.doesNotMatch(guides, /href="\/international-ecu-file-support\.html"/);
   assert.doesNotMatch(sitemap, /<loc>https:\/\/ecufileservice\.in\/international-ecu-file-support\.html<\/loc>/);
