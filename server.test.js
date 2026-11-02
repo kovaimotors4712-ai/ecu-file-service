@@ -2159,18 +2159,15 @@ test('message notification migration enables order message realtime publication'
 });
 
 
-test('international workshop landing page is indexable, canonical and discoverable', () => {
-  const page = fs.readFileSync(path.join(__dirname, 'international-ecu-file-support.html'), 'utf8');
+test('removed international workshop URL stays out of public navigation and sitemap', () => {
   const homepage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  const guides = fs.readFileSync(path.join(__dirname, 'guides.html'), 'utf8');
   const sitemap = fs.readFileSync(path.join(__dirname, 'sitemap.xml'), 'utf8');
-  assert.match(page, /<html lang="en">/);
-  assert.match(page, /<title>International ECU File Support for Workshops/);
-  assert.match(page, /rel="canonical" href="https:\/\/ecufileservice\.in\/international-ecu-file-support\.html"/);
-  assert.doesNotMatch(page, /name="robots" content="[^"]*noindex/i);
-  assert.match(page, /Compatibility and serviceability are confirmed first/);
-  assert.match(page, /Availability is not universal/);
-  assert.match(homepage, /href="\/international-ecu-file-support\.html"/);
-  assert.match(sitemap, /<loc>https:\/\/ecufileservice\.in\/international-ecu-file-support\.html<\/loc>/);
+  assert.equal(fs.existsSync(path.join(__dirname, 'international-ecu-file-support.html')), false);
+  assert.doesNotMatch(homepage, /href="\/international-ecu-file-support\.html"/);
+  assert.doesNotMatch(guides, /href="\/international-ecu-file-support\.html"/);
+  assert.doesNotMatch(sitemap, /<loc>https:\/\/ecufileservice\.in\/international-ecu-file-support\.html<\/loc>/);
+  assert.match(guides, /href="\/forum\.html">Workshop Forum<\/a>/);
 });
 
 
