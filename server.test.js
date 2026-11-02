@@ -2172,3 +2172,11 @@ test('international workshop landing page is indexable, canonical and discoverab
   assert.match(homepage, /href="\/international-ecu-file-support\.html"/);
   assert.match(sitemap, /<loc>https:\/\/ecufileservice\.in\/international-ecu-file-support\.html<\/loc>/);
 });
+
+
+test('international workshop support is internally linked from relevant resources', () => {
+  for (const file of ['ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'forum.html']) {
+    const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
+    assert.match(html, /href="\/international-ecu-file-support\.html"/, file + ' should link to international workshop support');
+  }
+});
