@@ -2157,3 +2157,26 @@ test('message notification migration enables order message realtime publication'
   assert.ok(migration.includes('ALTER PUBLICATION supabase_realtime ADD TABLE public.order_messages;'));
   assert.ok(migration.includes('pg_publication_tables'));
 });
+
+
+test('international workshop landing page is indexable, canonical and discoverable', () => {
+  const page = fs.readFileSync(path.join(__dirname, 'international-ecu-file-support.html'), 'utf8');
+  const homepage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  const sitemap = fs.readFileSync(path.join(__dirname, 'sitemap.xml'), 'utf8');
+  assert.match(page, /<html lang="en">/);
+  assert.match(page, /<title>International ECU File Support for Workshops/);
+  assert.match(page, /rel="canonical" href="https:\/\/ecufileservice\.in\/international-ecu-file-support\.html"/);
+  assert.doesNotMatch(page, /name="robots" content="[^"]*noindex/i);
+  assert.match(page, /Compatibility and serviceability are confirmed first/);
+  assert.match(page, /Availability is not universal/);
+  assert.match(homepage, /href="\/international-ecu-file-support\.html"/);
+  assert.match(sitemap, /<loc>https:\/\/ecufileservice\.in\/international-ecu-file-support\.html<\/loc>/);
+});
+
+
+test('international workshop support is internally linked from relevant resources', () => {
+  for (const file of ['ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'forum.html']) {
+    const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
+    assert.match(html, /href="\/international-ecu-file-support\.html"/, file + ' should link to international workshop support');
+  }
+});
