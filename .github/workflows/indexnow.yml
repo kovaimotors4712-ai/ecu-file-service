@@ -1,0 +1,51 @@
+name: Notify search engines with IndexNow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '*.html'
+      - 'sitemap.xml'
+      - 'robots.txt'
+      - '9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d.txt'
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out website files
+        uses: actions/checkout@v4
+      - name: Submit sitemap URLs to IndexNow
+        env:
+          INDEXNOW_KEY: 9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const xml = fs.readFileSync('sitemap.xml', 'utf8');
+          const urlList = [...xml.matchAll(/<loc>\\s*(.*?)\\s*<\\/loc>/g)].map(match => match[1].trim());
+          if (!urlList.length) throw new Error('No URLs found in sitemap.xml');
+          const payload = {
+            host: 'ecufileservice.in',
+            key: process.env.INDEXNOW_KEY,
+            keyLocation: 'https://ecufileservice.in/9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d.txt',
+            urlList
+          };
+          fetch('https://api.indexnow.org/indexnow', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
+            body: JSON.stringify(payload)
+          }).then(async response => {
+            const body = await response.text();
+            console.log('IndexNow HTTP', response.status, body);
+            if (!response.ok) process.exitCode = 1;
+          }).catch(error => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE
