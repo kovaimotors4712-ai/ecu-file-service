@@ -128,6 +128,13 @@
   }
 
   function renderAccountState() {
+    // Resolve these elements inside the function so early auth callbacks cannot
+    // access later top-level const declarations in the temporal dead zone.
+    const authTabs = document.querySelector('.auth-tabs');
+    const form = document.querySelector('#auth-form');
+    const resetForm = document.querySelector('#auth-reset-form');
+    const accountTitle = document.querySelector('#account-title');
+    const accountIntro = document.querySelector('.account-intro');
     const trigger = document.querySelector('#account-trigger');
     const signout = document.querySelector('.account-signout');
     const email = session?.user?.email;
