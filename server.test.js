@@ -2171,9 +2171,10 @@ test('removed international workshop URL stays out of public navigation and site
 });
 
 
-test('international workshop support is internally linked from relevant resources', () => {
-  for (const file of ['ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'forum.html']) {
+test('workshop enquiry links use the live contact page, not the removed URL', () => {
+  for (const file of ['index.html', 'ecu-file-services.html', 'airbag-crash-clear.html', 'forum.html']) {
     const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
-    assert.match(html, /href="\/international-ecu-file-support\.html"/, file + ' should link to international workshop support');
+    assert.doesNotMatch(html, /href="\/international-ecu-file-support\.html"/, file + ' must not link to the removed URL');
+    assert.match(html, /href="\/contact\.html"/, file + ' should retain a working contact path');
   }
 });
