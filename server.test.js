@@ -2180,3 +2180,19 @@ test('international workshop support is internally linked from relevant resource
     assert.match(html, /href="\/international-ecu-file-support\.html"/, file + ' should link to international workshop support');
   }
 });
+
+
+test('global Indian vehicle support page is public, indexable, internally linked and included in sitemap', () => {
+  const page = fs.readFileSync(path.join(__dirname, 'indian-vehicle-global-support.html'), 'utf8');
+  const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const guides = fs.readFileSync(path.join(__dirname, 'guides.html'), 'utf8');
+  const sitemap = fs.readFileSync(path.join(__dirname, 'sitemap.xml'), 'utf8');
+  assert.match(server, /'indian-vehicle-global-support\\.html'/);
+  assert.match(page, /name="robots" content="index, follow"/);
+  assert.match(page, /rel="canonical" href="https:\\/\\/ecufileservice\\.in\\/indian-vehicle-global-support\\.html"/);
+  for (const brand of ['Maruti Suzuki', 'Tata Motors', 'Mahindra', 'Force Motors', 'Ashok Leyland', 'Swaraj', 'TAFE', 'Sonalika', 'Escorts Kubota', 'Hero MotoCorp', 'TVS', 'Bajaj', 'Royal Enfield']) assert.ok(page.includes(brand), brand + ' should be represented');
+  for (const market of ['Bangladesh', 'Nepal', 'Sri Lanka', 'South Africa', 'Saudi Arabia', 'UAE', 'Mexico', 'Chile', 'Japan', 'Indonesia', 'Tanzania']) assert.ok(page.includes(market), market + ' should be represented');
+  assert.match(guides, /href="\\/indian-vehicle-global-support\\.html"/);
+  assert.match(sitemap, /<loc>https:\\/\\/ecufileservice\\.in\\/indian-vehicle-global-support\\.html<\\/loc>/);
+  assert.doesNotMatch(page, /ECU SOLUTION|Easy Solution/i);
+});
