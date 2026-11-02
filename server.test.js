@@ -689,8 +689,11 @@ test('serves customer and admin pages', async () => {
 test('serves robots.txt and sitemap.xml with correct headers and content', async () => {
   const robots = await call('/robots.txt');
   const sitemap = await call('/sitemap.xml');
+  const indexNowKey = await call('/9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d.txt');
   assert.equal(robots.response.status, 200);
   assert.equal(sitemap.response.status, 200);
+  assert.equal(indexNowKey.response.status, 200);
+  assert.equal(indexNowKey.payload.trim(), '9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d');
   assert.match(robots.response.headers.get('content-type') || '', /text\/plain/);
   assert.match(sitemap.response.headers.get('content-type') || '', /(?:application|text)\/xml/);
   assert.match(robots.payload, /User-agent: \*/);
