@@ -2190,7 +2190,7 @@ test('global Indian vehicle support page is public, indexable, internally linked
   assert.ok(server.includes("'indian-vehicle-global-support.html'"));
   assert.ok(page.includes('name="robots" content="index, follow"'));
   assert.ok(page.includes('rel="canonical" href="https://ecufileservice.in/indian-vehicle-global-support.html"'));
-  for (const brand of ['Maruti Suzuki', 'Tata Motors', 'Mahindra', 'Force Motors', 'Ashok Leyland', 'Swaraj', 'TAFE', 'Sonalika', 'Escorts Kubota', 'Hero MotoCorp', 'TVS', 'Bajaj', 'Royal Enfield']) assert.ok(page.includes(brand), brand + ' should be represented');
+  for (const brand of ['Maruti Suzuki', 'Tata Motors', 'Mahindra', 'Force Motors', 'Ashok Leyland', 'BharatBenz', 'SML Mahindra', 'Olectra', 'Swaraj', 'TAFE', 'Sonalika', 'Escorts Kubota', 'Hero MotoCorp', 'Ather', 'TVS', 'Bajaj', 'Royal Enfield']) assert.ok(page.includes(brand), brand + ' should be represented');
   for (const market of ['Bangladesh', 'Nepal', 'Sri Lanka', 'South Africa', 'Saudi Arabia', 'UAE', 'Mexico', 'Chile', 'Japan', 'Indonesia', 'Tanzania']) assert.ok(page.includes(market), market + ' should be represented');
   assert.ok(guides.includes('href="/indian-vehicle-global-support.html"'));
   assert.ok(sitemap.includes('<loc>https://ecufileservice.in/indian-vehicle-global-support.html</loc>'));
