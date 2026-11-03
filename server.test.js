@@ -764,6 +764,9 @@ test('serves the forum beta after verified RLS migration and keeps SQL files pri
   assert.match(forumCss.response.headers.get('content-type') || '', /text\/css/);
   assert.match(forumJs.response.headers.get('content-type') || '', /javascript/);
   assert.match(forum.payload, /canonical.*forum\.html/);
+  assert.match(forum.payload, /<title>Global Automotive Workshop Forum \| ECU File Service India<\/title>/);
+  assert.match(forum.payload, /Join a global automotive workshop forum/);
+  assert.match(forum.payload, /and Workshops worldwide/);
   assert.match(forum.payload, /forum-auth-form/);
   assert.match(forum.payload, /workshop topics|discussion board/i);
   assert.match(forumJs.payload, /escapeHtml/);
