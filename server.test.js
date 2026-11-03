@@ -677,6 +677,9 @@ test('serves customer and admin pages', async () => {
   assert.match(airbagSeo.payload,/<title>Airbag SRS Module File Support \| ECU File Service India<\/title>/);
   assert.match(airbagSeo.payload,/property="og:title" content="Airbag SRS Module File Support \| ECU File Service India"/);
   assert.match(airbagSeo.payload,/name="twitter:title" content="Airbag SRS Module File Support \| ECU File Service India"/);
+  assert.match(customer.payload,/name="twitter:title" content="ECU File Services &amp; Car Diagnostics in India \| ECU File Service India"/);
+  assert.match((await call('/car-diagnostic-help.html')).payload,/property="og:title" content="Car Diagnostic Help &amp; OBD Fault Codes \| ECU File Service India"/);
+  assert.match((await call('/car-electrical-diagnostics.html')).payload,/property="og:title" content="Car Electrical Fault Diagnosis &amp; ECU Problems \| ECU File Service India"/);
   assert.match(customer.response.headers.get('content-type') || '', /text\/html/);
   assert.equal(customer.response.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(customer.response.headers.get('x-frame-options'), 'DENY');
