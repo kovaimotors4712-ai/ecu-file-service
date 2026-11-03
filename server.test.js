@@ -673,6 +673,12 @@ test('serves customer and admin pages', async () => {
   assert.match(guides.payload, /ecu-file-identification-original-backup\.html/);
   assert.match(guides.payload, /WORKSHOP SAFETY/);
   assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
+  assert.match(ecuSeo.payload,/<title>ECU File Services India &amp; Worldwide \| ECU File Service India<\/title>/);
+  assert.match(ecuSeo.payload,/name="twitter:title" content="ECU File Services India &amp; Worldwide \| ECU File Service India"/);
+  assert.match(ecuSeo.payload,/"areaServed": \[/);
+  assert.match(ecuSeo.payload,/"name": "International markets"/);
+  assert.match(ecuSeo.payload,/for India &amp; worldwide workshops/);
+  assert.match(ecuSeo.payload,/Can workshops outside India submit a request\?/);
   assert.match(airbagSeo.payload,/canonical.*airbag-crash-clear\.html/);
   assert.match(airbagSeo.payload,/<title>Airbag SRS Module File Support \| ECU File Service India<\/title>/);
   assert.match(airbagSeo.payload,/property="og:title" content="Airbag SRS Module File Support \| ECU File Service India"/);
