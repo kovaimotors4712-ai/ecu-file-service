@@ -674,6 +674,9 @@ test('serves customer and admin pages', async () => {
   assert.match(guides.payload, /WORKSHOP SAFETY/);
   assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
   assert.match(airbagSeo.payload,/canonical.*airbag-crash-clear\.html/);
+  assert.match(airbagSeo.payload,/<title>Airbag SRS Module File Support \| ECU File Service India<\/title>/);
+  assert.match(airbagSeo.payload,/property="og:title" content="Airbag SRS Module File Support \| ECU File Service India"/);
+  assert.match(airbagSeo.payload,/name="twitter:title" content="Airbag SRS Module File Support \| ECU File Service India"/);
   assert.match(customer.response.headers.get('content-type') || '', /text\/html/);
   assert.equal(customer.response.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(customer.response.headers.get('x-frame-options'), 'DENY');
