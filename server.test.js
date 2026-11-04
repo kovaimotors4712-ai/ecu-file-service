@@ -2254,3 +2254,34 @@ test('diagnostic and service pages expose FAQ structured data matching their vis
     assert.match(html, /"acceptedAnswer"/, file + ' should include FAQ answers');
   }
 });
+
+
+test('forum and workshop directory FAQ structured data matches visible public questions', () => {
+  const cases = [
+    {
+      file: 'forum.html',
+      questions: [
+        'Can visitors read forum discussions?',
+        'What should I include when asking about a DTC?',
+        'Can I upload an ECU file or wiring document?',
+        'Are forum replies guaranteed repair instructions?'
+      ]
+    },
+    {
+      file: 'workshops.html',
+      questions: [
+        'How do I register a workshop?',
+        'What information should a workshop provide?',
+        'How can I find a workshop?',
+        'Are workshop reviews a guarantee of workmanship?'
+      ]
+    }
+  ];
+  for (const item of cases) {
+    const html = fs.readFileSync(path.join(__dirname, item.file), 'utf8');
+    assert.match(html, /"@type": ?"FAQPage"/, item.file + ' should expose FAQ structured data');
+    for (const question of item.questions) {
+      assert.ok(html.includes(question), item.file + ' should visibly contain FAQ question: ' + question);
+    }
+  }
+});
