@@ -2234,6 +2234,6 @@ test('key diagnostic and service pages provide valid breadcrumb structured data'
     const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
     assert.match(html, /"@type": ?"BreadcrumbList"/, file + ' should expose breadcrumb structured data');
     assert.match(html, /"position": 1, ?"name": ?"Home"/, file + ' should include the home breadcrumb');
-    assert.match(html, new RegExp(file.replace(/[.*+?^${}()|[\\]\\]/g, '\\\\$&')), file + ' should identify its own page');
+    assert.ok(html.includes(file), file + ' should identify its own page');
   }
 });
