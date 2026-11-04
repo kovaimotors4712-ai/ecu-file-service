@@ -25,6 +25,39 @@
     ]
   }
   </script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Does matching file size mean two ECU files are compatible?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. Size is only one attribute. Confirm ECU hardware/software identity, memory region, read method and approved compatibility evidence."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Why save a SHA-256 hash?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "It provides a repeatable way to detect whether the file bytes have changed between storage, transfer and analysis."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I post an ECU file publicly to ask for help?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Do not upload private customer data or files that you are not authorized to share. First remove identifying details and confirm that sharing is permitted. You can describe the controller IDs and symptoms in the workshop forum ."
+        }
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
   <div class="announcement"><span class="status-dot"></span> ECU WORKSHOP REFERENCE · FILE INTEGRITY <span class="announcement-right">PRESERVE ORIGINALS</span></div>
