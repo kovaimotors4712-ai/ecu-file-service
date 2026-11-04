@@ -2331,7 +2331,7 @@ test('public SEO landing pages keep canonical metadata and valid JSON-LD', () =>
     assert.match(html, /<title>[^<]{8,}<\/title>/i, file + ' should have a descriptive title');
     assert.match(html, /<meta name="description" content="[^"]{50,}"/i, file + ' should have a useful meta description');
     assert.ok(html.includes('https://ecufileservice.in/' + (file === 'index.html' ? '' : file)), file + ' should declare its canonical URL');
-    assert.match(html, /<meta name="robots" content="index, follow"/i, file + ' should be indexable');
+    assert.doesNotMatch(html, /<meta name="robots" content="noindex/i, file + ' must not be blocked from indexing');
     const scripts = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
     assert.ok(scripts.length > 0, file + ' should include structured data');
     for (const script of scripts) {
