@@ -2285,3 +2285,15 @@ test('forum and workshop directory FAQ structured data matches visible public qu
     }
   }
 });
+
+
+test('airbag SRS page displays safety-focused FAQs and matching FAQ structured data', () => {
+  const html = fs.readFileSync(path.join(__dirname, 'airbag-crash-clear.html'), 'utf8');
+  assert.match(html, /"@type": ?"FAQPage"/);
+  assert.match(html, /id="airbag-file-faq"/);
+  assert.ok(html.includes('What information is needed to review an SRS airbag module?'));
+  assert.ok(html.includes('Can workshops outside India request airbag file support?'));
+  assert.ok(html.includes('Does a file reset repair the complete airbag system?'));
+  assert.ok(html.includes('Should I write a modified file before repairing the vehicle?'));
+  assert.match(html, /Do not write a file or return the vehicle to service until the underlying SRS fault is diagnosed and repaired/);
+});
