@@ -677,6 +677,7 @@ test('serves customer and admin pages', async () => {
   assert.match(workshops.payload, /Workshop outside India\?/);
   assert.match(workshops.payload, /public workshop directory currently lists Indian locations/);
   assert.match(workshops.payload, /href="\/ecu-file-services\.html">International ECU file support/);
+  assert.match(workshops.payload, /href="\/forum\.html#forum-account-panel">Create your free community account/);
   assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
   assert.match(ecuSeo.payload,/<title>Remote ECU File Support for Workshops \| ECU File Service India<\/title>/);
   assert.match(ecuSeo.payload,/name="twitter:title" content="Remote ECU File Support for Workshops \| ECU File Service India"/);
