@@ -2318,6 +2318,19 @@ test('forum and airbag public pages include home-to-page breadcrumb structured d
 });
 
 
+
+
+test('ECU service landing links preselect the matching request service', () => {
+  const servicePage = fs.readFileSync(path.join(__dirname, 'ecu-file-services.html'), 'utf8');
+  const homePage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  assert.match(servicePage, /service=DPF%20OFF#order/);
+  assert.match(servicePage, /service=AdBlue%20%2F%20SCR%20OFF#order/);
+  assert.match(servicePage, /service=DTC%20OFF#order/);
+  assert.match(homePage, /allowedServices = \['DTC OFF', 'DPF OFF', 'AdBlue \/ SCR OFF'\]/);
+  assert.match(homePage, /serviceInput\.checked = true/);
+  assert.match(homePage, /serviceInput\.dispatchEvent\(new Event\('input'/);
+});
+
 test('public SEO landing pages keep canonical metadata and valid JSON-LD', () => {
   const files = [
     'index.html',
