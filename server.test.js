@@ -2210,3 +2210,13 @@ test('workshop enquiry links use the live contact page, not the removed URL', ()
     assert.match(html, /href="\/contact\.html"/, file + ' should retain a working contact path');
   }
 });
+
+
+test('ECU file service page links to relevant diagnostic, community and India workshop resources', () => {
+  const page = fs.readFileSync(path.join(__dirname, 'ecu-file-services.html'), 'utf8');
+  assert.match(page, /id="related-workshop-resources"/);
+  assert.match(page, /href="\\/guides\\.html"/);
+  assert.match(page, /href="\\/forum\\.html"/);
+  assert.match(page, /href="\\/workshops\\.html"/);
+  assert.match(page, /currently lists approved workshops in India/);
+});
