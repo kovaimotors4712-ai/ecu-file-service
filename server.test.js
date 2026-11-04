@@ -678,9 +678,10 @@ test('serves customer and admin pages', async () => {
   assert.match(workshops.payload, /public workshop directory currently lists Indian locations/);
   assert.match(workshops.payload, /href="\/ecu-file-services\.html">International ECU file support/);
   assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
-  assert.match(ecuSeo.payload,/<title>ECU File Services India &amp; Worldwide \| ECU File Service India<\/title>/);
-  assert.match(ecuSeo.payload,/name="twitter:title" content="ECU File Services India &amp; Worldwide \| ECU File Service India"/);
+  assert.match(ecuSeo.payload,/<title>Remote ECU File Support for Workshops \| ECU File Service India<\/title>/);
+  assert.match(ecuSeo.payload,/name="twitter:title" content="Remote ECU File Support for Workshops \| ECU File Service India"/);
   assert.match(ecuSeo.payload,/"areaServed": \[/);
+  assert.match(ecuSeo.payload,/"name": "Remote ECU File Support for Workshops in India and Worldwide"/);
   assert.match(ecuSeo.payload,/"name": "International markets"/);
   assert.match(ecuSeo.payload,/for India &amp; worldwide workshops/);
   assert.match(ecuSeo.payload,/Can workshops outside India submit a request\?/);
@@ -692,6 +693,7 @@ test('serves customer and admin pages', async () => {
   assert.match(airbagSeo.payload,/for India &amp; worldwide workshops/);
   assert.match(customer.payload,/name="twitter:title" content="ECU File Services India &amp; Worldwide \| ECU File Service India"/);
   assert.match(customer.payload,/<title>ECU File Services India &amp; Worldwide \| ECU File Service India<\/title>/);
+  assert.notEqual(customer.payload.match(/<title>(.*?)<\/title>/)?.[1], ecuSeo.payload.match(/<title>(.*?)<\/title>/)?.[1], 'homepage and service page titles should target distinct search intent');
   assert.match((await call('/car-diagnostic-help.html')).payload,/property="og:title" content="Car Diagnostic Help &amp; OBD Fault Codes \| ECU File Service India"/);
   assert.match((await call('/car-electrical-diagnostics.html')).payload,/property="og:title" content="Car Electrical Fault Diagnosis &amp; ECU Problems \| ECU File Service India"/);
   assert.match(customer.response.headers.get('content-type') || '', /text\/html/);
