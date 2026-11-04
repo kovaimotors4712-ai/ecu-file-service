@@ -672,6 +672,11 @@ test('serves customer and admin pages', async () => {
   assert.match(guides.payload, /ecu-fault-code-diagnosis\.html/);
   assert.match(guides.payload, /ecu-file-identification-original-backup\.html/);
   assert.match(guides.payload, /WORKSHOP SAFETY/);
+  const workshops = await call('/workshops.html');
+  assert.equal(workshops.response.status, 200);
+  assert.match(workshops.payload, /Workshop outside India\?/);
+  assert.match(workshops.payload, /public workshop directory currently lists Indian locations/);
+  assert.match(workshops.payload, /href="\/ecu-file-services\.html">International ECU file support/);
   assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
   assert.match(ecuSeo.payload,/<title>ECU File Services India &amp; Worldwide \| ECU File Service India<\/title>/);
   assert.match(ecuSeo.payload,/name="twitter:title" content="ECU File Services India &amp; Worldwide \| ECU File Service India"/);
