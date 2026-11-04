@@ -2306,7 +2306,7 @@ test('forum and airbag public pages include home-to-page breadcrumb structured d
   ]) {
     const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
     assert.match(html, /"@type": ?"BreadcrumbList"/, file + ' should expose breadcrumb data');
-    assert.match(html, /"position": 1, ?"name": ?"Home"/, file + ' should link back to home');
+    assert.ok(html.includes('"position": 1') && html.includes('"name": "Home"'), file + ' should link back to home');
     assert.ok(html.includes(label), file + ' should identify the page breadcrumb');
   }
 });
