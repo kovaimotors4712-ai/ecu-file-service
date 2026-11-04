@@ -2310,3 +2310,35 @@ test('forum and airbag public pages include home-to-page breadcrumb structured d
     assert.ok(html.includes(label), file + ' should identify the page breadcrumb');
   }
 });
+
+
+test('public SEO landing pages keep canonical metadata and valid JSON-LD', () => {
+  const files = [
+    'index.html',
+    'ecu-file-services.html',
+    'airbag-crash-clear.html',
+    'forum.html',
+    'workshops.html',
+    'guides.html',
+    'car-diagnostic-help.html',
+    'car-electrical-diagnostics.html',
+    'ecu-fault-code-diagnosis.html',
+    'ecu-file-identification-original-backup.html'
+  ];
+  const sitemap = fs.readFileSync(path.join(__dirname, 'sitemap.xml'), 'utf8');
+  for (const file of files) {
+    const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
+    assert.match(html, /<title>[^<]{8,}<\/title>/i, file + ' should have a descriptive title');
+    assert.match(html, /<meta name="description" content="[^"]{50,}"/i, file + ' should have a useful meta description');
+    assert.ok(html.includes('https://ecufileservice.in/' + (file === 'index.html' ? '' : file)), file + ' should declare its canonical URL');
+    assert.match(html, /<meta name="robots" content="index, follow"/i, file + ' should be indexable');
+    const scripts = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
+    assert.ok(scripts.length > 0, file + ' should include structured data');
+    for (const script of scripts) {
+      const data = JSON.parse(script[1]);
+      assert.equal(data['@context'], 'https://schema.org', file + ' structured data should use schema.org');
+    }
+    const sitemapPath = file === 'index.html' ? 'https://ecufileservice.in/' : 'https://ecufileservice.in/' + file;
+    assert.ok(sitemap.includes('<loc>' + sitemapPath + '</loc>'), file + ' should be listed in sitemap');
+  }
+});
