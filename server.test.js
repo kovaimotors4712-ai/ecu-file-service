@@ -2364,3 +2364,10 @@ test('public SEO landing pages keep canonical metadata and valid JSON-LD', () =>
     assert.ok(sitemap.includes('<loc>' + sitemapPath + '</loc>'), file + ' should be listed in sitemap');
   }
 });
+
+
+test('homepage provides direct navigation to the workshop directory', () => {
+  const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  assert.match(html, /<a href="\/workshops\.html">Find a workshop<\/a>/);
+  assert.match(html, /class="button button-ghost" href="\/workshops\.html">Find a workshop/);
+});
