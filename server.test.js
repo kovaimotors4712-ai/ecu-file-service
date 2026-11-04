@@ -2297,3 +2297,16 @@ test('airbag SRS page displays safety-focused FAQs and matching FAQ structured d
   assert.ok(html.includes('Should I write a modified file before repairing the vehicle?'));
   assert.match(html, /Do not write a file or return the vehicle to service until the underlying SRS fault is diagnosed and repaired/);
 });
+
+
+test('forum and airbag public pages include home-to-page breadcrumb structured data', () => {
+  for (const [file, label] of [
+    ['forum.html', 'Automotive Workshop Forum'],
+    ['airbag-crash-clear.html', 'Airbag SRS File Support']
+  ]) {
+    const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
+    assert.match(html, /"@type": ?"BreadcrumbList"/, file + ' should expose breadcrumb data');
+    assert.match(html, /"position": 1, ?"name": ?"Home"/, file + ' should link back to home');
+    assert.ok(html.includes(label), file + ' should identify the page breadcrumb');
+  }
+});
