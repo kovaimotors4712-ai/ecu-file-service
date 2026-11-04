@@ -2237,3 +2237,20 @@ test('key diagnostic and service pages provide valid breadcrumb structured data'
     assert.ok(html.includes(file), file + ' should identify its own page');
   }
 });
+
+
+test('diagnostic and service pages expose FAQ structured data matching their visible FAQ sections', () => {
+  const files = [
+    'ecu-file-services.html',
+    'car-diagnostic-help.html',
+    'car-electrical-diagnostics.html',
+    'ecu-fault-code-diagnosis.html',
+    'ecu-file-identification-original-backup.html'
+  ];
+  for (const file of files) {
+    const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
+    assert.match(html, /"@type": ?"FAQPage"/, file + ' should include FAQ structured data');
+    assert.match(html, /"@type": ?"Question"/, file + ' should include FAQ questions');
+    assert.match(html, /"acceptedAnswer"/, file + ' should include FAQ answers');
+  }
+});
