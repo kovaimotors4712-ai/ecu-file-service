@@ -688,7 +688,10 @@ test('serves customer and admin pages', async () => {
   assert.match(airbagSeo.payload,/<title>Airbag SRS Module File Support \| ECU File Service India<\/title>/);
   assert.match(airbagSeo.payload,/property="og:title" content="Airbag SRS Module File Support \| ECU File Service India"/);
   assert.match(airbagSeo.payload,/name="twitter:title" content="Airbag SRS Module File Support \| ECU File Service India"/);
-  assert.match(customer.payload,/name="twitter:title" content="ECU File Services &amp; Car Diagnostics in India \| ECU File Service India"/);
+  assert.match(airbagSeo.payload,/"name": "International markets"/);
+  assert.match(airbagSeo.payload,/for India &amp; worldwide workshops/);
+  assert.match(customer.payload,/name="twitter:title" content="ECU File Services India &amp; Worldwide \| ECU File Service India"/);
+  assert.match(customer.payload,/<title>ECU File Services India &amp; Worldwide \| ECU File Service India<\/title>/);
   assert.match((await call('/car-diagnostic-help.html')).payload,/property="og:title" content="Car Diagnostic Help &amp; OBD Fault Codes \| ECU File Service India"/);
   assert.match((await call('/car-electrical-diagnostics.html')).payload,/property="og:title" content="Car Electrical Fault Diagnosis &amp; ECU Problems \| ECU File Service India"/);
   assert.match(customer.response.headers.get('content-type') || '', /text\/html/);
@@ -771,6 +774,7 @@ test('serves the forum beta after verified RLS migration and keeps SQL files pri
   assert.match(forum.payload, /canonical.*forum\.html/);
   assert.match(forum.payload, /<title>Global Automotive Workshop Forum \| ECU File Service India<\/title>/);
   assert.match(forum.payload, /Join a global automotive workshop forum/);
+  assert.match(forum.payload, /name="twitter:title" content="Global Automotive Workshop Forum \| ECU File Service India"/);
   assert.match(forum.payload, /and Workshops worldwide/);
   assert.match(forum.payload, /forum-auth-form/);
   assert.match(forum.payload, /workshop topics|discussion board/i);
