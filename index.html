@@ -215,6 +215,17 @@ window.setInterval(refreshLiveChat,12000);
       var radio = document.querySelector('input[name="category"][value="' + category + '"]');
       if (radio) { radio.checked = true; radio.dispatchEvent(new Event('change', { bubbles: true })); }
     }
+    var requestedService = params.get('service') || '';
+    var allowedServices = ['DTC OFF', 'DPF OFF', 'AdBlue / SCR OFF'];
+    if (category === 'ECU' && allowedServices.includes(requestedService)) {
+      var serviceInput = Array.from(document.querySelectorAll('input[name="service"]')).find(function(input) {
+        return input.value === requestedService && !input.disabled;
+      });
+      if (serviceInput) {
+        serviceInput.checked = true;
+        serviceInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
   })();
   </script>
 
