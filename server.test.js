@@ -2371,3 +2371,12 @@ test('homepage provides direct navigation to the workshop directory', () => {
   assert.match(html, /<a href="\/workshops\.html">Find a workshop<\/a>/);
   assert.match(html, /class="button button-ghost" href="\/workshops\.html">Find a workshop/);
 });
+
+
+test('forum preserves the account deep link used by workshop registration', () => {
+  const forum = fs.readFileSync(path.join(__dirname, 'forum.html'), 'utf8');
+  const workshops = fs.readFileSync(path.join(__dirname, 'workshops.html'), 'utf8');
+  assert.match(workshops, /href="\/forum\.html#forum-account-panel"/);
+  assert.match(forum, /window\.location\.hash === '#forum-account-panel'/);
+  assert.match(forum, /accountPanel\.scrollIntoView\(\{ block: 'start', behavior: 'instant' \}\)/);
+});
