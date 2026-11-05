@@ -12,6 +12,14 @@
     try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (_) {}
     function resetForumScroll() {
       if (!window.location.pathname.includes('/forum')) return;
+      // Preserve the account deep link used by workshop registration and scroll to sign-up.
+      if (window.location.hash === '#forum-account-panel') {
+        var accountPanel = document.getElementById('forum-account-panel');
+        if (accountPanel) {
+          accountPanel.scrollIntoView({ block: 'start', behavior: 'instant' });
+          return;
+        }
+      }
       try {
         if (window.location.hash) history.replaceState(null, '', window.location.pathname + window.location.search);
       } catch (_) {}
