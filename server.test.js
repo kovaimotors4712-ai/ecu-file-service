@@ -1242,6 +1242,10 @@ test('public homepage contact is WhatsApp-only and retains a private support fal
   assert.doesNotMatch(admin,/name="contact_phone"|name="telegram_url"|name="contact_email"/);
   assert.match(publicSettings,/select=whatsapp_url/);
   assert.match(publicSettings,/whatsapp_url:whatsapp/);
+  const contact = fs.readFileSync(path.join(__dirname,'contact.html'),'utf8');
+  assert.match(contact,/href="https:\/\/wa\.me\/918300409707"/);
+  assert.match(contact,/Message us on WhatsApp/);
+  assert.doesNotMatch(contact,/href=["']tel:/i);
   assert.doesNotMatch(publicSettings,/contact_phone|telegram_url|contact_email/);
   for (const page of ['airbag-crash-clear.html','ecu-file-services.html']) {
     const html=fs.readFileSync(path.join(__dirname,page),'utf8');
