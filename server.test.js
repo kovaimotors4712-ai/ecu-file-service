@@ -698,6 +698,9 @@ test('serves customer and admin pages', async () => {
   assert.match(airbagSeo.payload,/name="twitter:title" content="Airbag SRS Module File Support \| ECU File Service India"/);
   assert.match(airbagSeo.payload,/"name": "International markets"/);
   assert.match(airbagSeo.payload,/for India &amp; worldwide workshops/);
+  assert.match(airbagSeo.payload,/SRS Module File Review/);
+  assert.match(airbagSeo.payload,/File work alone does not verify that the complete airbag system is safe/);
+  assert.doesNotMatch(airbagSeo.payload,/tested crash-cleared file ready to write back/);
   assert.match(customer.payload,/name="twitter:title" content="ECU File Services India &amp; Worldwide \| ECU File Service India"/);
   assert.match(customer.payload,/<title>ECU File Services India &amp; Worldwide \| ECU File Service India<\/title>/);
   assert.notEqual(customer.payload.match(/<title>(.*?)<\/title>/)?.[1], ecuSeo.payload.match(/<title>(.*?)<\/title>/)?.[1], 'homepage and service page titles should target distinct search intent');
