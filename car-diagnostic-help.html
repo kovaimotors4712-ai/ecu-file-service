@@ -310,7 +310,6 @@
     const results = document.getElementById('dtc-search-results');
     if (!form || !input || !button || !status || !results) return;
     const dataUrl = 'https://foerbsnavi.github.io/OBDex/generic.min.json';
-    let recordsPromise;
     const textOf = value => typeof value === 'string' ? value : '';
     const addText = (parent, tag, text, className) => {
       const node = document.createElement(tag);
@@ -318,24 +317,6 @@
       if (className) node.className = className;
       parent.appendChild(node);
       return node;
-    };
-    const getRecords = () => {
-      if (!recordsPromise) {
-        recordsPromise = fetch(dataUrl, { mode: 'cors', credentials: 'omit' })
-          .then(response => {
-            if (!response.ok) throw new Error('The code database is temporarily unavailable.');
-            return response.json();
-          })
-          .then(data => {
-            if (!Array.isArray(data)) throw new Error('The code database returned an unexpected format.');
-            return data;
-          })
-          .catch(error => {
-            recordsPromise = null;
-            throw error;
-          });
-      }
-      return recordsPromise;
     };
     const searchableText = item => [
       item.code, item.category, item.title && item.title.en, item.description && item.description.en,
@@ -363,27 +344,72 @@
       if (Array.isArray(item.related_codes) && item.related_codes.length) addText(card, 'p', 'Related codes: ' + item.related_codes.slice(0, 8).join(', '), 'dtc-meta');
       return card;
     };
+    async function searchDatabase(query) {
+      const response = await fetch(dataUrl, { mode: 'cors', credentials: 'omit', cache: 'default' });
+      if (!response.ok || !response.body) throw new Error('The DTC reference is temporarily unavailable.');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      const exactCode = /^[PBCU][0-3][0-9A-F]{3}$/.test(query);
+      const term = query.toLowerCase();
+      const limit = exactCode ? 1 : 12;
+      const matches = [];
+      let objectText = '', depth = 0, inString = false, escaped = false, stopped = false;
+      const processChunk = chunk => {
+        for (let i = 0; i < chunk.length; i++) {
+          const ch = chunk[i];
+          if (depth === 0) {
+            if (ch === '{') { objectText = '{'; depth = 1; inString = false; escaped = false; }
+            continue;
+          }
+          objectText += ch;
+          if (inString) {
+            if (escaped) escaped = false;
+            else if (ch === '\\') escaped = true;
+            else if (ch === '"') inString = false;
+          } else if (ch === '"') inString = true;
+          else if (ch === '{') depth++;
+          else if (ch === '}') {
+            depth--;
+            if (depth === 0) {
+              try {
+                const item = JSON.parse(objectText);
+                const hit = exactCode
+                  ? textOf(item.code).toUpperCase() === query
+                  : searchableText(item).includes(term);
+                if (hit) matches.push(item);
+              } catch (_) { /* Ignore a malformed individual entry. */ }
+              objectText = '';
+              if (matches.length >= limit) { stopped = true; break; }
+            }
+          }
+        }
+      };
+      try {
+        while (!stopped) {
+          const part = await reader.read();
+          if (part.done) break;
+          processChunk(decoder.decode(part.value, { stream: true }));
+        }
+        if (!stopped) processChunk(decoder.decode());
+      } finally {
+        if (stopped) await reader.cancel().catch(() => {});
+        reader.releaseLock();
+      }
+      return matches;
+    }
     form.addEventListener('submit', async event => {
       event.preventDefault();
       const query = input.value.trim().toUpperCase();
       if (query.length < 2) { status.textContent = 'Enter at least two characters.'; return; }
       button.disabled = true;
       results.replaceChildren();
-      status.textContent = 'Loading the DTC reference and searching…';
+      status.textContent = 'Searching the DTC reference…';
       try {
-        const records = await getRecords();
-        const exactCode = /^[PBCU][0-3][0-9A-F]{3}$/.test(query);
-        let matches;
-        if (exactCode) {
-          matches = records.filter(item => textOf(item.code).toUpperCase() === query).slice(0, 10);
-        } else {
-          const term = query.toLowerCase();
-          matches = records.filter(item => searchableText(item).includes(term)).slice(0, 12);
-        }
+        const matches = await searchDatabase(query);
         if (!matches.length) {
           status.textContent = 'No generic OBD-II match found. The code may be manufacturer-specific or described differently.';
         } else {
-          status.textContent = matches.length + ' matching result(s). Showing up to ' + (exactCode ? '10' : '12') + '.';
+          status.textContent = matches.length + (matches.length === 1 ? ' matching result.' : ' matching results. Showing up to 12.');
           matches.forEach(item => results.appendChild(renderRecord(item)));
         }
       } catch (error) {
