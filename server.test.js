@@ -2223,8 +2223,7 @@ test('published software detail pages are server-rendered and included in the dy
   assert.match(page.payload, /<title>ECU Diagnostic Utility/);
   assert.match(page.payload, /name="robots" content="index,follow"/);
   assert.ok(page.payload.includes('<link rel="canonical" href="https://ecufileservice.in' + productPath + '">'));
-') + '"'));
-  assert.match(page.payload, /application\\/ld\\+json/);
+  assert.ok(page.payload.includes('application/ld+json'));
   const sitemap = await call('/sitemap.xml');
   assert.equal(sitemap.response.status, 200);
   assert.ok(sitemap.payload.includes('https://ecufileservice.in' + productPath));
