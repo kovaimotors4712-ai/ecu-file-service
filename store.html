@@ -54,8 +54,8 @@ const tools=document.getElementById('store-tools'),search=document.getElementByI
 if(!grid)return;
 const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
 const https=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch(_){return '';}};
-const softwareSlug=value=>String(value||'').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,90)||'software';
-const canHaveSearchPage=item=>/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id||''))&&String(item.description||'').replace(/\\s+/g,' ').trim().length>=120;
+const softwareSlug=value=>String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,90)||'software';
+const canHaveSearchPage=item=>/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id||''))&&String(item.description||'').replace(/\s+/g,' ').trim().length>=120;
 const categoryOf=item=>{
 const text=(String(item.title||'')+' '+String(item.description||'')).toLowerCase();
 if(/airbag|srs|crash data|pretensioner/.test(text))return 'Airbag / SRS';
