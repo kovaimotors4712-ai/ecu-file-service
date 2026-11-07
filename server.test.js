@@ -33,6 +33,14 @@ const tokens = {
   admin: 'test-admin-token',
   other: 'test-other-customer-token'
 };
+const softwareSeoFixture = {
+  id: '123e4567-e89b-42d3-a456-426614174000',
+  title: 'ECU Diagnostic Utility',
+  description: 'A workshop diagnostic utility for identifying supported electronic control unit communication and fault-code information. Confirm compatibility with the exact vehicle, control module and interface before use.',
+  version: '2.0', price_paise: 0, currency: 'INR', price_visible: false,
+  image_url: null, product_url: null, contact_url: null, is_published: true,
+  created_at: '2026-11-07T00:00:00.000Z', updated_at: '2026-11-07T00:00:00.000Z'
+};
 
 const clean = value => String(value ?? '').trim();
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -242,6 +250,8 @@ const upstream = async (urlValue, options = {}) => {
     if (state.resendShouldFail) return response(500, { message: 'synthetic Resend outage' });
     return response(200, { id: 'email-local-1' });
   }
+
+  if (url.pathname === '/rest/v1/software_products' && method === 'GET') return response(200, [softwareSeoFixture]);
 
   if (url.pathname === '/rest/v1/advertising_inquiries') {
     if (method === 'GET') return response(200, filteredAdvertisingRows([...state.advertisingInquiries.values()].map(row=>({...row})),url.searchParams));
@@ -2205,6 +2215,19 @@ test('message notification migration enables order message realtime publication'
   assert.ok(migration.includes('pg_publication_tables'));
 });
 
+
+test('published software detail pages are server-rendered and included in the dynamic sitemap', async () => {
+  const productPath = '/software/ecu-diagnostic-utility-' + softwareSeoFixture.id;
+  const page = await call(productPath);
+  assert.equal(page.response.status, 200);
+  assert.match(page.payload, /<title>ECU Diagnostic Utility/);
+  assert.match(page.payload, /name="robots" content="index,follow"/);
+  assert.ok(page.payload.includes('<link rel="canonical" href="https://ecufileservice.in' + productPath + '">'));
+  assert.ok(page.payload.includes('application/ld+json'));
+  const sitemap = await call('/sitemap.xml');
+  assert.equal(sitemap.response.status, 200);
+  assert.ok(sitemap.payload.includes('https://ecufileservice.in' + productPath));
+});
 
 test('removed international workshop URL stays out of public navigation and sitemap', () => {
   const homepage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
