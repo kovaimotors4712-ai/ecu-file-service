@@ -5,6 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const root = __dirname;
+const { buildSoftwareSitemapEntries, isIndexableSoftwareProduct, productIdFromPath, renderSoftwareProductPage, softwareProductPath } = require('./software-seo');
 try {
   const envText = fs.readFileSync(path.join(root, '.env'), 'utf8');
   for (const line of envText.split(/\r?\n/)) {
@@ -2071,6 +2072,71 @@ async function handleApi(request, response, url) {
   return true;
 }
 
+async function handlePublicSoftwareSeoRequest(request, response, pathname) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    response.writeHead(405, { Allow: 'GET, HEAD' }).end();
+    return true;
+  }
+  if (pathname === '/sitemap.xml') {
+    let sitemap;
+    try { sitemap = await fs.promises.readFile(path.join(root, 'sitemap.xml'), 'utf8'); }
+    catch { response.writeHead(500).end(); return true; }
+    if (supabaseServiceRoleKey && sitemap.includes('</urlset>')) {
+      try {
+        const result = await supabaseRequest(serviceToken(),
+          'rest/v1/software_products?select=id,title,description,is_published,created_at,updated_at&is_published=eq.true&order=updated_at.desc&limit=200',
+          { timeoutMs: 12000 });
+        if (result.ok) {
+          const products = await result.json();
+          const entries = buildSoftwareSitemapEntries(products);
+          if (entries) sitemap = sitemap.replace('</urlset>', entries + '</urlset>');
+        } else {
+          console.warn('[software-seo] Dynamic sitemap query failed; serving static sitemap.', { status: result.status });
+        }
+      } catch (error) {
+        console.warn('[software-seo] Dynamic sitemap unavailable; serving static sitemap.', { message: error.message });
+      }
+    }
+    response.writeHead(200, {
+      'Content-Type': 'application/xml; charset=utf-8',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      'X-Content-Type-Options': 'nosniff'
+    });
+    response.end(request.method === 'HEAD' ? undefined : sitemap);
+    return true;
+  }
+  if (!pathname.startsWith('/software/')) return false;
+  const productId = productIdFromPath(pathname);
+  if (!productId || !supabaseServiceRoleKey) { response.writeHead(404).end('Not found'); return true; }
+  try {
+    const result = await supabaseRequest(serviceToken(),
+      'rest/v1/software_products?id=eq.' + encodeURIComponent(productId) +
+      '&is_published=eq.true&select=id,title,description,version,price_paise,price_visible,currency,image_url,product_url,contact_url,is_published,created_at,updated_at&limit=1',
+      { timeoutMs: 12000 });
+    if (!result.ok) { response.writeHead(503, { 'Cache-Control': 'no-store' }).end('Software details are temporarily unavailable.'); return true; }
+    const rows = await result.json();
+    const product = rows?.[0];
+    if (!isIndexableSoftwareProduct(product)) { response.writeHead(404).end('Not found'); return true; }
+    const canonicalPath = softwareProductPath(product);
+    if (pathname.replace(/\/$/, '') !== canonicalPath) {
+      response.writeHead(301, { Location: canonicalPath, 'Cache-Control': 'public, max-age=86400' }).end();
+      return true;
+    }
+    const html = renderSoftwareProductPage(product);
+    response.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    });
+    response.end(request.method === 'HEAD' ? undefined : html);
+    return true;
+  } catch (error) {
+    console.warn('[software-seo] Product page request failed.', { message: error.message });
+    response.writeHead(503, { 'Cache-Control': 'no-store' }).end('Software details are temporarily unavailable.');
+    return true;
+  }
+}
+
 function createHttpServer() {
   const server = http.createServer((request, response) => {
     // Baseline browser hardening on every response, including API and error paths.
@@ -2100,6 +2166,13 @@ function createHttpServer() {
     }
     let pathname;
     try { pathname = decodeURIComponent(requestUrl.pathname); } catch { response.writeHead(400).end('Bad request'); return; }
+    if (pathname === '/sitemap.xml' || pathname.startsWith('/software/')) {
+      handlePublicSoftwareSeoRequest(request, response, pathname).catch(error => {
+        if (!response.writableEnded) response.writeHead(500).end('Request failed');
+        console.warn('[software-seo] Public route failed.', { message: error.message });
+      });
+      return;
+    }
     if (pathname === '/robots.txt') {
       const robotsBody = [
         'User-agent: Google-InspectionTool',
