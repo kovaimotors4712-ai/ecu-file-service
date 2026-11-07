@@ -2222,7 +2222,7 @@ test('published software detail pages are server-rendered and included in the dy
   assert.equal(page.response.status, 200);
   assert.match(page.payload, /<title>ECU Diagnostic Utility/);
   assert.match(page.payload, /name="robots" content="index,follow"/);
-  assert.match(page.payload, new RegExp('rel="canonical" href="https://ecufileservice\\\\.in' + productPath.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\test('removed international workshop URL stays out of public navigation and sitemap', () => {
+  assert.ok(page.payload.includes('<link rel="canonical" href="https://ecufileservice.in' + productPath + '">'));
 ') + '"'));
   assert.match(page.payload, /application\\/ld\\+json/);
   const sitemap = await call('/sitemap.xml');
