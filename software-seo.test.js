@@ -47,7 +47,7 @@ test('sitemap includes only eligible published products and escapes XML', () => 
   ]);
   assert.equal((entries.match(/<url>/g) || []).length, 1);
   assert.match(entries, /ecu-diagnostic-utility/);
-  assert.match(buildSoftwareSitemapEntries([{...validProduct, title: 'ECU & OBD Utility'}]), /ECU &amp; OBD/);
+  assert.match(buildSoftwareSitemapEntries([{...validProduct, title: 'ECU & OBD Utility'}]), /ecu-obd-utility/);
 });
 
 test('product HTML has unique metadata, canonical, safe escaping and no fake product offer data', () => {
