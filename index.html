@@ -186,8 +186,25 @@ window.setInterval(refreshLiveChat,12000);
       <div id="customer-notification-list" class="customer-order-list"></div>
     </div>
     <p class="account-intro">Save requests and access your private file history.</p><div class="auth-tabs"><button type="button" class="auth-tab active" data-mode="signin">Sign in</button><button type="button" class="auth-tab" data-mode="signup">Create account</button></div><form id="auth-form"><label for="auth-email">Email address</label><input id="auth-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required><label for="auth-password">Password</label><input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="8" placeholder="At least 8 characters" required><label for="auth-confirm-signup-password" class="auth-confirm-signup-label" hidden>Confirm Password</label><input id="auth-confirm-signup-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Confirm your password" hidden disabled><button class="button button-dark auth-submit" type="submit">Sign in <span>→</span></button><button class="auth-reset" type="button">Forgot password?</button></form><form id="auth-reset-form" hidden><label for="auth-new-password">New Password</label><input id="auth-new-password" type="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" required><label for="auth-confirm-password">Confirm New Password</label><input id="auth-confirm-password" type="password" autocomplete="new-password" minlength="8" placeholder="Enter your new password again" required><button class="button button-dark auth-submit" id="auth-reset-submit" type="submit">Update Password</button><button class="auth-reset auth-reset-back" type="button">Back to sign in</button></form><div class="account-message" role="status" aria-live="polite"></div><section class="pending-checkouts" id="pending-checkouts" aria-label="Saved checkouts" hidden><div class="customer-orders-head"><h3>Saved checkouts</h3><span class="field-help">Resume a payment you did not finish.</span></div><div id="pending-checkout-list" aria-live="polite"></div></section><section class="customer-orders" id="customer-orders" aria-label="Your orders" hidden><div class="customer-orders-head"><h3>Your orders</h3><button type="button" id="refresh-customer-orders">Refresh</button></div><div class="customer-order-list" aria-live="polite"></div></section><button class="account-signout" type="button" hidden>Sign out</button><a class="admin-shortcut" href="/admin.html">Admin order management ↗</a></dialog>
-  <div class="floating-quick-actions" aria-label="Quick access"><a class="floating-forum-cta" href="/forum.html" aria-label="Open workshop forum"><span class="floating-forum-dot" aria-hidden="true"></span><span>Workshop Forum</span><span aria-hidden="true">↗</span></a><a class="floating-dtc-cta" href="/car-diagnostic-help.html#dtc-search" aria-label="Open DTC search"><span class="floating-dtc-icon" aria-hidden="true">⌕</span><span>DTC Search</span><span aria-hidden="true">↗</span></a></div>
+  <button class="floating-dtc-cta" id="open-dtc-popup" type="button" aria-haspopup="dialog" aria-controls="dtc-popup"><span class="floating-dtc-icon" aria-hidden="true">⌕</span><span>DTC SEARCH</span><span aria-hidden="true">↗</span></button>
+  <dialog class="dtc-popup" id="dtc-popup" aria-label="DTC Search">
+    <button class="dtc-popup-close" id="close-dtc-popup" type="button" aria-label="Close DTC Search">×</button>
+    <iframe title="Standalone DTC Search tool" src="/dtc-search.html" loading="lazy"></iframe>
+  </dialog>
   <footer class="site-footer"><a class="brand footer-brand" href="#home"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 10h26v20H7z"/><path d="M12 15h5v10h-5zm11 0h5m-5 5h5m-5 5h5M3 15h4m-4 5h4m-4 5h4m26-10h4m-4 5h4m-4 5h4"/></svg></span><span class="brand-name">ECU FILE SERVICE INDIA</span></a><span class="footer-copy">Professional file support for automotive specialists. <a href="/forum.html" class="footer-guides-link">Automotive forum ↗</a> · <a href="/guides.html" class="footer-guides-link">Diagnostic guides ↗</a> · <a href="/terms.html" class="footer-guides-link">Terms &amp; Conditions</a> · <a href="/privacy.html" class="footer-guides-link">Privacy Policy</a> · <a href="/contact.html" class="footer-guides-link">International Workshop Support ↗</a> · <a href="/contact.html" class="footer-guides-link">Contact &amp; Support</a></span><span class="footer-right">© <span id="year"></span> ECU FILE SERVICE INDIA <span class="footer-dot">·</span> BUILT FOR THE WORKSHOP</span></footer>
+  <script>
+  (function(){
+    const popup=document.getElementById('dtc-popup');
+    const open=document.getElementById('open-dtc-popup');
+    const close=document.getElementById('close-dtc-popup');
+    if(popup&&open&&close){
+      open.addEventListener('click',()=>{if(typeof popup.showModal==='function')popup.showModal();else window.location.href='/dtc-search.html';});
+      close.addEventListener('click',()=>popup.close());
+      popup.addEventListener('click',event=>{if(event.target===popup)popup.close();});
+      document.addEventListener('keydown',event=>{if(event.key==='Escape'&&popup.open)popup.close();});
+    }
+  })();
+  </script>
   <script>
   (function(){
     const contactLinks=document.getElementById('public-contact-links');
@@ -244,13 +261,14 @@ window.setInterval(refreshLiveChat,12000);
     .software-home-section{padding-top:clamp(24px,4vw,42px)!important;padding-bottom:clamp(24px,4vw,42px)!important}
     .software-home-section .section-heading{margin-bottom:16px!important}
     .software-home-empty{border:1px dashed #b9c88b!important;background:#fffef7!important}
-    .floating-quick-actions{position:fixed;z-index:1000;right:max(14px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:stretch;gap:8px}
-    .floating-forum-cta,.floating-dtc-cta{position:static;display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:11px 14px;background:#18231e;color:#e8f4bc;border:1px solid #9db64a;box-shadow:0 8px 26px #0d17104a;font-size:12px;font-weight:800;text-decoration:none;border-radius:3px;white-space:nowrap}
-    .floating-forum-cta:hover,.floating-dtc-cta:hover{background:#2b3a30}
-    .floating-dtc-cta{background:#f1f6e6;color:#1c2c22;border-color:#9eae79;box-shadow:0 8px 26px #0d17102a}
-    .floating-dtc-cta:hover{background:#e1edc7;color:#17201e}
-    .floating-dtc-icon{font-size:17px;line-height:1}
-    .floating-forum-dot{width:7px;height:7px;background:#d3ed72;border-radius:50%;box-shadow:0 0 0 4px #d3ed7228}
+    .floating-dtc-cta{position:fixed;z-index:1000;right:max(16px,env(safe-area-inset-right));bottom:max(20px,env(safe-area-inset-bottom));display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:16px 20px;background:#d9f16f;color:#17251c;border:2px solid #263c29;box-shadow:0 8px 28px #101c1a55;font-size:13px;font-weight:900;letter-spacing:.07em;border-radius:8px;white-space:nowrap;cursor:pointer}
+    .floating-dtc-cta:hover{background:#e8ff8a;transform:translateY(-1px)}
+    .floating-dtc-icon{font-size:21px;line-height:1}
+    .dtc-popup{width:min(760px,calc(100vw - 22px));height:min(720px,calc(100dvh - 24px));max-width:none;max-height:none;padding:0;border:1px solid #b9c9b6;border-radius:13px;background:#f5f7f3;box-shadow:0 24px 90px #0008;overflow:hidden}
+    .dtc-popup::backdrop{background:#07120edb;backdrop-filter:blur(5px)}
+    .dtc-popup iframe{display:block;width:100%;height:100%;border:0;background:#f5f7f3}
+    .dtc-popup-close{position:absolute;z-index:2;top:9px;right:10px;width:34px;height:34px;border:1px solid #cad5c9;border-radius:50%;background:#fff;color:#1d2d23;font-size:24px;line-height:1;cursor:pointer;box-shadow:0 2px 10px #0002}
+    @media(max-width:600px){.floating-dtc-cta{right:12px;bottom:max(14px,env(safe-area-inset-bottom));padding:15px 19px;font-size:13px}.dtc-popup{width:calc(100vw - 12px);height:calc(100dvh - 12px);border-radius:10px}}
     @media(max-width:620px){.quick-service-strip-primary{grid-template-columns:minmax(0,1fr);padding:16px 14px;gap:10px}.quick-service-strip-primary .quick-service-heading{grid-column:auto}.quick-service-strip-primary .quick-service-heading h2{font-size:24px}.quick-service-strip-primary .quick-file-services-card{padding:14px}.quick-module-picker{grid-template-columns:repeat(2,minmax(0,1fr))}.quick-module-option{min-height:54px}.quick-request-strip{padding:18px 14px}.quick-request-strip .quick-service-heading{grid-column:auto}.quick-request-card{padding:15px!important}.floating-quick-actions{right:12px;bottom:max(14px,env(safe-area-inset-bottom));gap:7px}.floating-forum-cta,.floating-dtc-cta{padding:10px 12px;font-size:11px}.software-home-section{padding:24px 14px!important}}
     .quick-service-card .quick-service-icon{font-size:11px;letter-spacing:.045em;color:#536b1c;line-height:1.5}
     .quick-store-card .quick-service-icon{font-size:12px;letter-spacing:.035em;color:#3e5414}
