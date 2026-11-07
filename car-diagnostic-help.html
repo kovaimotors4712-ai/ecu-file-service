@@ -35,35 +35,107 @@
 
   <script type="application/ld+json">
   {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": [
-      {
-        "@type": "Question",
-        "name": "Can I keep driving with a warning light?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "It depends on the warning and how the vehicle behaves. A flashing check-engine light, oil-pressure warning, overheating, smoke, fuel smell, or serious loss of braking or steering assistance can indicate an urgent safety risk. Stop in a safe place and arrange qualified help. For other warnings, consult the vehicle owner’s manual promptly."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "Does an OBD fault code tell me which part to replace?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Not by itself. A code records a detected condition or test failure. The correct next step may include checking wiring, connectors, power supply, grounds, live data and related faults using the vehicle-specific diagnostic procedure."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "What should I send when asking for diagnostic help?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Share the vehicle make, model, year, engine and fuel type, the exact code and suffix, symptoms, when the fault occurs, and relevant scan or measurement results. Remove registration numbers, VINs, names and other personal details from anything posted publicly."
-        }
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Can I keep driving with a warning light?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It depends on the warning and vehicle behaviour. A flashing check-engine light, oil-pressure warning, overheating, smoke, fuel smell, or loss of braking or steering assistance can indicate an urgent risk. Stop safely and arrange qualified help. Check the owner’s manual for other warnings."
       }
-    ]
-  }
+    },
+    {
+      "@type": "Question",
+      "name": "Does an OBD fault code tell me which part to replace?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. A DTC reports a detected condition, circuit or test result; it does not prove that the named component has failed. Check related wiring, connectors, power, ground, live data and manufacturer test procedures before replacing parts."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What voltage should a 12V car battery show?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "As a general reference, a conventional 12V lead-acid battery that has rested with the engine off may read about 12.6–12.8V when fully charged. Surface charge, temperature, battery chemistry and recent driving affect the reading. Voltage alone is not a complete battery health test; use the battery maker’s test procedure."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What voltage should the alternator charge at?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Many conventional charging systems often operate around 13.8–14.4V while running, but this is not a universal pass/fail range. Smart charging systems can deliberately vary voltage, sometimes outside that range, depending on battery state, temperature and vehicle strategy. Compare readings with the vehicle-specific specification and scan data."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What does a DPF do?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A diesel particulate filter traps soot particles in the exhaust. During regeneration, the vehicle raises exhaust temperature under controlled conditions to oxidise accumulated soot. A small amount of ash remains and may eventually require professional cleaning or replacement, depending on the vehicle."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What happens if a DPF is removed or cut out?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Removing a factory-fitted DPF increases particulate emissions and can cause emissions-system faults, warning lights, diagnostic or drivability problems if the vehicle detects missing or implausible system signals. It can also breach inspection, emissions, warranty or insurance requirements depending on the country. Diagnose the reason for blockage and use a compliant repair instead of deleting the system."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What does the EGR system do?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "EGR means Exhaust Gas Recirculation. It meters a controlled amount of exhaust gas back into the intake under selected operating conditions. This lowers peak combustion temperature and helps reduce nitrogen-oxide (NOx) emissions. The ECU controls it using engine and sensor data."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What happens if the EGR is disabled or removed?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Disabling or removing EGR can increase NOx emissions and may trigger fault codes, warning lights, limp mode or poor running because the ECU expects the system to operate. Legal and inspection consequences depend on local rules. A proper diagnosis should check the valve, cooler, passages, wiring and related sensors."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is an immobilizer and what does immobilizer OFF mean?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "An immobilizer is an anti-theft system that authorises engine starting only when the vehicle recognises a correctly coded key or approved credential. 'Immobilizer OFF' generally refers to disabling that protection; this reduces theft protection and may create legal, insurance, warranty or reliability problems. Do not bypass it. For a no-start issue, have the key, transponder, antenna, battery and relevant modules checked using approved procedures."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does a car crank but not start?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Possible causes include fuel delivery, ignition, engine-speed or synchronisation signals, compression, wiring, ECU power supply, or immobilizer authorisation. Record any security light and scan all relevant modules. The symptom alone cannot identify the failed part."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does a car battery keep going flat?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Common causes include an aged or damaged battery, charging-system fault, poor connections, a light or accessory left on, or excessive key-off current draw. Modern vehicles need time to enter sleep mode, so parasitic-draw testing must follow the correct vehicle procedure."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What should I do if the engine temperature warning appears?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Stop in a safe place as soon as possible and follow the owner’s manual. Switch off the engine when appropriate, keep clear of steam and hot coolant, and never open a hot pressurised coolant cap. Arrange assistance if the engine is overheating or coolant is leaking."
+      }
+    }
+  ]
+}
   </script>
 </head>
 <body>
@@ -130,6 +202,46 @@
     <p>Not by itself. A code records a detected condition or test failure. The correct next step may include checking wiring, connectors, power supply, grounds, live data and related faults using the vehicle-specific diagnostic procedure.</p>
     <h3>What should I send when asking for diagnostic help?</h3>
     <p>Share the vehicle make, model, year, engine and fuel type, the exact code and suffix, symptoms, when the fault occurs, and relevant scan or measurement results. Remove registration numbers, VINs, names and other personal details from anything posted publicly.</p>
+
+
+    <section id="common-questions" aria-labelledby="common-questions-title">
+      <h2 id="common-questions-title">Common Car Questions and Answers</h2>
+      <p>Quick, plain-language answers to common questions about car batteries, engine warnings, diesel emissions systems, immobilizers and diagnostics. Exact values and procedures vary by vehicle; always check the owner’s manual and manufacturer service information.</p>
+
+      <h3>What voltage should a 12V car battery show?</h3>
+      <p>As a general reference, a conventional 12V lead-acid battery that has rested with the engine off may read about <strong>12.6–12.8V when fully charged</strong>. A reading taken immediately after driving or charging can be affected by surface charge. Battery chemistry, temperature and condition also matter. A voltage reading alone cannot confirm battery health; use the correct battery test.</p>
+
+      <h3>What voltage should the alternator charge at?</h3>
+      <p>Many conventional charging systems often operate around <strong>13.8–14.4V</strong> while the engine is running. However, smart charging systems deliberately vary voltage according to battery state, temperature and vehicle strategy; some readings may be lower or higher. Do not condemn an alternator from one universal number. Compare with the vehicle-specific specification and scan data.</p>
+
+      <h3>What does a DPF do?</h3>
+      <p>A Diesel Particulate Filter traps soot particles from diesel exhaust. During controlled regeneration, the vehicle raises exhaust temperature so accumulated soot can be oxidised. A small amount of non-combustible ash remains and may eventually require professional cleaning or filter replacement, depending on the vehicle and its service limits.</p>
+
+      <h3>What happens if a DPF is removed or cut out?</h3>
+      <p>Removing a factory-fitted DPF increases particulate emissions. It can also lead to emissions-system fault codes, warning lights, diagnostic or drivability issues when the ECU detects missing or implausible system operation. Inspection, emissions, warranty and insurance consequences depend on local law and policy. The safer approach is to diagnose the cause of restriction—such as sensor, regeneration, engine or filter faults—and repair the system compliantly.</p>
+
+      <h3>What does the EGR system do?</h3>
+      <p>EGR means Exhaust Gas Recirculation. It meters a controlled amount of exhaust gas back into the intake under selected operating conditions. This reduces peak combustion temperature and helps reduce nitrogen-oxide (NOx) emissions. The ECU controls EGR flow using engine operating conditions and sensor information.</p>
+
+      <h3>What happens if the EGR is disabled or removed?</h3>
+      <p>Disabling or removing EGR can increase NOx emissions. Because the ECU expects the system to work, it may also cause fault codes, warning lights, limp mode or poor running. Legal and inspection consequences depend on the country. A proper repair checks the valve, cooler, passages, wiring and related sensors rather than bypassing emissions controls.</p>
+
+      <h3>What is an immobilizer? What does “immobilizer OFF” mean?</h3>
+      <p>An immobilizer is an anti-theft system that allows starting only after the vehicle recognises a correctly coded key or approved credential. “Immobilizer OFF” generally means disabling that protection. This reduces theft protection and can create legal, insurance, warranty or reliability problems. For a no-start fault, have the key, transponder, antenna, battery and related modules checked using approved procedures; do not bypass the security system.</p>
+
+      <h3>Why does a car crank but not start?</h3>
+      <p>Possible causes include fuel delivery, ignition, engine-speed or synchronisation signals, compression, wiring, ECU power supply or immobilizer authorisation. Record any security warning and scan the relevant modules. “Cranks but will not start” is a symptom, not a diagnosis.</p>
+
+      <h3>Why does a car battery keep going flat?</h3>
+      <p>Common causes include an aged or damaged battery, charging-system fault, poor connections, a light or accessory left on, or excessive key-off current draw. Modern vehicles need time to enter sleep mode, so parasitic-draw testing must follow the correct vehicle procedure.</p>
+
+      <h3>What should I do if the engine temperature warning appears?</h3>
+      <p>Stop in a safe place as soon as possible and follow the owner’s manual. Switch off the engine when appropriate, keep clear of steam and hot coolant, and never open a hot pressurised coolant cap. Arrange assistance if the engine is overheating or coolant is leaking.</p>
+
+      <h3>What information should I provide when asking for help?</h3>
+      <p>Share the vehicle make, model, year, engine and fuel type, the exact warning or DTC (including suffix), symptoms, when the issue occurs, recent repairs and relevant scan or measurement results. Do not publish a VIN, registration number, customer name, phone number or other private information.</p>
+    </section>
+    <p><strong>Educational note:</strong> These are general references, not vehicle-specific specifications or repair instructions. Battery readings, charging strategies, emissions rules and immobilizer designs vary by make, model, year and market. Confirm all decisions with the manufacturer’s information and a qualified technician.</p>
 
     <h2>More electrical diagnostic help</h2>
     <p>For battery, starter, charging-system, sensor wiring and ECU communication symptoms, read our <a href="/car-electrical-diagnostics.html">car electrical problems and ECU diagnostics guide</a>.</p>
