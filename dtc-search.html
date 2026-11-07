@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="index,follow">
+  <meta name="description" content="Free generic OBD-II DTC lookup. Search diagnostic trouble codes such as P0420 and read common meanings, symptoms and possible causes.">
+  <link rel="canonical" href="https://ecufileservice.in/dtc-search.html">
+  <title>Free DTC Search & OBD-II Fault Code Lookup | ECU File Service India</title>
+  <meta property="og:title" content="Free DTC Search & OBD-II Fault Code Lookup | ECU File Service India">
+  <meta property="og:description" content="Search generic OBD-II diagnostic trouble codes and review common meanings, symptoms and possible causes.">
+  <meta property="og:url" content="https://ecufileservice.in/dtc-search.html">
+  <meta property="og:type" content="website">
+  <style>
+    :root{color-scheme:light;--ink:#18231e;--muted:#607067;--line:#dce4dc;--green:#243b2c;--lime:#d5ed78}
+    *{box-sizing:border-box}body{margin:0;background:#f5f7f3;color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+    .dtc-shell{max-width:760px;margin:0 auto;min-height:100vh;padding:26px 20px 34px}
+    .dtc-brand{font-size:11px;letter-spacing:.13em;font-weight:800;color:#63715f;margin:0 0 26px}
+    .dtc-tool{background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px;box-shadow:0 12px 36px #1a2c1a0d}
+    .eyebrow{font-size:10px;font-weight:800;letter-spacing:.14em;color:#748b39;margin:0 0 10px}
+    h1{font-size:clamp(24px,5vw,32px);line-height:1.15;margin:0 0 12px}
+    .dtc-intro{color:#536259;line-height:1.55;font-size:14px;margin:0 0 20px}
+    .dtc-search-row{display:flex;gap:10px;align-items:stretch}
+    .dtc-search-row input{flex:1;min-width:0;border:1px solid #b9c7b9;border-radius:7px;padding:14px;font-size:16px;background:#fff;color:#18231e}
+    .dtc-search-row button{border:0;border-radius:7px;padding:0 20px;background:#243b2c;color:#fff;font-size:14px;font-weight:800;cursor:pointer}
+    .dtc-search-row button:disabled{opacity:.55;cursor:wait}
+    .dtc-status{font-size:13px;line-height:1.5;color:#536259;margin:14px 0}
+    .dtc-results{display:grid;gap:12px;margin-top:12px}
+    .dtc-result{padding:15px;border:1px solid var(--line);border-radius:8px;background:#fbfcfa}
+    .dtc-result h3{font-size:16px;line-height:1.35;margin:0 0 8px}
+    .dtc-result p{font-size:13px;line-height:1.55;margin:7px 0;color:#34433a}
+    .dtc-code{display:inline-block;margin-right:9px;padding:4px 7px;border-radius:5px;background:#e8eef6;font-weight:800}
+    .dtc-meta{font-size:12px;color:#68766d!important}
+    .dtc-disclaimer{font-size:11px;line-height:1.5;color:#718076;margin:18px 0 0}
+    @media(max-width:520px){.dtc-shell{padding:18px 12px 24px}.dtc-tool{padding:17px}.dtc-search-row{flex-direction:column}.dtc-search-row button{min-height:46px}}
+  </style>
+</head>
+<body>
+  <main class="dtc-shell">
+    <p class="dtc-brand">ECU FILE SERVICE INDIA · DIAGNOSTIC TOOL</p>
+    <section class="dtc-tool" aria-labelledby="dtc-search-title">
+      <p class="eyebrow">FREE OBD-II LOOKUP</p>
+      <h1 id="dtc-search-title">DTC Search</h1>
+      <p class="dtc-intro">Enter a diagnostic trouble code such as P0420, or a short fault phrase such as misfire or oxygen sensor. Results show general OBD-II reference information, not a confirmed diagnosis.</p>
+      <form id="dtc-search-form" class="dtc-search-row">
+        <label for="dtc-query" class="visually-hidden" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">DTC code or fault description</label>
+        <input id="dtc-query" name="q" type="search" maxlength="80" placeholder="Enter DTC code (e.g. P0420)" autocomplete="off" required>
+        <button id="dtc-search-button" type="submit">Search DTC</button>
+      </form>
+      <p id="dtc-search-status" class="dtc-status" role="status" aria-live="polite">Enter a code or fault phrase to search the generic OBD-II reference.</p>
+      <div id="dtc-search-results" class="dtc-results"></div>
+      <p class="dtc-disclaimer">Coverage: generic OBD-II codes only; manufacturer-specific codes may not be included. Reference data: OBDex (CC0). A fault code does not prove a part has failed. Confirm results using vehicle-specific service information.</p>
+    </section>
+  </main>
+  <script>
+  (() => {
+    const form = document.getElementById('dtc-search-form');
+    const input = document.getElementById('dtc-query');
+    const button = document.getElementById('dtc-search-button');
+    const status = document.getElementById('dtc-search-status');
+    const results = document.getElementById('dtc-search-results');
+    if (!form || !input || !button || !status || !results) return;
+    const dataUrl = 'https://foerbsnavi.github.io/OBDex/generic.min.json';
+    const textOf = value => typeof value === 'string' ? value : '';
+    const addText = (parent, tag, text, className) => {
+      const node = document.createElement(tag);
+      node.textContent = text;
+      if (className) node.className = className;
+      parent.appendChild(node);
+      return node;
+    };
+    const searchableText = item => [
+      item.code, item.category, item.title && item.title.en, item.description && item.description.en,
+      ...(Array.isArray(item.affected_components) ? item.affected_components : []),
+      ...(Array.isArray(item.symptoms) ? item.symptoms.map(x => x && x.en) : []),
+      ...(Array.isArray(item.common_causes) ? item.common_causes.map(x => x && (x.label && x.label.en || x.id)) : [])
+    ].map(textOf).join(' ').toLowerCase();
+    const renderRecord = item => {
+      const card = document.createElement('article');
+      card.className = 'dtc-result';
+      const heading = document.createElement('h3');
+      addText(heading, 'span', textOf(item.code), 'dtc-code');
+      heading.appendChild(document.createTextNode(textOf(item.title && item.title.en) || 'Diagnostic trouble code'));
+      card.appendChild(heading);
+      addText(card, 'p', textOf(item.description && item.description.en) || 'No general description is available for this code.');
+      if (Array.isArray(item.common_causes) && item.common_causes.length) {
+        const causes = item.common_causes.slice(0, 5).map(x => textOf(x && x.label && x.label.en)).filter(Boolean);
+        if (causes.length) addText(card, 'p', 'Common possible causes: ' + causes.join('; '));
+      }
+      if (Array.isArray(item.symptoms) && item.symptoms.length) {
+        const symptoms = item.symptoms.slice(0, 5).map(x => textOf(x && x.en)).filter(Boolean);
+        if (symptoms.length) addText(card, 'p', 'Possible symptoms: ' + symptoms.join('; '));
+      }
+      addText(card, 'p', 'Category: ' + textOf(item.category).replace(/\b\w/g, c => c.toUpperCase()) + '. A DTC describes a detected condition; further tests are needed to identify the actual cause.', 'dtc-meta');
+      if (Array.isArray(item.related_codes) && item.related_codes.length) addText(card, 'p', 'Related codes: ' + item.related_codes.slice(0, 8).join(', '), 'dtc-meta');
+      return card;
+    };
+    async function searchDatabase(query) {
+      const response = await fetch(dataUrl, { mode: 'cors', credentials: 'omit', cache: 'default' });
+      if (!response.ok || !response.body) throw new Error('The DTC reference is temporarily unavailable.');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      const exactCode = /^[PBCU][0-3][0-9A-F]{3}$/.test(query);
+      const term = query.toLowerCase();
+      const limit = exactCode ? 1 : 12;
+      const matches = [];
+      let objectText = '', depth = 0, inString = false, escaped = false, stopped = false;
+      const processChunk = chunk => {
+        for (let i = 0; i < chunk.length; i++) {
+          const ch = chunk[i];
+          if (depth === 0) {
+            if (ch === '{') { objectText = '{'; depth = 1; inString = false; escaped = false; }
+            continue;
+          }
+          objectText += ch;
+          if (inString) {
+            if (escaped) escaped = false;
+            else if (ch === '\\') escaped = true;
+            else if (ch === '"') inString = false;
+          } else if (ch === '"') inString = true;
+          else if (ch === '{') depth++;
+          else if (ch === '}') {
+            depth--;
+            if (depth === 0) {
+              try {
+                const item = JSON.parse(objectText);
+                const hit = exactCode
+                  ? textOf(item.code).toUpperCase() === query
+                  : searchableText(item).includes(term);
+                if (hit) matches.push(item);
+              } catch (_) { /* Ignore a malformed individual entry. */ }
+              objectText = '';
+              if (matches.length >= limit) { stopped = true; break; }
+            }
+          }
+        }
+      };
+      try {
+        while (!stopped) {
+          const part = await reader.read();
+          if (part.done) break;
+          processChunk(decoder.decode(part.value, { stream: true }));
+        }
+        if (!stopped) processChunk(decoder.decode());
+      } finally {
+        if (stopped) await reader.cancel().catch(() => {});
+        reader.releaseLock();
+      }
+      return matches;
+    }
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const query = input.value.trim().toUpperCase();
+      if (query.length < 2) { status.textContent = 'Enter at least two characters.'; return; }
+      button.disabled = true;
+      results.replaceChildren();
+      status.textContent = 'Searching the DTC reference…';
+      try {
+        const matches = await searchDatabase(query);
+        if (!matches.length) {
+          status.textContent = 'No generic OBD-II match found. The code may be manufacturer-specific or described differently.';
+        } else {
+          status.textContent = matches.length + (matches.length === 1 ? ' matching result.' : ' matching results. Showing up to 12.');
+          matches.forEach(item => results.appendChild(renderRecord(item)));
+        }
+      } catch (error) {
+        status.textContent = (error && error.message) || 'Search could not be completed. Please try again later.';
+      } finally {
+        button.disabled = false;
+      }
+    });
+  })();
+  </script>
+</body>
+</html>
