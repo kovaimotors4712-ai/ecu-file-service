@@ -23,6 +23,9 @@ function slugify(value) {
 
 function softwareCategory(product) {
   const text = (String(product?.title || '') + ' ' + String(product?.description || '')).toLowerCase();
+  if (/adas|advanced driver assistance|calibration target|radar calibration|camera calibration/.test(text)) return 'ADAS Software';
+  if (/dpf|diesel particulate filter|fap/.test(text)) return 'DPF Software';
+  if (/egr|exhaust gas recirculation/.test(text)) return 'EGR Software';
   if (/airbag|srs|crash data/.test(text)) return 'Airbag and SRS';
   if (/immobilizer|immo|key program|transponder/.test(text)) return 'Immobilizer and Key Tools';
   if (/dashboard|cluster|speedometer|instrument/.test(text)) return 'Dashboard and Cluster';
