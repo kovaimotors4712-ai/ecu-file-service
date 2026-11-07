@@ -60,7 +60,11 @@
     const status = document.getElementById('dtc-search-status');
     const results = document.getElementById('dtc-search-results');
     if (!form || !input || !button || !status || !results) return;
-    const dataUrl = 'https://foerbsnavi.github.io/OBDex/generic.min.json';
+
+    // GitHub Pages paths are case-sensitive. Keep the downloaded reference cached
+    // for subsequent searches so users do not repeatedly download the full dataset.
+    const dataUrl = 'https://foerbsnavi.github.io/obdex/generic.min.json';
+    let databasePromise = null;
     const textOf = value => typeof value === 'string' ? value : '';
     const addText = (parent, tag, text, className) => {
       const node = document.createElement(tag);
@@ -91,62 +95,32 @@
         const symptoms = item.symptoms.slice(0, 5).map(x => textOf(x && x.en)).filter(Boolean);
         if (symptoms.length) addText(card, 'p', 'Possible symptoms: ' + symptoms.join('; '));
       }
-      addText(card, 'p', 'Category: ' + textOf(item.category).replace(/\b\w/g, c => c.toUpperCase()) + '. A DTC describes a detected condition; further tests are needed to identify the actual cause.', 'dtc-meta');
+      addText(card, 'p', 'Category: ' + textOf(item.category).replace(/\\b\\w/g, c => c.toUpperCase()) + '. A DTC describes a detected condition; further tests are needed to identify the actual cause.', 'dtc-meta');
       if (Array.isArray(item.related_codes) && item.related_codes.length) addText(card, 'p', 'Related codes: ' + item.related_codes.slice(0, 8).join(', '), 'dtc-meta');
       return card;
     };
-    async function searchDatabase(query) {
-      const response = await fetch(dataUrl, { mode: 'cors', credentials: 'omit', cache: 'default' });
-      if (!response.ok || !response.body) throw new Error('The DTC reference is temporarily unavailable.');
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      const exactCode = /^[PBCU][0-3][0-9A-F]{3}$/.test(query);
-      const term = query.toLowerCase();
-      const limit = exactCode ? 1 : 12;
-      const matches = [];
-      let objectText = '', depth = 0, inString = false, escaped = false, stopped = false;
-      const processChunk = chunk => {
-        for (let i = 0; i < chunk.length; i++) {
-          const ch = chunk[i];
-          if (depth === 0) {
-            if (ch === '{') { objectText = '{'; depth = 1; inString = false; escaped = false; }
-            continue;
-          }
-          objectText += ch;
-          if (inString) {
-            if (escaped) escaped = false;
-            else if (ch === '\\') escaped = true;
-            else if (ch === '"') inString = false;
-          } else if (ch === '"') inString = true;
-          else if (ch === '{') depth++;
-          else if (ch === '}') {
-            depth--;
-            if (depth === 0) {
-              try {
-                const item = JSON.parse(objectText);
-                const hit = exactCode
-                  ? textOf(item.code).toUpperCase() === query
-                  : searchableText(item).includes(term);
-                if (hit) matches.push(item);
-              } catch (_) { /* Ignore a malformed individual entry. */ }
-              objectText = '';
-              if (matches.length >= limit) { stopped = true; break; }
-            }
-          }
+    async function loadDatabase() {
+      if (databasePromise) return databasePromise;
+      databasePromise = (async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 20000);
+        try {
+          const response = await fetch(dataUrl, { mode: 'cors', credentials: 'omit', cache: 'force-cache', signal: controller.signal });
+          if (!response.ok) throw new Error('DTC reference server returned HTTP ' + response.status + '. Please retry shortly.');
+          const data = await response.json();
+          if (!Array.isArray(data)) throw new Error('DTC reference data format is invalid.');
+          return data;
+        } catch (error) {
+          if (error && error.name === 'AbortError') throw new Error('DTC data is taking too long to load. Check your connection and try again.');
+          throw error;
+        } finally {
+          clearTimeout(timer);
         }
-      };
-      try {
-        while (!stopped) {
-          const part = await reader.read();
-          if (part.done) break;
-          processChunk(decoder.decode(part.value, { stream: true }));
-        }
-        if (!stopped) processChunk(decoder.decode());
-      } finally {
-        if (stopped) await reader.cancel().catch(() => {});
-        reader.releaseLock();
-      }
-      return matches;
+      })().catch(error => {
+        databasePromise = null;
+        throw error;
+      });
+      return databasePromise;
     }
     form.addEventListener('submit', async event => {
       event.preventDefault();
@@ -154,9 +128,15 @@
       if (query.length < 2) { status.textContent = 'Enter at least two characters.'; return; }
       button.disabled = true;
       results.replaceChildren();
-      status.textContent = 'Searching the DTC reference…';
+      status.textContent = 'Loading DTC reference…';
       try {
-        const matches = await searchDatabase(query);
+        const database = await loadDatabase();
+        status.textContent = 'Searching…';
+        const exactCode = /^[PBCU][0-3][0-9A-F]{3}$/.test(query);
+        const term = query.toLowerCase();
+        const matches = exactCode
+          ? database.filter(item => textOf(item.code).toUpperCase() === query).slice(0, 1)
+          : database.filter(item => searchableText(item).includes(term)).slice(0, 12);
         if (!matches.length) {
           status.textContent = 'No generic OBD-II match found. The code may be manufacturer-specific or described differently.';
         } else {
@@ -170,6 +150,6 @@
       }
     });
   })();
-  </script>
+  </script>t>
 </body>
 </html>
