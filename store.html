@@ -20,6 +20,7 @@
 <p class="kicker">SOFTWARE & WORKSHOP TOOLS</p><h1>Software Store.<br><span>Listings & pricing.</span></h1>
 <p class="intro">Browse software and workshop resources published by the site team. Some listings show a public price; others are quote-on-request. Sign in and request a price, then check My Account → Private requests for the team reply and secure Razorpay payment link. Downloads are enabled only after payment is verified and delivery is ready.</p>
 <section class="panel"><div class="store-heading"><div><h2>Available software</h2><p>Only listings published by the admin are shown here.</p></div><span class="store-count" id="store-count">Loading…</span></div>
+<div class="store-tools" id="store-tools" hidden><label class="store-search-label" for="software-search">Find software</label><div class="store-filter-row"><input id="software-search" type="search" maxlength="100" placeholder="Search software, tool or keyword…" autocomplete="off"><select id="software-category" aria-label="Filter by software category"><option value="all">All categories</option><option value="ECU / ECM">ECU / ECM</option><option value="Diagnostics / DTC">Diagnostics / DTC</option><option value="Immobilizer / Keys">Immobilizer / Keys</option><option value="Airbag / SRS">Airbag / SRS</option><option value="Dashboard / Cluster">Dashboard / Cluster</option><option value="Other tools">Other tools</option></select></div><p class="store-filter-hint">Search the published catalogue or narrow it by category.</p></div>
 <div id="software-catalog" class="software-catalog" aria-live="polite"><p class="note">Loading software listings…</p></div></section>
 <div class="actions"><a class="button button-dark" href="/">Browse ECU file services <span>↗</span></a><a class="button button-ghost" href="/forum.html">Workshop forum <span>↗</span></a></div>
 <p class="note">Purchase only software and digital resources that the seller is legally authorized to distribute. Verify compatibility and licence terms before purchase. Prices may be shown publicly or provided after a request. If a price is not shown, select Request price. The team will reply in My Account with the quote and, when ready, a secure Razorpay payment link. Pay only through the official link; downloads are enabled after payment verification.</p>
@@ -45,22 +46,51 @@
 .software-product .button:hover{background:#2b3a30!important}
 
 @media(max-width:600px){.software-catalog{grid-template-columns:1fr}}
-</style>
+.store-tools{margin:22px 0 8px;padding:16px;background:#f4f6f1;border:1px solid var(--line)}.store-search-label{display:block;font:10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:#52604e;margin-bottom:8px}.store-filter-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,240px);gap:10px}.store-filter-row input,.store-filter-row select{width:100%;min-height:44px;padding:10px 12px;border:1px solid #cbd3c8;border-radius:3px;background:#fff;color:#17201e;font:inherit;font-size:13px}.store-filter-hint{margin:8px 0 0;color:#66716a;font-size:11px}.software-product{background:#fff;box-shadow:0 5px 18px rgba(16,26,25,.045);transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}.software-product:hover{transform:translateY(-2px);border-color:#829b2e;box-shadow:0 10px 24px rgba(16,26,25,.08)}.software-category{display:inline-flex;align-self:flex-start;padding:5px 8px;background:#edf2e4;color:#405321;font:10px var(--mono);letter-spacing:.04em;border-radius:2px}.store-empty{grid-column:1/-1;padding:24px;border:1px dashed #cbd3c8;color:#66716a;text-align:center;font-size:13px}@media(max-width:600px){.store-filter-row{grid-template-columns:1fr}.store-tools{padding:12px}.software-product:hover{transform:none}}</style>
 <script>
 (function(){
-const grid=document.getElementById('software-catalog'),count=document.getElementById('store-count');if(!grid)return;
+const grid=document.getElementById('software-catalog'),count=document.getElementById('store-count');
+const tools=document.getElementById('store-tools'),search=document.getElementById('software-search'),category=document.getElementById('software-category');
+if(!grid)return;
 const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
 const https=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch(_){return '';}};
+const categoryOf=item=>{
+const text=(String(item.title||'')+' '+String(item.description||'')).toLowerCase();
+if(/airbag|srs|crash data|pretensioner/.test(text))return 'Airbag / SRS';
+if(/immobil|key programm|transponder|key learn|key coding/.test(text))return 'Immobilizer / Keys';
+if(/dashboard|instrument cluster|odometer|speedometer|tacho/.test(text))return 'Dashboard / Cluster';
+if(/dtc|obd.?ii|diagnostic trouble|fault code|scan tool|diagnostic/.test(text))return 'Diagnostics / DTC';
+if(/ecu|ecm|pcm|bench|boot|j.?tag|flasher|programmer|tuning|calibration/.test(text))return 'ECU / ECM';
+return 'Other tools';
+};
+let cards=[];
+const render=()=>{
+const term=String(search?.value||'').trim().toLowerCase(),chosen=category?.value||'all';
+const visible=cards.filter(({item,group})=>(chosen==='all'||group===chosen)&&(!term||[item.title,item.version,item.description,group].some(v=>String(v||'').toLowerCase().includes(term))));
+grid.replaceChildren();
+if(!visible.length){const empty=el('p','No matching software found. Try another keyword or select All categories.');empty.className='store-empty';grid.append(empty);return;}
+visible.forEach(({card})=>grid.append(card));
+};
+if(search)search.addEventListener('input',render);
+if(category)category.addEventListener('change',render);
 fetch('/api/software-products',{headers:{Accept:'application/json'}}).then(r=>r.ok?r.json():Promise.reject()).then(data=>{
-const items=Array.isArray(data.items)?data.items:[];count.textContent=items.length+' LISTING'+(items.length===1?'':'S');grid.replaceChildren();
-if(!items.length){const p=el('p','No software listings have been published yet. Please check back later.');p.className='note';grid.append(p);return;}
-items.forEach(item=>{const card=el('article');card.className='software-product';const imgUrl=https(item.image_url);if(imgUrl){const img=el('img');img.src=imgUrl;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';card.append(img);}
+const items=Array.isArray(data.items)?data.items:[];count.textContent=items.length+' LISTING'+(items.length===1?'':'S');
+if(!items.length){grid.replaceChildren(el('p','No software listings have been published yet. Please check back later.'));return;}
+cards=items.map(item=>{
+const card=el('article');card.className='software-product';
+const imgUrl=https(item.image_url);if(imgUrl){const img=el('img');img.src=imgUrl;img.alt=String(item.title||'Software product');img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';card.append(img);}
+const group=categoryOf(item),tag=el('span',group);tag.className='software-category';card.append(tag);
 const version=el('span',item.version?'VERSION '+item.version:'SOFTWARE LISTING');version.className='version';card.append(version,el('h3',item.title||'Software'));if(item.description)card.append(el('p',item.description));
 if(item.price_visible&&item.price_paise!==null&&item.price_paise!==undefined){const price=el('div',new Intl.NumberFormat('en-IN',{style:'currency',currency:item.currency||'INR',maximumFractionDigits:2}).format(Number(item.price_paise)/100));price.className='price';card.append(price);}
-const target=https(item.contact_url)||https(item.product_url);if(target){const link=el('a',item.contact_url?'Seller contact / details ↗':'Product details ↗');link.href=target;link.target='_blank';link.rel='noopener noreferrer';link.className='button button-dark';card.append(link);}const buy=el('button',item.price_visible?'Request payment link ↗':'Request price ↗');buy.type='button';buy.className='button button-dark software-purchase-request';buy.addEventListener('click',async()=>{const api=window.EfsiSupabase;const session=api?.getSession?.();if(!api?.rest||!session?.user?.id){document.querySelector('#account-trigger')?.click();alert('Please sign in to request a software price.');return;}buy.disabled=true;try{await api.rest('forum_customer_requests',{method:'POST',prefer:'return=minimal',body:{user_id:session.user.id,request_type:'software_requirement',title:'Software price request: '+String(item.title||'Software').slice(0,90),body:'Software: '+(item.title||'Software')+'\\nVersion: '+(item.version||'Not specified')+'\\nProduct ID: '+item.id+'\\nPlease provide a price quote and payment link.',status:'open',admin_reply:'',software_product_id:item.id,software_status:'requested',customer_auto_reply:'Your software request has been received. Check My Account → Private requests for your quote, payment link and delivery update.'}});buy.textContent='Check request status ↗';buy.onclick=()=>window.location.href='/#account-messages';alert('Request sent. Check My Account → Private requests for updates.');}catch(error){alert(error.message||'Could not send request. Please sign in and retry.');buy.disabled=false;}});card.append(buy);grid.append(card);});
+const target=https(item.contact_url)||https(item.product_url);if(target){const link=el('a',item.contact_url?'Seller contact / details ↗':'Product details ↗');link.href=target;link.target='_blank';link.rel='noopener noreferrer';link.className='button button-dark';card.append(link);}
+const buy=el('button',item.price_visible?'Request payment link ↗':'Request price ↗');buy.type='button';buy.className='button button-dark software-purchase-request';
+buy.addEventListener('click',async()=>{const api=window.EfsiSupabase;const session=api?.getSession?.();if(!api?.rest||!session?.user?.id){document.querySelector('#account-trigger')?.click();alert('Please sign in to request a software price.');return;}buy.disabled=true;try{await api.rest('forum_customer_requests',{method:'POST',prefer:'return=minimal',body:{user_id:session.user.id,request_type:'software_requirement',title:'Software price request: '+String(item.title||'Software').slice(0,90),body:'Software: '+(item.title||'Software')+'\nVersion: '+(item.version||'Not specified')+'\nProduct ID: '+item.id+'\nPlease provide a price quote and payment link.',status:'open',admin_reply:'',software_product_id:item.id,software_status:'requested',customer_auto_reply:'Your software request has been received. Check My Account → Private requests for your quote, payment link and delivery update.'}});buy.textContent='Check request status ↗';buy.onclick=()=>window.location.href='/#account-messages';alert('Request sent. Check My Account → Private requests for updates.');}catch(error){alert(error.message||'Could not send request. Please sign in and retry.');buy.disabled=false;}});
+card.append(buy);return {item,group,card};
+});
+if(tools)tools.hidden=false;render();
 }).catch(()=>{count.textContent='TEMPORARILY UNAVAILABLE';grid.replaceChildren(el('p','Software listings are temporarily unavailable. Please try again later.'));});
 })();
-</script>
+</script>>
 <dialog class="account-dialog" id="account-dialog" aria-labelledby="account-title"><button class="dialog-close" type="button" aria-label="Close">×</button><span class="form-kicker">CUSTOMER ACCOUNT</span><h2 id="account-title">Sign in to your account</h2>
     <div id="customer-notifications" hidden>
       <div class="customer-orders-head"><h3>Notifications</h3></div>
