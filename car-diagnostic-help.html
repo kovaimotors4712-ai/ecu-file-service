@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Automotive maintenance FAQ: engine oil, filters, coolant, brakes, tyres, battery, DPF, EGR, AdBlue, warning lights, OBD fault codes and car diagnostics.">
+  <meta name="description" content="Answers to common car problems and questions: car will not start, battery drain, engine overheating, warning lights, brake vibration, AC faults, DPF, EGR and OBD diagnostics. Practical first checks and safety guidance.">
   <link rel="canonical" href="https://ecufileservice.in/car-diagnostic-help.html">
-  <title>Car Maintenance FAQ, Common Problems & OBD Diagnostics | ECU File Service India</title>
-  <meta property="og:title" content="Car Maintenance FAQ, Common Problems &amp; OBD Diagnostics | ECU File Service India">
-  <meta property="og:description" content="Clear answers about car servicing, engine oil, filters, brakes, tyres, battery, diesel emissions systems, warning lights and OBD diagnostics.">
+  <title>Common Car Problems & Questions Answered | ECU File Service India</title>
+  <meta property="og:title" content="Common Car Problems &amp; Questions Answered | ECU File Service India">
+  <meta property="og:description" content="Find answers to common car starting, battery, engine, warning light, brake and AC problems, with safe first checks and diagnostic guidance.">
   <meta property="og:url" content="https://ecufileservice.in/car-diagnostic-help.html">
   <meta property="og:type" content="article">
   <link rel="stylesheet" href="/styles.css">
@@ -573,8 +573,8 @@
   </header>
   <main class="section" style="max-width:900px;margin:48px auto;padding:24px">
     <p class="eyebrow">CAR OWNER HELP · DIAGNOSTIC BASICS</p>
-    <h1>Car Maintenance Questions, Common Problems and Dashboard Warning Lights</h1>
-    <p>When a car shows a warning light, struggles to start, loses power or runs roughly, the symptom is a starting point—not a confirmed diagnosis. The correct cause depends on the vehicle, engine, model year, fault codes and test results.</p>
+    <h1>Common Car Problems and Questions: Practical Answers for Car Owners</h1>
+    <p>When a car shows a warning light, struggles to start, loses power or runs roughly, the symptom is a starting point—not a confirmed diagnosis. The correct cause depends on the vehicle, engine, model year, fault codes and test results.</p>\n    <p>Looking for a quick fault-code reference? Open the separate <a href="/dtc-search.html">free DTC Search tool</a>. This page is dedicated to general car questions and troubleshooting guidance.</p>
 
     <h2>Check-engine light is on</h2>
     <p>A check-engine light can relate to emissions controls, sensors, wiring, fuel delivery, ignition or engine-management systems. Read the diagnostic trouble codes (DTCs) with a compatible scanner, record the exact codes and freeze-frame data where available, and follow the manufacturer's diagnostic procedure. A code points to a circuit or detected condition; it does not automatically prove that a named part has failed.</p>
@@ -617,19 +617,7 @@
     <h2>Why a fault may come and go</h2>
     <p>Intermittent faults can be affected by heat, vibration, moisture, battery voltage or a loose connection. Note the conditions when the symptom occurs and preserve scan data before clearing codes or disconnecting the battery. A single scan with no stored code does not rule out an intermittent electrical or mechanical problem.</p>
 
-    <section class="dtc-tool" id="dtc-search" aria-labelledby="dtc-search-title">
-      <p class="eyebrow">FREE OBD-II LOOKUP</p>
-      <h2 id="dtc-search-title">Search a Diagnostic Trouble Code (DTC)</h2>
-      <p>Enter a code such as P0420, or a short fault phrase such as misfire or oxygen sensor. Results explain common meanings; a code is not proof that a part has failed.</p>
-      <form id="dtc-search-form" class="dtc-search-row">
-        <label for="dtc-query" class="visually-hidden">DTC code or fault description</label>
-        <input id="dtc-query" name="q" type="search" maxlength="80" placeholder="Example: P0420 or oxygen sensor" autocomplete="off" required>
-        <button id="dtc-search-button" type="submit">Search DTC</button>
-      </form>
-      <p id="dtc-search-status" class="dtc-status" role="status" aria-live="polite">The code database loads only when you search. No DTC database is stored on this website.</p>
-      <div id="dtc-search-results" class="dtc-results"></div>
-      <p class="dtc-meta">Coverage: generic OBD-II codes only. Manufacturer-specific codes may not be included. Data: OBDex (CC0). Results are general references; confirm with vehicle-specific service information.</p>
-    </section>
+
 
     <h2>Frequently asked questions</h2>
     <h3>Can I keep driving with a warning light?</h3>
@@ -868,102 +856,4 @@
       ...(Array.isArray(item.affected_components) ? item.affected_components : []),
       ...(Array.isArray(item.symptoms) ? item.symptoms.map(x => x && x.en) : []),
       ...(Array.isArray(item.common_causes) ? item.common_causes.map(x => x && (x.label && x.label.en || x.id)) : [])
-    ].map(textOf).join(' ').toLowerCase();
-    const renderRecord = item => {
-      const card = document.createElement('article');
-      card.className = 'dtc-result';
-      const heading = document.createElement('h3');
-      addText(heading, 'span', textOf(item.code), 'dtc-code');
-      heading.appendChild(document.createTextNode(textOf(item.title && item.title.en) || 'Diagnostic trouble code'));
-      card.appendChild(heading);
-      addText(card, 'p', textOf(item.description && item.description.en) || 'No general description is available for this code.');
-      if (Array.isArray(item.common_causes) && item.common_causes.length) {
-        const causes = item.common_causes.slice(0, 5).map(x => textOf(x && x.label && x.label.en)).filter(Boolean);
-        if (causes.length) addText(card, 'p', 'Common possible causes: ' + causes.join('; '));
-      }
-      if (Array.isArray(item.symptoms) && item.symptoms.length) {
-        const symptoms = item.symptoms.slice(0, 5).map(x => textOf(x && x.en)).filter(Boolean);
-        if (symptoms.length) addText(card, 'p', 'Possible symptoms: ' + symptoms.join('; '));
-      }
-      addText(card, 'p', 'Category: ' + textOf(item.category).replace(/\b\w/g, c => c.toUpperCase()) + '. A DTC describes a detected condition; further tests are needed to identify the actual cause.', 'dtc-meta');
-      if (Array.isArray(item.related_codes) && item.related_codes.length) addText(card, 'p', 'Related codes: ' + item.related_codes.slice(0, 8).join(', '), 'dtc-meta');
-      return card;
-    };
-    async function searchDatabase(query) {
-      const response = await fetch(dataUrl, { mode: 'cors', credentials: 'omit', cache: 'default' });
-      if (!response.ok || !response.body) throw new Error('The DTC reference is temporarily unavailable.');
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      const exactCode = /^[PBCU][0-3][0-9A-F]{3}$/.test(query);
-      const term = query.toLowerCase();
-      const limit = exactCode ? 1 : 12;
-      const matches = [];
-      let objectText = '', depth = 0, inString = false, escaped = false, stopped = false;
-      const processChunk = chunk => {
-        for (let i = 0; i < chunk.length; i++) {
-          const ch = chunk[i];
-          if (depth === 0) {
-            if (ch === '{') { objectText = '{'; depth = 1; inString = false; escaped = false; }
-            continue;
-          }
-          objectText += ch;
-          if (inString) {
-            if (escaped) escaped = false;
-            else if (ch === '\\') escaped = true;
-            else if (ch === '"') inString = false;
-          } else if (ch === '"') inString = true;
-          else if (ch === '{') depth++;
-          else if (ch === '}') {
-            depth--;
-            if (depth === 0) {
-              try {
-                const item = JSON.parse(objectText);
-                const hit = exactCode
-                  ? textOf(item.code).toUpperCase() === query
-                  : searchableText(item).includes(term);
-                if (hit) matches.push(item);
-              } catch (_) { /* Ignore a malformed individual entry. */ }
-              objectText = '';
-              if (matches.length >= limit) { stopped = true; break; }
-            }
-          }
-        }
-      };
-      try {
-        while (!stopped) {
-          const part = await reader.read();
-          if (part.done) break;
-          processChunk(decoder.decode(part.value, { stream: true }));
-        }
-        if (!stopped) processChunk(decoder.decode());
-      } finally {
-        if (stopped) await reader.cancel().catch(() => {});
-        reader.releaseLock();
-      }
-      return matches;
-    }
-    form.addEventListener('submit', async event => {
-      event.preventDefault();
-      const query = input.value.trim().toUpperCase();
-      if (query.length < 2) { status.textContent = 'Enter at least two characters.'; return; }
-      button.disabled = true;
-      results.replaceChildren();
-      status.textContent = 'Searching the DTC reference…';
-      try {
-        const matches = await searchDatabase(query);
-        if (!matches.length) {
-          status.textContent = 'No generic OBD-II match found. The code may be manufacturer-specific or described differently.';
-        } else {
-          status.textContent = matches.length + (matches.length === 1 ? ' matching result.' : ' matching results. Showing up to 12.');
-          matches.forEach(item => results.appendChild(renderRecord(item)));
-        }
-      } catch (error) {
-        status.textContent = (error && error.message) || 'Search could not be completed. Please try again later.';
-      } finally {
-        button.disabled = false;
-      }
-    });
-  })();
-  </script>
-</body>
-</html>
+    ].map(textOf).join('
