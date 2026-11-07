@@ -54,6 +54,8 @@ const tools=document.getElementById('store-tools'),search=document.getElementByI
 if(!grid)return;
 const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
 const https=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch(_){return '';}};
+const softwareSlug=value=>String(value||'').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,90)||'software';
+const canHaveSearchPage=item=>/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id||''))&&String(item.description||'').replace(/\\s+/g,' ').trim().length>=120;
 const categoryOf=item=>{
 const text=(String(item.title||'')+' '+String(item.description||'')).toLowerCase();
 if(/airbag|srs|crash data|pretensioner/.test(text))return 'Airbag / SRS';
@@ -81,6 +83,7 @@ const card=el('article');card.className='software-product';
 const imgUrl=https(item.image_url);if(imgUrl){const img=el('img');img.src=imgUrl;img.alt=String(item.title||'Software product');img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';card.append(img);}
 const group=categoryOf(item),tag=el('span',group);tag.className='software-category';card.append(tag);
 const version=el('span',item.version?'VERSION '+item.version:'SOFTWARE LISTING');version.className='version';card.append(version,el('h3',item.title||'Software'));if(item.description)card.append(el('p',item.description));
+if(canHaveSearchPage(item)){const details=el('a','View software details →');details.href='/software/'+softwareSlug(item.title)+'-'+String(item.id).toLowerCase();details.className='button button-ghost';card.append(details);}
 if(item.price_visible&&item.price_paise!==null&&item.price_paise!==undefined){const price=el('div',new Intl.NumberFormat('en-IN',{style:'currency',currency:item.currency||'INR',maximumFractionDigits:2}).format(Number(item.price_paise)/100));price.className='price';card.append(price);}
 const target=https(item.contact_url)||https(item.product_url);if(target){const link=el('a',item.contact_url?'Seller contact / details ↗':'Product details ↗');link.href=target;link.target='_blank';link.rel='noopener noreferrer';link.className='button button-dark';card.append(link);}
 const buy=el('button',item.price_visible?'Request payment link ↗':'Request price ↗');buy.type='button';buy.className='button button-dark software-purchase-request';
