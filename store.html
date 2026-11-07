@@ -131,7 +131,7 @@ card.append(buy);return {item,group,card};
 });
 if(categoryIndex){
 const ordered=['Immobilizer / Keys','Diagnostics / DTC','ADAS','EGR','DPF','ECU / ECM','Airbag / SRS','Dashboard / Cluster','Other tools'];
-const present=ordered.filter(name=>cards.some(entry=>entry.group===name));
+const present=ordered;
 categoryIndex.replaceChildren();
 const all=el('button','All software');all.type='button';all.setAttribute('aria-pressed','true');all.addEventListener('click',()=>{category.value='all';currentPage=0;render();});categoryIndex.append(all);
 present.forEach(name=>{const b=el('button',name);b.type='button';b.setAttribute('aria-pressed','false');b.addEventListener('click',()=>{category.value=name;currentPage=0;render();});categoryIndex.append(b);});categoryIndex.hidden=false;
