@@ -52,6 +52,7 @@
 .software-product{padding:9px!important;gap:6px!important;min-height:0;overflow:hidden}
 .software-product .software-cover{width:100%;aspect-ratio:1.18/1;display:grid;place-items:center;position:relative;overflow:hidden;background:linear-gradient(145deg,#132523,#273d37);border:1px solid #31483e}
 .software-product .software-cover svg{width:78%;height:78%;display:block}
+.software-product .software-cover.image-fallback{background:linear-gradient(145deg,#172a26,#34483c);color:#c9d9b0;font:9px var(--mono);letter-spacing:.08em;text-align:center;padding:8px}
 .software-product .software-category{font-size:8px;padding:3px 5px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .software-product .version{font-size:8px;letter-spacing:.06em}
 .software-product h3{font-size:13px!important;line-height:1.2!important;margin:0!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.4em}
@@ -111,7 +112,7 @@ for(let i=0;i<6;i++){const line=document.createElementNS(ns,'path');const y=29+i
 const label=document.createElementNS(ns,'text');label.setAttribute('x','80');label.setAttribute('y','63');label.setAttribute('text-anchor','middle');label.setAttribute('font-size','13');label.setAttribute('font-weight','700');label.setAttribute('fill','#fff');label.textContent=String(item.title||'ECU').replace(/[^A-Za-z0-9 ]/g,'').slice(0,10).toUpperCase();svg.append(label);
 const sub=document.createElementNS(ns,'text');sub.setAttribute('x','80');sub.setAttribute('y','79');sub.setAttribute('text-anchor','middle');sub.setAttribute('font-size','8');sub.setAttribute('fill',palette);sub.textContent='WORKSHOP SOFTWARE';svg.append(sub);
 cover.append(svg);
-const imgUrl=https(item.image_url);if(imgUrl){const img=el('img');img.src=imgUrl;img.alt=String(item.title||'Software product');img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';cover.replaceChildren(img);img.style.cssText='width:100%;height:100%;object-fit:contain;background:#132523';}
+const imgUrl=https(item.image_url);if(imgUrl){const img=el('img');img.src=imgUrl;img.alt=String(item.title||'Software product');img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.onerror=()=>{cover.classList.add('image-fallback');cover.replaceChildren(el('span','IMAGE PREVIEW UNAVAILABLE'));};cover.replaceChildren(img);img.style.cssText='width:100%;height:100%;object-fit:contain;background:#132523';}
 card.append(cover);
 const tag=el('span',group);tag.className='software-category';card.append(tag);
 const version=el('span',item.version?'VERSION '+item.version:'SOFTWARE TOOL');version.className='version';card.append(version,el('h3',item.title||'Software'));
