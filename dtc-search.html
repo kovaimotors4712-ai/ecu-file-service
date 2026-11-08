@@ -61,145 +61,67 @@
     const results = document.getElementById('dtc-search-results');
     if (!form || !input || !button || !status || !results) return;
 
-    // Keep the public OBDex endpoint and stream records so a search does not
-    // have to download and parse the entire 9k+ record database before returning.
+    // Load the reference once in the background, then search an in-memory index.
+    // This avoids downloading and scanning the remote JSON on every Search click.
     const dataUrl = 'https://foerbsnavi.github.io/OBDex/generic.min.json';
     const textOf = value => typeof value === 'string' ? value : '';
-    const addText = (parent, tag, text, className) => {
-      const node = document.createElement(tag);
-      node.textContent = text;
-      if (className) node.className = className;
-      parent.appendChild(node);
-      return node;
-    };
-    const searchableText = item => [
-      item.code, item.category, item.title && item.title.en, item.description && item.description.en,
-      ...(Array.isArray(item.affected_components) ? item.affected_components : []),
-      ...(Array.isArray(item.symptoms) ? item.symptoms.map(x => x && x.en) : []),
-      ...(Array.isArray(item.common_causes) ? item.common_causes.map(x => x && (x.label && x.label.en || x.id)) : [])
-    ].map(textOf).join(' ').toLowerCase();
-    const renderRecord = item => {
-      const card = document.createElement('article');
-      card.className = 'dtc-result';
-      const heading = document.createElement('h3');
-      addText(heading, 'span', textOf(item.code), 'dtc-code');
-      heading.appendChild(document.createTextNode(textOf(item.title && item.title.en) || 'Diagnostic trouble code'));
-      card.appendChild(heading);
-      addText(card, 'p', textOf(item.description && item.description.en) || 'No general description is available for this code.');
-      if (Array.isArray(item.common_causes) && item.common_causes.length) {
-        const causes = item.common_causes.slice(0, 5).map(x => textOf(x && x.label && x.label.en)).filter(Boolean);
-        if (causes.length) addText(card, 'p', 'Common possible causes: ' + causes.join('; '));
+    let databasePromise = null;
+
+    function loadDatabase() {
+      if (!databasePromise) {
+        databasePromise = fetch(dataUrl, {
+          mode: 'cors', credentials: 'omit', cache: 'force-cache'
+        }).then(response => {
+          if (!response.ok) throw new Error('DTC reference server returned HTTP ' + response.status + '.');
+          return response.json();
+        }).then(data => {
+          if (!Array.isArray(data) || !data.length) throw new Error('DTC reference data format is invalid or empty.');
+          const byCode = new Map();
+          const searchable = data.map(item => {
+            const code = textOf(item && item.code).toUpperCase();
+            if (code) byCode.set(code, item);
+            return { item, code, text: searchableText(item) };
+          });
+          return { byCode, searchable, count: data.length };
+        }).catch(error => {
+          databasePromise = null;
+          throw error;
+        });
       }
-      if (Array.isArray(item.symptoms) && item.symptoms.length) {
-        const symptoms = item.symptoms.slice(0, 5).map(x => textOf(x && x.en)).filter(Boolean);
-        if (symptoms.length) addText(card, 'p', 'Possible symptoms: ' + symptoms.join('; '));
-      }
-      addText(card, 'p', 'Category: ' + textOf(item.category).replace(/\\b\\w/g, ch => ch.toUpperCase()) + '. A DTC describes a detected condition; further tests are needed to identify the actual cause.', 'dtc-meta');
-      if (Array.isArray(item.related_codes) && item.related_codes.length) addText(card, 'p', 'Related codes: ' + item.related_codes.slice(0, 8).join(', '), 'dtc-meta');
-      return card;
-    };
-    // Query the public reference directly for each search. No database index
-    // is retained in browser memory or stored in the site's database.
+      return databasePromise;
+    }
+
+    // Start loading as soon as the page opens, not after the visitor clicks Search.
+    loadDatabase().then(database => {
+      if (!input.value.trim()) status.textContent = 'DTC database ready · ' + database.count.toLocaleString() + ' codes loaded. Search now.';
+    }).catch(() => {
+      if (!input.value.trim()) status.textContent = 'DTC database is taking longer to load. You can still try a search.';
+    });
+
     async function searchDatabase(query, signal, onProgress) {
-      const response = await fetch(dataUrl, {
-        mode: 'cors', credentials: 'omit', cache: 'no-store', signal
-      });
-      if (!response.ok) throw new Error('DTC reference server returned HTTP ' + response.status + '. Please retry shortly.');
+      const database = await Promise.race([
+        loadDatabase(),
+        new Promise((_, reject) => {
+          if (signal.aborted) return reject(new DOMException('Search cancelled.', 'AbortError'));
+          signal.addEventListener('abort', () => reject(new DOMException('Search timed out.', 'AbortError')), { once: true });
+        })
+      ]);
       const exactCode = /^[PBCU][0-3][0-9A-F]{3}$/.test(query);
+      if (exactCode) {
+        const match = database.byCode.get(query);
+        onProgress(database.count, true);
+        return match ? [match] : [];
+      }
       const term = query.toLowerCase();
       const matches = [];
-      let checked = 0;
-      const limit = exactCode ? 1 : 12;
-      const inspectRecord = raw => {
-        try {
-          const item = JSON.parse(raw);
-          if (!item || typeof item !== 'object' || !item.code) return false;
-          checked++;
-          const code = textOf(item.code).toUpperCase();
-          const matched = exactCode
-            ? code === query
-            : searchableText(item).includes(term);
-          if (matched && matches.length < limit) matches.push(item);
-          // Stop as soon as enough results are found; keyword searches should
-          // not scan the remaining thousands of records after filling the UI.
-          return matches.length >= limit;
-        } catch (_) {
-          return false;
+      for (const entry of database.searchable) {
+        if (entry.text.includes(term)) {
+          matches.push(entry.item);
+          if (matches.length >= 12) break;
         }
-      };
-      if (!response.body || typeof response.body.getReader !== 'function') {
-        const data = await response.json();
-        if (!Array.isArray(data)) throw new Error('DTC reference data format is invalid.');
-        for (const item of data) {
-          checked++;
-          const code = textOf(item && item.code).toUpperCase();
-          if (exactCode ? code === query : searchableText(item).includes(term)) {
-            if (matches.length < limit) matches.push(item);
-              if (matches.length >= limit) break;
-          }
-          if (checked % 250 === 0) onProgress(checked, false);
-          if (matches.length >= limit) break;
-        }
-        onProgress(checked, true);
-        return matches;
       }
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let objectText = '', depth = 0, inString = false, escaped = false;
-      let reachedResultLimit = false;
-      try {
-        while (true) {
-          const part = await reader.read();
-          if (part.done) break;
-          const chunk = decoder.decode(part.value, { stream: true });
-          for (let i = 0; i < chunk.length; i++) {
-            const ch = chunk[i];
-            if (depth === 0) {
-              if (ch === '{') { objectText = '{'; depth = 1; inString = false; escaped = false; }
-              continue;
-            }
-            objectText += ch;
-            if (inString) {
-              if (escaped) escaped = false;
-              else if (ch === '\\') escaped = true;
-              else if (ch === '"') inString = false;
-            } else if (ch === '"') inString = true;
-            else if (ch === '{') depth++;
-            else if (ch === '}') {
-              depth--;
-              if (depth === 0) {
-                if (inspectRecord(objectText)) { reachedResultLimit = true; break; }
-                objectText = '';
-              }
-            }
-          }
-          onProgress(checked, false);
-          if (reachedResultLimit) {
-            try { await reader.cancel(); } catch (_) {}
-            break;
-          }
-          await new Promise(resolve => setTimeout(resolve, 0));
-        }
-        if (!reachedResultLimit) {
-          const tail = decoder.decode();
-          if (tail) {
-            for (let i = 0; i < tail.length; i++) {
-              const ch = tail[i];
-              if (depth === 0) { if (ch === '{') { objectText = '{'; depth = 1; inString = false; escaped = false; } continue; }
-              objectText += ch;
-              if (inString) { if (escaped) escaped = false; else if (ch === '\\') escaped = true; else if (ch === '"') inString = false; }
-              else if (ch === '"') inString = true;
-              else if (ch === '{') depth++;
-              else if (ch === '}') { depth--; if (depth === 0) { if (inspectRecord(objectText)) { reachedResultLimit = true; break; } objectText = ''; } }
-            }
-          }
-        }
-        onProgress(checked, true);
-        if (!checked) throw new Error('DTC reference data format is invalid or empty.');
-        return matches;
-      } finally {
-        reader.releaseLock();
-      }
+      onProgress(database.count, true);
+      return matches;
     }
     form.addEventListener('submit', async event => {
       event.preventDefault();
