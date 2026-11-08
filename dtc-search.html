@@ -98,65 +98,99 @@
       if (Array.isArray(item.related_codes) && item.related_codes.length) addText(card, 'p', 'Related codes: ' + item.related_codes.slice(0, 8).join(', '), 'dtc-meta');
       return card;
     };
-    async function searchDatabase(query, signal) {
+    // Download and parse the reference once per page session. Repeated searches
+    // use an in-memory index instead of re-downloading/re-parsing 9k+ records.
+    let databasePromise = null;
+    async function loadDatabase(signal, onProgress) {
       const response = await fetch(dataUrl, { mode: 'cors', credentials: 'omit', cache: 'force-cache', signal });
       if (!response.ok) throw new Error('DTC reference server returned HTTP ' + response.status + '. Please retry shortly.');
+      const records = [];
+      const addRecord = raw => {
+        try {
+          const item = JSON.parse(raw);
+          if (item && typeof item === 'object' && item.code) {
+            records.push({ item, code: textOf(item.code).toUpperCase(), search: searchableText(item) });
+          }
+        } catch (_) { /* Ignore malformed individual records. */ }
+      };
+      if (!response.body || typeof response.body.getReader !== 'function') {
+        const data = await response.json();
+        if (!Array.isArray(data)) throw new Error('DTC reference data format is invalid.');
+        data.forEach(item => records.push({ item, code: textOf(item.code).toUpperCase(), search: searchableText(item) }));
+        onProgress(records.length, true);
+        return records;
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let objectText = '', depth = 0, inString = false, escaped = false;
+      try {
+        while (true) {
+          const part = await reader.read();
+          if (part.done) break;
+          const chunk = decoder.decode(part.value, { stream: true });
+          for (let i = 0; i < chunk.length; i++) {
+            const ch = chunk[i];
+            if (depth === 0) {
+              if (ch === '{') { objectText = '{'; depth = 1; inString = false; escaped = false; }
+              continue;
+            }
+            objectText += ch;
+            if (inString) {
+              if (escaped) escaped = false;
+              else if (ch === '\\\\') escaped = true;
+              else if (ch === '"') inString = false;
+            } else if (ch === '"') inString = true;
+            else if (ch === '{') depth++;
+            else if (ch === '}') {
+              depth--;
+              if (depth === 0) { addRecord(objectText); objectText = ''; }
+            }
+          }
+          onProgress(records.length, false);
+          // Let the browser paint the progress text between streamed chunks.
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+        const tail = decoder.decode();
+        if (tail) {
+          for (let i = 0; i < tail.length; i++) {
+            const ch = tail[i];
+            if (depth === 0) { if (ch === '{') { objectText = '{'; depth = 1; inString = false; escaped = false; } continue; }
+            objectText += ch;
+            if (inString) { if (escaped) escaped = false; else if (ch === '\\\\') escaped = true; else if (ch === '"') inString = false; }
+            else if (ch === '"') inString = true;
+            else if (ch === '{') depth++;
+            else if (ch === '}') { depth--; if (depth === 0) { addRecord(objectText); objectText = ''; } }
+          }
+        }
+        onProgress(records.length, true);
+        if (!records.length) throw new Error('DTC reference data format is invalid or empty.');
+        return records;
+      } finally {
+        reader.releaseLock();
+      }
+    }
+    async function searchDatabase(query, signal, onProgress) {
+      if (!databasePromise) {
+        databasePromise = loadDatabase(signal, onProgress).catch(error => {
+          databasePromise = null;
+          throw error;
+        });
+      } else {
+        onProgress(0, false, true);
+      }
+      const database = await databasePromise;
       const exactCode = /^[PBCU][0-3][0-9A-F]{3}$/.test(query);
       const term = query.toLowerCase();
       const limit = exactCode ? 1 : 12;
       const matches = [];
-      if (!response.body || typeof response.body.getReader !== 'function') {
-        const data = await response.json();
-        if (!Array.isArray(data)) throw new Error('DTC reference data format is invalid.');
-        return data.filter(item => exactCode
-          ? textOf(item.code).toUpperCase() === query
-          : searchableText(item).includes(term)).slice(0, limit);
-      }
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let objectText = '', depth = 0, inString = false, escaped = false, stopped = false;
-      const processChunk = chunk => {
-        for (let i = 0; i < chunk.length; i++) {
-          const ch = chunk[i];
-          if (depth === 0) {
-            if (ch === '{') { objectText = '{'; depth = 1; inString = false; escaped = false; }
-            continue;
-          }
-          objectText += ch;
-          if (inString) {
-            if (escaped) escaped = false;
-            else if (ch === '\\') escaped = true;
-            else if (ch === '"') inString = false;
-          } else if (ch === '"') inString = true;
-          else if (ch === '{') depth++;
-          else if (ch === '}') {
-            depth--;
-            if (depth === 0) {
-              try {
-                const item = JSON.parse(objectText);
-                const hit = exactCode
-                  ? textOf(item.code).toUpperCase() === query
-                  : searchableText(item).includes(term);
-                if (hit) matches.push(item);
-              } catch (_) { /* Ignore malformed individual records. */ }
-              objectText = '';
-              if (matches.length >= limit) { stopped = true; break; }
-            }
-          }
+      for (let i = 0; i < database.length; i++) {
+        const record = database[i];
+        if (exactCode ? record.code === query : record.search.includes(term)) {
+          matches.push(record.item);
+          if (matches.length >= limit) break;
         }
-      };
-      try {
-        while (!stopped) {
-          const part = await reader.read();
-          if (part.done) break;
-          processChunk(decoder.decode(part.value, { stream: true }));
-        }
-        if (!stopped) processChunk(decoder.decode());
-        return matches;
-      } finally {
-        if (stopped) await reader.cancel().catch(() => {});
-        reader.releaseLock();
       }
+      return matches;
     }
     form.addEventListener('submit', async event => {
       event.preventDefault();
@@ -164,20 +198,35 @@
       if (query.length < 2) { status.textContent = 'Enter at least two characters.'; return; }
       button.disabled = true;
       results.replaceChildren();
-      status.textContent = 'Searching the DTC reference…';
+      status.textContent = databasePromise
+        ? 'Searching the loaded DTC reference…'
+        : 'Connecting to the DTC reference…';
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 25000);
+      let lastProgressAt = 0;
+      const showProgress = (count, complete, alreadyLoading) => {
+        if (complete) {
+          status.textContent = 'DTC reference ready. Finding the closest matches…';
+        } else if (alreadyLoading) {
+          status.textContent = 'Preparing your search…';
+        } else if (count > lastProgressAt) {
+          lastProgressAt = count;
+          status.textContent = count
+            ? 'Getting the DTC reference ready · ' + count.toLocaleString() + ' entries checked…'
+            : 'Connecting to the DTC reference…';
+        }
+      };
       try {
-        const matches = await searchDatabase(query, controller.signal);
+        const matches = await searchDatabase(query, controller.signal, showProgress);
         if (!matches.length) {
           status.textContent = 'No generic OBD-II match found. The code may be manufacturer-specific or described differently.';
         } else {
-          status.textContent = matches.length + (matches.length === 1 ? ' matching result.' : ' matching results. Showing up to 12.');
+          status.textContent = matches.length + (matches.length === 1 ? ' matching result found.' : ' matching results found. Showing up to 12.');
           matches.forEach(item => results.appendChild(renderRecord(item)));
         }
       } catch (error) {
         status.textContent = error && error.name === 'AbortError'
-          ? 'DTC reference timed out. Please check your connection and try again.'
+          ? 'The DTC reference is taking longer than expected. Please try again.'
           : (error && error.message) || 'Search could not be completed. Please try again later.';
       } finally {
         clearTimeout(timeout);
