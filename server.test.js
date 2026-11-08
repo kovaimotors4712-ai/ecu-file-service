@@ -2423,3 +2423,11 @@ test('international workshop support page is indexable, covers target regions an
   assert.ok(homepage.includes('href="/international-ecu-file-support.html"'));
   assert.ok(sitemap.includes('<loc>https://ecufileservice.in/international-ecu-file-support.html</loc>'));
 });
+
+
+test('public software catalogue API filters licence-status wording without changing stored records', async () => {
+  const result = await call('/api/software-products');
+  assert.equal(result.response.status, 200);
+  const items = result.payload.items || [];
+  for (const item of items) assert.doesNotMatch(String(item.description || ''), /licen[cs]e|licensing/i);
+});
