@@ -63,7 +63,7 @@
 
     // Load the reference once in the background, then search an in-memory index.
     // This avoids downloading and scanning the remote JSON on every Search click.
-    const dataUrl = 'https://foerbsnavi.github.io/OBDex/generic.min.json';
+    const dataUrl = '/api/dtc-reference';
     const textOf = value => typeof value === 'string' ? value : '';
     const addText = (parent, tag, text, className) => {
       const node = document.createElement(tag);
@@ -162,7 +162,7 @@
       if (query.length < 2) { status.textContent = 'Enter at least two characters.'; return; }
       button.disabled = true;
       results.replaceChildren();
-      status.textContent = 'Connecting to the external DTC reference…';
+      status.textContent = 'Loading the DTC reference…';
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 25000);
       let lastProgressAt = 0;
