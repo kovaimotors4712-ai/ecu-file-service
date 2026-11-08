@@ -2229,25 +2229,23 @@ test('published software detail pages are server-rendered and included in the dy
   assert.ok(sitemap.payload.includes('https://ecufileservice.in' + productPath));
 });
 
-test('removed international workshop URL stays out of public navigation and sitemap', () => {
+test('international workshop support page is publicly served and included in navigation and sitemap', () => {
   const homepage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-  const guides = fs.readFileSync(path.join(__dirname, 'guides.html'), 'utf8');
   const sitemap = fs.readFileSync(path.join(__dirname, 'sitemap.xml'), 'utf8');
   const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
-  assert.doesNotMatch(server, /international-ecu-file-support\.html/);
-  assert.doesNotMatch(homepage, /href="\/international-ecu-file-support\.html"/);
-  assert.doesNotMatch(guides, /href="\/international-ecu-file-support\.html"/);
-  assert.doesNotMatch(sitemap, /<loc>https:\/\/ecufileservice\.in\/international-ecu-file-support\.html<\/loc>/);
-  assert.match(guides, /href="\/forum\.html">Workshop Forum<\/a>/);
+  assert.match(server, /international-ecu-file-support\\.html/);
+  assert.match(homepage, /href="\\/international-ecu-file-support\\.html"/);
+  assert.match(sitemap, /<loc>https:\\/\\/ecufileservice\\.in\\/international-ecu-file-support\\.html<\\/loc>/);
 });
 
 
-test('workshop enquiry links use the live contact page, not the removed URL', () => {
+test('workshop enquiry pages retain contact paths while homepage exposes international support', () => {
   for (const file of ['index.html', 'ecu-file-services.html', 'airbag-crash-clear.html', 'forum.html']) {
     const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
-    assert.doesNotMatch(html, /href="\/international-ecu-file-support\.html"/, file + ' must not link to the removed URL');
-    assert.match(html, /href="\/contact\.html"/, file + ' should retain a working contact path');
+    assert.match(html, /href="\\/contact\\.html"/, file + ' should retain a working contact path');
   }
+  const homepage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  assert.match(homepage, /href="\\/international-ecu-file-support\\.html"/);
 });
 
 
