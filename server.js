@@ -142,7 +142,8 @@ function requestHttps(urlValue, { method = 'GET', headers = {}, body, timeoutMs 
   const allowed = url.protocol === 'https:' && (
     (supabaseHostname && url.hostname === supabaseHostname) ||
     url.hostname === 'api.razorpay.com' ||
-    url.hostname === 'api.resend.com'
+    url.hostname === 'api.resend.com' ||
+    url.hostname === 'foerbsnavi.github.io'
   );
   if (!allowed) return Promise.reject(new Error('Blocked unsupported upstream HTTPS destination.'));
   const payload = body === undefined || body === null ? null : Buffer.isBuffer(body) ? body : Buffer.from(String(body));
@@ -2013,7 +2014,47 @@ async function handleAdminUsers(request,response){
   }catch(error){jsonResponse(response,error.statusCode||400,{error:error.message||'Member action failed.'});return true;}
 }
 
+let dtcReferenceCache = null;
+let dtcReferencePromise = null;
+const DTC_REFERENCE_URL = 'https://foerbsnavi.github.io/OBDex/generic.min.json';
+async function loadDtcReference(force = false) {
+  const now = Date.now();
+  if (!force && dtcReferenceCache && dtcReferenceCache.expiresAt > now) return dtcReferenceCache.data;
+  if (!dtcReferencePromise) {
+    dtcReferencePromise = requestHttps(DTC_REFERENCE_URL, {
+      headers: { Accept: 'application/json' },
+      timeoutMs: 25000
+    }).then(async upstream => {
+      if (!upstream.ok) throw Object.assign(new Error('DTC reference source returned HTTP ' + upstream.status + '.'), { statusCode: 502 });
+      const data = await upstream.json();
+      if (!Array.isArray(data) || !data.length || !data.some(item => String(item && item.code || '').toUpperCase() === 'P2463')) {
+        throw Object.assign(new Error('DTC reference source returned incomplete data.'), { statusCode: 502 });
+      }
+      dtcReferenceCache = { data, expiresAt: Date.now() + 6 * 60 * 60 * 1000 };
+      return data;
+    }).finally(() => { dtcReferencePromise = null; });
+  }
+  return dtcReferencePromise;
+}
+async function handleDtcReference(request, response) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
+  try {
+    const data = await loadDtcReference();
+    response.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'public, max-age=3600, stale-while-revalidate=21600',
+      'X-Content-Type-Options': 'nosniff'
+    });
+    response.end(request.method === 'HEAD' ? undefined : JSON.stringify(data));
+  } catch (error) {
+    console.warn('[dtc-reference] Reference load failed.', { message: error.message });
+    jsonResponse(response, 503, { error: 'DTC reference is temporarily unavailable. Please retry shortly.' });
+  }
+  return true;
+}
+
 async function handleApi(request, response, url) {
+  if (url.pathname === '/api/dtc-reference') return handleDtcReference(request, response);
   if (url.pathname === '/api/health') { jsonResponse(response, 200, { configured: hasSafeSupabaseConfig, paymentConfigured: paymentsConfigured(), paymentReadiness: paymentReadinessChecks() }); return true; }
   if (url.pathname === '/api/site-content') return handlePublicSiteContent(request, response);
   if (url.pathname === '/api/software-products') return handlePublicSoftwareProducts(request, response);
@@ -2215,6 +2256,7 @@ if (require.main === module) {
   const server = createHttpServer();
   server.listen(port, '0.0.0.0', () => {
     console.log(`ECU File Service India is listening on port ${port}`);
+    loadDtcReference().catch(error => console.warn('[dtc-reference] Background preload failed.', { message: error.message }));
     cleanupExpiredCheckoutIntents().catch(() => {});
     triggerCleanupWorker(2000);
     triggerNotificationWorker(1000);
