@@ -5,7 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const root = __dirname;
-const { buildSoftwareSitemapEntries, isIndexableSoftwareProduct, publicProductDescription, productIdFromPath, renderSoftwareProductPage, softwareProductPath } = require('./software-seo');
+const { buildSoftwareSitemapEntries, isIndexableSoftwareProduct, publicProductDescription, publicProductTitle, productIdFromPath, renderSoftwareProductPage, softwareProductPath } = require('./software-seo');
 try {
   const envText = fs.readFileSync(path.join(root, '.env'), 'utf8');
   for (const line of envText.split(/\r?\n/)) {
@@ -1942,7 +1942,7 @@ async function handlePublicSoftwareProducts(request,response){
   if(!supabaseServiceRoleKey){jsonResponse(response,200,{items:[]});return true;}
   const result=await supabaseRequest(serviceToken(),'rest/v1/software_products?select=id,title,description,version,price_paise,price_visible,currency,image_url,product_url,contact_url,sort_order,created_at&is_published=eq.true&order=created_at.desc&limit=100',{timeoutMs:12000});
   if(!result.ok){console.warn('[software-products] Public query failed',{status:result.status});jsonResponse(response,502,{error:'Software listings could not be loaded.'});return true;}
-  jsonResponse(response,200,{items:(await result.json()).map(item=>({...item,description:publicProductDescription(item),price_paise:item.price_visible?item.price_paise:null}))});return true;
+  jsonResponse(response,200,{items:(await result.json()).map(item=>({...item,title:publicProductTitle(item),description:publicProductDescription(item),price_paise:item.price_visible?item.price_paise:null}))});return true;
 }
 async function handleAdminSoftwareProducts(request,response){
   const admin=await requireAdmin(request);if(!admin){jsonResponse(response,403,{error:'Administrator role is required.'});return true;}
