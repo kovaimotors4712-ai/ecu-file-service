@@ -35,14 +35,13 @@ function softwareCategory(product) {
 }
 
 function publicProductDescription(product) {
-  return String(product?.description || '').replace(/\\s+/g, ' ').trim()
-    .replace(/\\b(?:licence|license)\\s+terms?\\b/gi, 'package details')
-    .replace(/\\b(?:licence|license)\\s+entitlement\\b/gi, 'available functions')
-    .replace(/\\b(?:licence|license)\\s+type\\b/gi, 'software edition')
-    .replace(/\\blicensed\\b/gi, 'compatible')
-    .replace(/\\b(?:licence|license|licensing)\\b/gi, 'software edition');
+  return String(product?.description || '').replace(/\s+/g, ' ').trim()
+    .replace(/\b(?:licence|license)\s+terms?\b/gi, 'package details')
+    .replace(/\b(?:licence|license)\s+entitlement\b/gi, 'available functions')
+    .replace(/\b(?:licence|license)\s+type\b/gi, 'software edition')
+    .replace(/\blicensed\b/gi, 'compatible')
+    .replace(/\b(?:licence|license|licensing)\b/gi, 'software edition');
 }
-
 function isIndexableSoftwareProduct(product) {
   const description = String(product?.description || '').replace(/\s+/g, ' ').trim();
   return Boolean(product?.id && UUID_PATTERN.test(String(product.id)) &&
@@ -59,7 +58,7 @@ function softwareProductUrl(product) {
 }
 
 function seoDescription(product) {
-  const clean = String(product?.description || '').replace(/\s+/g, ' ').trim();
+  const clean = publicProductDescription(product);
   if (clean.length <= 160) return clean;
   return clean.slice(0, 157).replace(/\s+\S*$/, '') + '...';
 }
@@ -67,7 +66,7 @@ function seoDescription(product) {
 function renderSoftwareProductPage(product) {
   if (!isIndexableSoftwareProduct(product)) return null;
   const title = String(product.title).trim();
-  const description = String(product.description).replace(/\s+/g, ' ').trim();
+  const description = publicProductDescription(product);
   const category = softwareCategory(product);
   const canonical = softwareProductUrl(product);
   const metaDescription = seoDescription(product);
