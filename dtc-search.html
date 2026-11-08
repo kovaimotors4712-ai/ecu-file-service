@@ -120,7 +120,9 @@
             ? code === query
             : searchableText(item).includes(term);
           if (matched && matches.length < limit) matches.push(item);
-          return exactCode && matched;
+          // Stop as soon as enough results are found; keyword searches should
+          // not scan the remaining thousands of records after filling the UI.
+          return matches.length >= limit;
         } catch (_) {
           return false;
         }
@@ -133,9 +135,10 @@
           const code = textOf(item && item.code).toUpperCase();
           if (exactCode ? code === query : searchableText(item).includes(term)) {
             if (matches.length < limit) matches.push(item);
-            if (exactCode) break;
+              if (matches.length >= limit) break;
           }
           if (checked % 250 === 0) onProgress(checked, false);
+          if (matches.length >= limit) break;
         }
         onProgress(checked, true);
         return matches;
@@ -143,7 +146,7 @@
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let objectText = '', depth = 0, inString = false, escaped = false;
-      let foundExact = false;
+      let reachedResultLimit = false;
       try {
         while (true) {
           const part = await reader.read();
@@ -165,19 +168,19 @@
             else if (ch === '}') {
               depth--;
               if (depth === 0) {
-                if (inspectRecord(objectText)) { foundExact = true; break; }
+                if (inspectRecord(objectText)) { reachedResultLimit = true; break; }
                 objectText = '';
               }
             }
           }
           onProgress(checked, false);
-          if (foundExact) {
+          if (reachedResultLimit) {
             try { await reader.cancel(); } catch (_) {}
             break;
           }
           await new Promise(resolve => setTimeout(resolve, 0));
         }
-        if (!foundExact) {
+        if (!reachedResultLimit) {
           const tail = decoder.decode();
           if (tail) {
             for (let i = 0; i < tail.length; i++) {
@@ -210,7 +213,7 @@
       let lastProgressAt = 0;
       const showProgress = (count, complete, alreadyLoading) => {
         if (complete) {
-          status.textContent = 'Search scan complete. Preparing your results…';
+          status.textContent = 'Reference lookup finished. Preparing your results…';
         } else if (count > lastProgressAt) {
           lastProgressAt = count;
           status.textContent = count
