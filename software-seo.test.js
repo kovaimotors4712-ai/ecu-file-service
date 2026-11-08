@@ -75,6 +75,7 @@ test('public software descriptions omit licence-status wording while retaining u
 test('software detail pages normalize public titles and split escaped paragraphs', () => {
   const titlePage = renderSoftwareProductPage({...validProduct, title: 'Winols'});
   assert.match(titlePage, /<title>EVC WinOLS V4\.7/);
+  assert.match(titlePage, /class="software-detail-cover"/);
   const description = 'First paragraph contains enough context about the ECU software, its purpose and the supported workflow.\\n\\nSecond paragraph explains that technicians should confirm the exact vehicle, module and interface before choosing a package.';
   const page = renderSoftwareProductPage({...validProduct, description});
   assert.match(page, /<p>First paragraph contains enough context/);
