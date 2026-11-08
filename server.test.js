@@ -2410,3 +2410,19 @@ test('forum preserves the account deep link used by workshop registration', () =
   assert.match(forum, /window\.location\.hash === '#forum-account-panel'/);
   assert.match(forum, /accountPanel\.scrollIntoView\(\{ block: 'start', behavior: 'instant' \}\)/);
 });
+
+
+test('international workshop support page is indexable, covers target regions and is discoverable', async () => {
+  const page = await call('/international-ecu-file-support.html');
+  const homepage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  const sitemap = fs.readFileSync(path.join(__dirname, 'sitemap.xml'), 'utf8');
+  assert.equal(page.response.status, 200);
+  assert.match(page.payload, /name="robots" content="index, follow"/);
+  assert.match(page.payload, /canonical" href="https:\/\/ecufileservice\.in\/international-ecu-file-support\.html"/);
+  assert.match(page.payload, /FOR AUTOMOTIVE WORKSHOPS IN INDIA &amp; WORLDWIDE/);
+  for (const brand of ['Maruti Suzuki', 'Tata Motors', 'Mahindra', 'Force Motors', 'Ashok Leyland', 'BharatBenz', 'Swaraj', 'TAFE', 'Sonalika']) assert.ok(page.payload.includes(brand), brand + ' should be represented');
+  for (const market of ['Bangladesh', 'Nepal', 'Sri Lanka', 'Pakistan', 'South Africa', 'Kenya', 'Ghana', 'Tanzania', 'UAE', 'Saudi Arabia', 'Mexico', 'Chile', 'Peru', 'Indonesia', 'Australia']) assert.ok(page.payload.includes(market), market + ' should be represented');
+  assert.ok(homepage.includes('href="/international-ecu-file-support.html"'));
+  assert.ok(sitemap.includes('<loc>https://ecufileservice.international-ecu-file-support.html</loc>') === false);
+  assert.ok(sitemap.includes('<loc>https://ecufileservice.in/international-ecu-file-support.html</loc>'));
+});
