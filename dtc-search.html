@@ -158,7 +158,7 @@
             objectText += ch;
             if (inString) {
               if (escaped) escaped = false;
-              else if (ch === '\\\\') escaped = true;
+              else if (ch === '\\') escaped = true;
               else if (ch === '"') inString = false;
             } else if (ch === '"') inString = true;
             else if (ch === '{') depth++;
@@ -184,7 +184,7 @@
               const ch = tail[i];
               if (depth === 0) { if (ch === '{') { objectText = '{'; depth = 1; inString = false; escaped = false; } continue; }
               objectText += ch;
-              if (inString) { if (escaped) escaped = false; else if (ch === '\\\\') escaped = true; else if (ch === '"') inString = false; }
+              if (inString) { if (escaped) escaped = false; else if (ch === '\\') escaped = true; else if (ch === '"') inString = false; }
               else if (ch === '"') inString = true;
               else if (ch === '{') depth++;
               else if (ch === '}') { depth--; if (depth === 0) { if (inspectRecord(objectText)) { foundExact = true; break; } objectText = ''; } }
@@ -210,7 +210,7 @@
       let lastProgressAt = 0;
       const showProgress = (count, complete, alreadyLoading) => {
         if (complete) {
-          status.textContent = 'DTC reference ready. Finding the closest matches…';
+          status.textContent = 'Search scan complete. Preparing your results…';
         } else if (count > lastProgressAt) {
           lastProgressAt = count;
           status.textContent = count
