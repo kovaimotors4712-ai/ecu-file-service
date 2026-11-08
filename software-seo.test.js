@@ -63,7 +63,7 @@ test('product HTML has unique metadata, canonical, safe escaping and no fake pro
 
 
 test('public software descriptions omit licence-status wording while retaining useful product detail', () => {
-  const html = renderSoftwareProductPage({...validProduct, description: 'This licensed utility has a licence type and licence terms. Confirm supported ECU details before purchase.'});
+  const html = renderSoftwareProductPage({...validProduct, description: 'This licensed utility has a licence type and licence terms. Confirm supported ECU details before purchase. Technicians should identify the exact control module, software build and communication interface before choosing a package.'});
   assert.doesNotMatch(html, /licen[cs]e|licensing/i);
   assert.match(html, /compatible utility/);
   assert.match(html, /software edition/);
