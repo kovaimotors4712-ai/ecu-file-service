@@ -88,7 +88,7 @@ function renderSoftwareProductPage(product) {
     .map(part => '<p>' + escapeHtml(part) + '</p>').join('\n');
   const image = /^https:\/\//i.test(String(product.image_url || ''))
     ? '<img class="software-detail-image" src="' + escapeHtml(product.image_url) + '" alt="' + escapeHtml(title) + '" loading="lazy" decoding="async">'
-    : '';
+    : '<div class="software-detail-cover" role="img" aria-label="' + escapeHtml(title) + ' software cover"><span>ECU FILE SERVICE INDIA</span><strong>' + escapeHtml(title) + '</strong><small>' + escapeHtml(category) + '</small></div>';
   const version = product.version ? '<p><strong>Version:</strong> ' + escapeHtml(product.version) + '</p>' : '';
   const price = product.price_visible && Number.isSafeInteger(Number(product.price_paise)) && Number(product.price_paise) > 0
     ? '<p><strong>Price:</strong> ₹' + (Number(product.price_paise) / 100).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</p>'
