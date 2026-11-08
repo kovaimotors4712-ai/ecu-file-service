@@ -98,31 +98,52 @@
       if (Array.isArray(item.related_codes) && item.related_codes.length) addText(card, 'p', 'Related codes: ' + item.related_codes.slice(0, 8).join(', '), 'dtc-meta');
       return card;
     };
-    // Download and parse the reference once per page session. Repeated searches
-    // use an in-memory index instead of re-downloading/re-parsing 9k+ records.
-    let databasePromise = null;
-    async function loadDatabase(signal, onProgress) {
-      const response = await fetch(dataUrl, { mode: 'cors', credentials: 'omit', cache: 'force-cache', signal });
+    // Query the public reference directly for each search. No database index
+    // is retained in browser memory or stored in the site's database.
+    async function searchDatabase(query, signal, onProgress) {
+      const response = await fetch(dataUrl, {
+        mode: 'cors', credentials: 'omit', cache: 'no-store', signal
+      });
       if (!response.ok) throw new Error('DTC reference server returned HTTP ' + response.status + '. Please retry shortly.');
-      const records = [];
-      const addRecord = raw => {
+      const exactCode = /^[PBCU][0-3][0-9A-F]{3}$/.test(query);
+      const term = query.toLowerCase();
+      const matches = [];
+      let checked = 0;
+      const limit = exactCode ? 1 : 12;
+      const inspectRecord = raw => {
         try {
           const item = JSON.parse(raw);
-          if (item && typeof item === 'object' && item.code) {
-            records.push({ item, code: textOf(item.code).toUpperCase(), search: searchableText(item) });
-          }
-        } catch (_) { /* Ignore malformed individual records. */ }
+          if (!item || typeof item !== 'object' || !item.code) return false;
+          checked++;
+          const code = textOf(item.code).toUpperCase();
+          const matched = exactCode
+            ? code === query
+            : searchableText(item).includes(term);
+          if (matched && matches.length < limit) matches.push(item);
+          return exactCode && matched;
+        } catch (_) {
+          return false;
+        }
       };
       if (!response.body || typeof response.body.getReader !== 'function') {
         const data = await response.json();
         if (!Array.isArray(data)) throw new Error('DTC reference data format is invalid.');
-        data.forEach(item => records.push({ item, code: textOf(item.code).toUpperCase(), search: searchableText(item) }));
-        onProgress(records.length, true);
-        return records;
+        for (const item of data) {
+          checked++;
+          const code = textOf(item && item.code).toUpperCase();
+          if (exactCode ? code === query : searchableText(item).includes(term)) {
+            if (matches.length < limit) matches.push(item);
+            if (exactCode) break;
+          }
+          if (checked % 250 === 0) onProgress(checked, false);
+        }
+        onProgress(checked, true);
+        return matches;
       }
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let objectText = '', depth = 0, inString = false, escaped = false;
+      let foundExact = false;
       try {
         while (true) {
           const part = await reader.read();
@@ -137,60 +158,45 @@
             objectText += ch;
             if (inString) {
               if (escaped) escaped = false;
-              else if (ch === '\\') escaped = true;
+              else if (ch === '\\\\') escaped = true;
               else if (ch === '"') inString = false;
             } else if (ch === '"') inString = true;
             else if (ch === '{') depth++;
             else if (ch === '}') {
               depth--;
-              if (depth === 0) { addRecord(objectText); objectText = ''; }
+              if (depth === 0) {
+                if (inspectRecord(objectText)) { foundExact = true; break; }
+                objectText = '';
+              }
             }
           }
-          onProgress(records.length, false);
-          // Let the browser paint the progress text between streamed chunks.
+          onProgress(checked, false);
+          if (foundExact) {
+            try { await reader.cancel(); } catch (_) {}
+            break;
+          }
           await new Promise(resolve => setTimeout(resolve, 0));
         }
-        const tail = decoder.decode();
-        if (tail) {
-          for (let i = 0; i < tail.length; i++) {
-            const ch = tail[i];
-            if (depth === 0) { if (ch === '{') { objectText = '{'; depth = 1; inString = false; escaped = false; } continue; }
-            objectText += ch;
-            if (inString) { if (escaped) escaped = false; else if (ch === '\\') escaped = true; else if (ch === '"') inString = false; }
-            else if (ch === '"') inString = true;
-            else if (ch === '{') depth++;
-            else if (ch === '}') { depth--; if (depth === 0) { addRecord(objectText); objectText = ''; } }
+        if (!foundExact) {
+          const tail = decoder.decode();
+          if (tail) {
+            for (let i = 0; i < tail.length; i++) {
+              const ch = tail[i];
+              if (depth === 0) { if (ch === '{') { objectText = '{'; depth = 1; inString = false; escaped = false; } continue; }
+              objectText += ch;
+              if (inString) { if (escaped) escaped = false; else if (ch === '\\\\') escaped = true; else if (ch === '"') inString = false; }
+              else if (ch === '"') inString = true;
+              else if (ch === '{') depth++;
+              else if (ch === '}') { depth--; if (depth === 0) { if (inspectRecord(objectText)) { foundExact = true; break; } objectText = ''; } }
+            }
           }
         }
-        onProgress(records.length, true);
-        if (!records.length) throw new Error('DTC reference data format is invalid or empty.');
-        return records;
+        onProgress(checked, true);
+        if (!checked) throw new Error('DTC reference data format is invalid or empty.');
+        return matches;
       } finally {
         reader.releaseLock();
       }
-    }
-    async function searchDatabase(query, signal, onProgress) {
-      if (!databasePromise) {
-        databasePromise = loadDatabase(signal, onProgress).catch(error => {
-          databasePromise = null;
-          throw error;
-        });
-      } else {
-        onProgress(0, false, true);
-      }
-      const database = await databasePromise;
-      const exactCode = /^[PBCU][0-3][0-9A-F]{3}$/.test(query);
-      const term = query.toLowerCase();
-      const limit = exactCode ? 1 : 12;
-      const matches = [];
-      for (let i = 0; i < database.length; i++) {
-        const record = database[i];
-        if (exactCode ? record.code === query : record.search.includes(term)) {
-          matches.push(record.item);
-          if (matches.length >= limit) break;
-        }
-      }
-      return matches;
     }
     form.addEventListener('submit', async event => {
       event.preventDefault();
@@ -198,22 +204,18 @@
       if (query.length < 2) { status.textContent = 'Enter at least two characters.'; return; }
       button.disabled = true;
       results.replaceChildren();
-      status.textContent = databasePromise
-        ? 'Searching the loaded DTC reference…'
-        : 'Connecting to the DTC reference…';
+      status.textContent = 'Connecting to the external DTC reference…';
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 25000);
       let lastProgressAt = 0;
       const showProgress = (count, complete, alreadyLoading) => {
         if (complete) {
           status.textContent = 'DTC reference ready. Finding the closest matches…';
-        } else if (alreadyLoading) {
-          status.textContent = 'Preparing your search…';
         } else if (count > lastProgressAt) {
           lastProgressAt = count;
           status.textContent = count
-            ? 'Getting the DTC reference ready · ' + count.toLocaleString() + ' entries checked…'
-            : 'Connecting to the DTC reference…';
+            ? 'Your result is getting closer · ' + count.toLocaleString() + ' codes checked…'
+            : 'Connecting to the external DTC reference…';
         }
       };
       try {
