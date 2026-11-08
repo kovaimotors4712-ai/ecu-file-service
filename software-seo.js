@@ -34,6 +34,15 @@ function softwareCategory(product) {
   return 'Automotive Software';
 }
 
+function publicProductDescription(product) {
+  return String(product?.description || '').replace(/\\s+/g, ' ').trim()
+    .replace(/\\b(?:licence|license)\\s+terms?\\b/gi, 'package details')
+    .replace(/\\b(?:licence|license)\\s+entitlement\\b/gi, 'available functions')
+    .replace(/\\b(?:licence|license)\\s+type\\b/gi, 'software edition')
+    .replace(/\\blicensed\\b/gi, 'compatible')
+    .replace(/\\b(?:licence|license|licensing)\\b/gi, 'software edition');
+}
+
 function isIndexableSoftwareProduct(product) {
   const description = String(product?.description || '').replace(/\s+/g, ' ').trim();
   return Boolean(product?.id && UUID_PATTERN.test(String(product.id)) &&
@@ -95,7 +104,7 @@ function renderSoftwareProductPage(product) {
     + '</head><body><main class="software-detail"><p class="eyebrow"><a href="/">Home</a> / <a href="/store.html">Software Store</a> / ' + escapeHtml(category) + '</p>'
     + '<h1>' + escapeHtml(title) + '</h1>' + image + version + price + paragraphs + detailLink
     + '<a class="cta" href="' + escapeHtml(enquiryUrl) + '">Enquire about this software</a>'
-    + '<p><small>Check compatibility, licence terms and supported vehicles with the provider before purchase.</small></p></main></body></html>';
+    + '<p><small>Confirm exact vehicle compatibility, software edition and package contents before purchase.</small></p></main></body></html>';
 }
 
 function buildSoftwareSitemapEntries(products, lastmod = new Date().toISOString().slice(0, 10)) {
@@ -114,7 +123,7 @@ function productIdFromPath(pathname) {
 }
 
 module.exports = {
-  MIN_DESCRIPTION_LENGTH, buildSoftwareSitemapEntries, isIndexableSoftwareProduct,
+  MIN_DESCRIPTION_LENGTH, buildSoftwareSitemapEntries, isIndexableSoftwareProduct, publicProductDescription,
   productIdFromPath, renderSoftwareProductPage, slugify, softwareCategory,
   softwareProductPath, softwareProductUrl
 };
