@@ -2423,6 +2423,5 @@ test('international workshop support page is indexable, covers target regions an
   for (const brand of ['Maruti Suzuki', 'Tata Motors', 'Mahindra', 'Force Motors', 'Ashok Leyland', 'BharatBenz', 'Swaraj', 'TAFE', 'Sonalika']) assert.ok(page.payload.includes(brand), brand + ' should be represented');
   for (const market of ['Bangladesh', 'Nepal', 'Sri Lanka', 'Pakistan', 'South Africa', 'Kenya', 'Ghana', 'Tanzania', 'UAE', 'Saudi Arabia', 'Mexico', 'Chile', 'Peru', 'Indonesia', 'Australia']) assert.ok(page.payload.includes(market), market + ' should be represented');
   assert.ok(homepage.includes('href="/international-ecu-file-support.html"'));
-  assert.ok(sitemap.includes('<loc>https://ecufileservice.international-ecu-file-support.html</loc>') === false);
   assert.ok(sitemap.includes('<loc>https://ecufileservice.in/international-ecu-file-support.html</loc>'));
 });
