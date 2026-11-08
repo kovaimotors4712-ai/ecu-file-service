@@ -65,6 +65,39 @@
     // This avoids downloading and scanning the remote JSON on every Search click.
     const dataUrl = 'https://foerbsnavi.github.io/OBDex/generic.min.json';
     const textOf = value => typeof value === 'string' ? value : '';
+    const addText = (parent, tag, text, className) => {
+      const node = document.createElement(tag);
+      node.textContent = text;
+      if (className) node.className = className;
+      parent.appendChild(node);
+      return node;
+    };
+    const searchableText = item => [
+      item.code, item.category, item.title && item.title.en, item.description && item.description.en,
+      ...(Array.isArray(item.affected_components) ? item.affected_components : []),
+      ...(Array.isArray(item.symptoms) ? item.symptoms.map(x => x && x.en) : []),
+      ...(Array.isArray(item.common_causes) ? item.common_causes.map(x => x && (x.label && x.label.en || x.id)) : [])
+    ].map(textOf).join(' ').toLowerCase();
+    const renderRecord = item => {
+      const card = document.createElement('article');
+      card.className = 'dtc-result';
+      const heading = document.createElement('h3');
+      addText(heading, 'span', textOf(item.code), 'dtc-code');
+      heading.appendChild(document.createTextNode(textOf(item.title && item.title.en) || 'Diagnostic trouble code'));
+      card.appendChild(heading);
+      addText(card, 'p', textOf(item.description && item.description.en) || 'No general description is available for this code.');
+      if (Array.isArray(item.common_causes) && item.common_causes.length) {
+        const causes = item.common_causes.slice(0, 5).map(x => textOf(x && x.label && x.label.en)).filter(Boolean);
+        if (causes.length) addText(card, 'p', 'Common possible causes: ' + causes.join('; '));
+      }
+      if (Array.isArray(item.symptoms) && item.symptoms.length) {
+        const symptoms = item.symptoms.slice(0, 5).map(x => textOf(x && x.en)).filter(Boolean);
+        if (symptoms.length) addText(card, 'p', 'Possible symptoms: ' + symptoms.join('; '));
+      }
+      addText(card, 'p', 'Category: ' + textOf(item.category) + '. A DTC describes a detected condition; further tests are needed to identify the actual cause.', 'dtc-meta');
+      if (Array.isArray(item.related_codes) && item.related_codes.length) addText(card, 'p', 'Related codes: ' + item.related_codes.slice(0, 8).join(', '), 'dtc-meta');
+      return card;
+    };
     let databasePromise = null;
 
     function loadDatabase() {
