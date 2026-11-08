@@ -2233,19 +2233,19 @@ test('international workshop support page is publicly served and included in nav
   const homepage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   const sitemap = fs.readFileSync(path.join(__dirname, 'sitemap.xml'), 'utf8');
   const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
-  assert.match(server, /international-ecu-file-support\\.html/);
-  assert.match(homepage, /href="\\/international-ecu-file-support\\.html"/);
-  assert.match(sitemap, /<loc>https:\\/\\/ecufileservice\\.in\\/international-ecu-file-support\\.html<\\/loc>/);
+  assert.match(server, /international-ecu-file-support\.html/);
+  assert.match(homepage, /href="\/international-ecu-file-support\.html"/);
+  assert.match(sitemap, /<loc>https:\/\/ecufileservice\.in\/international-ecu-file-support\.html<\/loc>/);
 });
 
 
 test('workshop enquiry pages retain contact paths while homepage exposes international support', () => {
   for (const file of ['index.html', 'ecu-file-services.html', 'airbag-crash-clear.html', 'forum.html']) {
     const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
-    assert.match(html, /href="\\/contact\\.html"/, file + ' should retain a working contact path');
+    assert.match(html, /href="\/contact\.html"/, file + ' should retain a working contact path');
   }
   const homepage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-  assert.match(homepage, /href="\\/international-ecu-file-support\\.html"/);
+  assert.match(homepage, /href="\/international-ecu-file-support\.html"/);
 });
 
 
