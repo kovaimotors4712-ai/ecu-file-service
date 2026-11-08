@@ -34,13 +34,27 @@ function softwareCategory(product) {
   return 'Automotive Software';
 }
 
+function publicProductTitle(product) {
+  const title = String(product?.title || '').trim();
+  const normalized = {
+    'odis': 'ODIS Service V26',
+    'winols': 'EVC WinOLS V4.7',
+    'xdecoder': 'xDecoder V12.7',
+    'davinci 5in1': 'DaVinci 5-in-1'
+  };
+  return normalized[title.toLowerCase()] || title;
+}
+
 function publicProductDescription(product) {
-  return String(product?.description || '').replace(/\s+/g, ' ').trim()
-    .replace(/\b(?:licence|license)\s+terms?\b/gi, 'package details')
-    .replace(/\b(?:licence|license)\s+entitlement\b/gi, 'available functions')
-    .replace(/\b(?:licence|license)\s+type\b/gi, 'software edition')
-    .replace(/\blicensed\b/gi, 'compatible')
-    .replace(/\b(?:licence|license|licensing)\b/gi, 'software edition');
+  return String(product?.description || '').replace(/\r\n?/g, '\n').replace(/\\n/g, '\n')
+    .split(/\n+/).map(line => line.replace(/[ \t]+/g, ' ').trim()).filter(Boolean)
+    .map(line => line
+      .replace(/\b(?:licence|license)\s+terms?\b/gi, 'package details')
+      .replace(/\b(?:licence|license)\s+entitlement\b/gi, 'available functions')
+      .replace(/\b(?:licence|license)\s+type\b/gi, 'software edition')
+      .replace(/\blicensed\b/gi, 'compatible')
+      .replace(/\b(?:licence|license|licensing)\b/gi, 'software edition'))
+    .join('\n\n');
 }
 function isIndexableSoftwareProduct(product) {
   const description = String(product?.description || '').replace(/\s+/g, ' ').trim();
@@ -50,7 +64,7 @@ function isIndexableSoftwareProduct(product) {
 }
 
 function softwareProductPath(product) {
-  return '/software/' + slugify(product?.title) + '-' + String(product?.id || '').toLowerCase();
+  return '/software/' + slugify(publicProductTitle(product)) + '-' + String(product?.id || '').toLowerCase();
 }
 
 function softwareProductUrl(product) {
@@ -58,14 +72,14 @@ function softwareProductUrl(product) {
 }
 
 function seoDescription(product) {
-  const clean = publicProductDescription(product);
+  const clean = publicProductDescription(product).replace(/\s+/g, ' ').trim();
   if (clean.length <= 160) return clean;
   return clean.slice(0, 157).replace(/\s+\S*$/, '') + '...';
 }
 
 function renderSoftwareProductPage(product) {
   if (!isIndexableSoftwareProduct(product)) return null;
-  const title = String(product.title).trim();
+  const title = publicProductTitle(product);
   const description = publicProductDescription(product);
   const category = softwareCategory(product);
   const canonical = softwareProductUrl(product);
@@ -122,7 +136,7 @@ function productIdFromPath(pathname) {
 }
 
 module.exports = {
-  MIN_DESCRIPTION_LENGTH, buildSoftwareSitemapEntries, isIndexableSoftwareProduct, publicProductDescription,
+  MIN_DESCRIPTION_LENGTH, buildSoftwareSitemapEntries, isIndexableSoftwareProduct, publicProductDescription, publicProductTitle,
   productIdFromPath, renderSoftwareProductPage, slugify, softwareCategory,
   softwareProductPath, softwareProductUrl
 };
