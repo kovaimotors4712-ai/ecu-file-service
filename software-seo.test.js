@@ -5,6 +5,7 @@ const test = require('node:test');
 const {
   buildSoftwareSitemapEntries,
   isIndexableSoftwareProduct,
+  publicProductTitle,
   productIdFromPath,
   renderSoftwareProductPage,
   softwareCategory,
@@ -68,4 +69,16 @@ test('public software descriptions omit licence-status wording while retaining u
   assert.match(html, /compatible utility/);
   assert.match(html, /software edition/);
   assert.match(html, /package details/);
+});
+
+
+test('software detail pages normalize public titles and split escaped paragraphs', () => {
+  const titlePage = renderSoftwareProductPage({...validProduct, title: 'Winols'});
+  assert.match(titlePage, /<title>EVC WinOLS V4\.7/);
+  const description = 'First paragraph contains enough context about the ECU software, its purpose and the supported workflow.\\n\\nSecond paragraph explains that technicians should confirm the exact vehicle, module and interface before choosing a package.';
+  const page = renderSoftwareProductPage({...validProduct, description});
+  assert.match(page, /<p>First paragraph contains enough context/);
+  assert.match(page, /<p>Second paragraph explains/);
+  assert.doesNotMatch(page, /\\\\n/);
+  assert.equal(publicProductTitle({...validProduct, title: 'Odis'}), 'ODIS Service V26');
 });
