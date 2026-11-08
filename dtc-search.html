@@ -190,7 +190,7 @@
               if (inString) { if (escaped) escaped = false; else if (ch === '\\') escaped = true; else if (ch === '"') inString = false; }
               else if (ch === '"') inString = true;
               else if (ch === '{') depth++;
-              else if (ch === '}') { depth--; if (depth === 0) { if (inspectRecord(objectText)) { foundExact = true; break; } objectText = ''; } }
+              else if (ch === '}') { depth--; if (depth === 0) { if (inspectRecord(objectText)) { reachedResultLimit = true; break; } objectText = ''; } }
             }
           }
         }
