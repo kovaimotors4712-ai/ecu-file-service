@@ -664,6 +664,7 @@ test('serves customer and admin pages', async () => {
   const admin = await call('/admin.html');
   const adminJs = await call('/admin.js');
   const ecuSeo = await call('/ecu-file-services.html');
+  const dtcSearch = await call('/dtc-search.html');
   const airbagSeo = await call('/airbag-crash-clear.html');
   const guides = await call('/guides.html');
   const guidesCss = await call('/guides.css');
@@ -671,6 +672,9 @@ test('serves customer and admin pages', async () => {
   assert.equal(admin.response.status, 200);
   assert.equal(adminJs.response.status, 200);
   assert.equal(ecuSeo.response.status, 200);
+  assert.equal(dtcSearch.response.status, 200);
+  assert.match(dtcSearch.payload, /href="\/dtc\/P0420"/);
+  assert.match(dtcSearch.payload, /href="\/dtc\/P2463"/);
   assert.equal(airbagSeo.response.status, 200);
   assert.equal(guides.response.status, 200);
   assert.equal(guidesCss.response.status, 200);
