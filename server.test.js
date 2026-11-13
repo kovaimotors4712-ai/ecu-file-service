@@ -569,6 +569,30 @@ async function call(pathname, { method = 'GET', body, token } = {}) {
   return { response, payload };
 }
 
+test('dynamic DTC landing pages render known generic codes and return 404 for unknown codes', async () => {
+  const fixture = [
+    { code: 'P0420', title: { en: 'Catalyst Efficiency Below Threshold' }, description: { en: 'The catalyst monitor reports efficiency below its threshold.' }, common_causes: [{ label: { en: 'Catalyst performance issue' } }], symptoms: [{ en: 'Check engine light' }], related_codes: ['P0430'] },
+    { code: 'P2463', title: { en: 'Diesel Particulate Filter Soot Accumulation' }, description: { en: 'Soot accumulation in the diesel particulate filter.' } }
+  ];
+  setTestUpstreamRequest(async (urlValue, options = {}) => {
+    if (String(urlValue).includes('/OBDex/generic.min.json')) return response(200, fixture);
+    return upstream(urlValue, options);
+  });
+  try {
+    const page = await call('/dtc/P0420');
+    assert.equal(page.response.status, 200);
+    assert.match(page.response.headers.get('content-type') || '', /text\/html/);
+    assert.match(page.payload, /<title>P0420 Code: Catalyst Efficiency Below Threshold/);
+    assert.match(page.payload, /Catalyst performance issue/);
+    assert.match(page.payload, /href="\/dtc\/P0430"/);
+    assert.match(page.payload, /rel="canonical" href="https:\/\/ecufileservice\.in\/dtc\/P0420"/);
+    const missing = await call('/dtc/P0999');
+    assert.equal(missing.response.status, 404);
+  } finally {
+    setTestUpstreamRequest(upstream);
+  }
+});
+
 function customerRequest() {
   const fileText = 'TEST ECU FILE CONTENT';
   const request = {
