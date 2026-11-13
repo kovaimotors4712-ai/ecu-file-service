@@ -2036,6 +2036,50 @@ async function loadDtcReference(force = false) {
   }
   return dtcReferencePromise;
 }
+
+function escapeDtcHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+}
+function renderDtcSeoPage(item, code) {
+  const title = item && item.title && item.title.en || 'Generic OBD-II diagnostic trouble code';
+  const description = item && item.description && item.description.en || 'General diagnostic trouble code reference.';
+  const causes = Array.isArray(item && item.common_causes) ? item.common_causes.map(x => x && x.label && x.label.en).filter(Boolean).slice(0, 8) : [];
+  const symptoms = Array.isArray(item && item.symptoms) ? item.symptoms.map(x => x && x.en).filter(Boolean).slice(0, 8) : [];
+  const related = Array.isArray(item && item.related_codes) ? item.related_codes.slice(0, 12).filter(x => /^[PBCU][0-3][0-9A-F]{3}$/i.test(String(x))) : [];
+  const esc = escapeDtcHtml;
+  const list = values => values.length ? '<ul>' + values.map(value => '<li>' + esc(value) + '</li>').join('') + '</ul>' : '<p>Vehicle-specific service information is needed to identify possible causes.</p>';
+  const canonical = 'https://ecufileservice.in/dtc/' + code;
+  const pageTitle = code + ' Code: ' + title + ' | ECU File Service India';
+  const pageDescription = (code + ': ' + description).slice(0, 300);
+  return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>' + esc(pageTitle) + '</title><meta name="description" content="' + esc(pageDescription) + '">' +
+    '<meta name="robots" content="index,follow"><link rel="canonical" href="' + canonical + '">' +
+    '<script type="application/ld+json">' + JSON.stringify({'@context':'https://schema.org','@type':'TechArticle','headline':code+' – '+title,'description':pageDescription,'mainEntityOfPage':canonical,'author':{'@type':'Organization','name':'ECU File Service India'},'publisher':{'@type':'Organization','name':'ECU File Service India'}}).replace(/</g,'\\u003c') + '<\/script>' +
+    '<style>body{font-family:Arial,sans-serif;line-height:1.6;color:#18231e;margin:0;background:#f5f7f3}.wrap{max-width:850px;margin:32px auto;padding:22px;background:#fff;border:1px solid #dce4dc;border-radius:12px}h1{line-height:1.25}a{color:#24543a}li{margin:6px 0}.search{display:inline-block;padding:10px 14px;background:#243b2c;color:white;border-radius:6px;text-decoration:none}</style></head><body><main class="wrap"><nav><a href="/">Home</a> / <a href="/dtc-search.html">DTC Search</a> / '+esc(code)+'</nav>' +
+    '<article><h1>' + esc(code) + ' – ' + esc(title) + '</h1><p>' + esc(description) + '</p><h2>Possible causes</h2>' + list(causes) +
+    '<h2>Possible symptoms</h2>' + list(symptoms) +
+    '<h2>Diagnosis</h2><p>Use a compatible scan tool to confirm the code and check related codes and live data. Inspect the relevant wiring, connectors, power, ground and sensor signals using the vehicle manufacturer’s wiring diagram and service specifications. Do not replace a component based on the code alone.</p>' +
+    (related.length ? '<h2>Related DTC codes</h2><ul>' + related.map(value => '<li><a href="/dtc/'+encodeURIComponent(String(value).toUpperCase())+'">'+esc(String(value).toUpperCase())+'</a></li>').join('') + '</ul>' : '') +
+    '<p><a class="search" href="/dtc-search.html?q='+encodeURIComponent(code)+'">Search this code in DTC Search</a></p><p><small>Generic OBD-II reference only. Manufacturer-specific definitions, test values and repair procedures can vary by vehicle. Verify with vehicle-specific service information.</small></p></article></main></body></html>';
+}
+async function handleDtcSeoRequest(request, response, pathname) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') { response.writeHead(405, { Allow: 'GET, HEAD' }).end(); return true; }
+  const match = pathname.match(/^\/dtc\/([PBCU][0-3][0-9A-F]{3})\/?$/i);
+  if (!match) { response.writeHead(404).end('Not found'); return true; }
+  const code = match[1].toUpperCase();
+  try {
+    const data = await loadDtcReference();
+    const item = data.find(entry => String(entry && entry.code || '').toUpperCase() === code);
+    if (!item) { response.writeHead(404, {'Content-Type':'text/plain; charset=utf-8'}).end('DTC code not found in the generic reference.'); return true; }
+    response.writeHead(200, {'Content-Type':'text/html; charset=utf-8','Cache-Control':'public, max-age=3600, stale-while-revalidate=21600','X-Content-Type-Options':'nosniff'});
+    response.end(request.method === 'HEAD' ? undefined : renderDtcSeoPage(item, code));
+  } catch (error) {
+    console.warn('[dtc-seo] DTC page render failed.', {code, message:error.message});
+    response.writeHead(503, {'Cache-Control':'no-store'}).end('DTC reference is temporarily unavailable.');
+  }
+  return true;
+}
+
 async function handleDtcReference(request, response) {
   if (request.method !== 'GET' && request.method !== 'HEAD') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
   try {
@@ -2122,6 +2166,17 @@ async function handlePublicSoftwareSeoRequest(request, response, pathname) {
     let sitemap;
     try { sitemap = await fs.promises.readFile(path.join(root, 'sitemap.xml'), 'utf8'); }
     catch { response.writeHead(500).end(); return true; }
+    if (sitemap.includes('</urlset>')) {
+      try {
+        const dtcData = await loadDtcReference();
+        const dtcEntries = dtcData.map(item => String(item && item.code || '').toUpperCase())
+          .filter(code => /^[PBCU][0-3][0-9A-F]{3}$/.test(code))
+          .map(code => '<url><loc>https://ecufileservice.in/dtc/' + code + '</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>').join('');
+        if (dtcEntries) sitemap = sitemap.replace('</urlset>', dtcEntries + '</urlset>');
+      } catch (error) {
+        console.warn('[dtc-seo] Dynamic DTC sitemap unavailable; serving base sitemap.', {message:error.message});
+      }
+    }
     if (supabaseServiceRoleKey && sitemap.includes('</urlset>')) {
       try {
         const result = await supabaseRequest(serviceToken(),
@@ -2211,6 +2266,13 @@ function createHttpServer() {
       handlePublicSoftwareSeoRequest(request, response, pathname).catch(error => {
         if (!response.writableEnded) response.writeHead(500).end('Request failed');
         console.warn('[software-seo] Public route failed.', { message: error.message });
+      });
+      return;
+    }
+    if (pathname.toLowerCase().startsWith('/dtc/')) {
+      handleDtcSeoRequest(request, response, pathname).catch(error => {
+        if (!response.writableEnded) response.writeHead(500).end('Request failed');
+        console.warn('[dtc-seo] Public route failed.', { message: error.message });
       });
       return;
     }
