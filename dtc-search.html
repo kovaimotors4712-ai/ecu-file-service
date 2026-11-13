@@ -124,9 +124,15 @@
       return databasePromise;
     }
 
+    // Allow a code-specific landing page to open this same search tool with its code ready.
+    const initialCode = new URLSearchParams(window.location.search).get('q');
+    if (initialCode && /^[PBCU][0-3][0-9A-F]{3}$/i.test(initialCode.trim())) input.value = initialCode.trim().toUpperCase();
+
     // Start loading as soon as the page opens, not after the visitor clicks Search.
     loadDatabase().then(database => {
-      if (!input.value.trim()) status.textContent = 'DTC database ready · ' + database.count.toLocaleString() + ' codes loaded. Search now.';
+      if (initialCode && /^[PBCU][0-3][0-9A-F]{3}$/i.test(initialCode.trim())) {
+        form.requestSubmit();
+      } else if (!input.value.trim()) status.textContent = 'DTC database ready · ' + database.count.toLocaleString() + ' codes loaded. Search now.';
     }).catch(() => {
       if (!input.value.trim()) status.textContent = 'DTC database is taking longer to load. You can still try a search.';
     });
