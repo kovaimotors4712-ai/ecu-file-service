@@ -665,6 +665,8 @@ test('serves customer and admin pages', async () => {
   const adminJs = await call('/admin.js');
   const ecuSeo = await call('/ecu-file-services.html');
   const dtcSearch = await call('/dtc-search.html');
+  const sitemap = await call('/sitemap.xml');
+  const invalidDtc = await call('/dtc/not-a-code');
   const airbagSeo = await call('/airbag-crash-clear.html');
   const guides = await call('/guides.html');
   const guidesCss = await call('/guides.css');
@@ -673,6 +675,9 @@ test('serves customer and admin pages', async () => {
   assert.equal(adminJs.response.status, 200);
   assert.equal(ecuSeo.response.status, 200);
   assert.equal(dtcSearch.response.status, 200);
+  assert.equal(sitemap.response.status, 200);
+  assert.doesNotMatch(sitemap.payload, /<loc>https:\/\/ecufileservice\.in\/dtc\//);
+  assert.equal(invalidDtc.response.status, 404);
   assert.match(dtcSearch.payload, /href="\/dtc\/P0420"/);
   assert.match(dtcSearch.payload, /href="\/dtc\/P2463"/);
   assert.equal(airbagSeo.response.status, 200);
