@@ -32,6 +32,14 @@
     .dtc-code{display:inline-block;margin-right:9px;padding:4px 7px;border-radius:5px;background:#e8eef6;font-weight:800}
     .dtc-meta{font-size:12px;color:#68766d!important}
     .dtc-disclaimer{font-size:11px;line-height:1.5;color:#718076;margin:18px 0 0}
+    .dtc-popular{margin:22px 0 0;padding-top:18px;border-top:1px solid var(--line)}
+    .dtc-popular h2{font-size:17px;margin:0 0 8px}
+    .dtc-popular p{font-size:13px;line-height:1.5;color:#536259;margin:0 0 10px}
+    .dtc-popular ul{columns:2;column-gap:24px;margin:0;padding-left:19px}
+    .dtc-popular li{font-size:12px;line-height:1.55;margin:0 0 7px;break-inside:avoid}
+    .dtc-popular a{color:#24543a;text-decoration:underline}
+    @media(max-width:520px){.dtc-popular ul{columns:1}}
+
     @media(max-width:520px){.dtc-shell{padding:18px 12px 24px}.dtc-tool{padding:17px}.dtc-search-row{flex-direction:column}.dtc-search-row button{min-height:46px}}
   </style>
 </head>
@@ -49,6 +57,34 @@
       </form>
       <p id="dtc-search-status" class="dtc-status" role="status" aria-live="polite">Enter a code or fault phrase to search the generic OBD-II reference.</p>
       <div id="dtc-search-results" class="dtc-results"></div>
+      <section class="dtc-popular" aria-labelledby="dtc-popular-title">
+        <h2 id="dtc-popular-title">Common OBD-II fault codes</h2>
+        <p>Open a code reference for its general meaning, possible causes and diagnostic guidance.</p>
+        <ul>
+          <li><a href="/dtc/P0101">P0101 – Mass or airflow sensor range/performance</a></li>
+          <li><a href="/dtc/P0113">P0113 – Intake air temperature sensor high input</a></li>
+          <li><a href="/dtc/P0171">P0171 – System too lean (Bank 1)</a></li>
+          <li><a href="/dtc/P0172">P0172 – System too rich (Bank 1)</a></li>
+          <li><a href="/dtc/P0201">P0201 – Injector circuit (Cylinder 1)</a></li>
+          <li><a href="/dtc/P0234">P0234 – Engine overboost condition</a></li>
+          <li><a href="/dtc/P0241">P0241 – Turbo boost sensor low input</a></li>
+          <li><a href="/dtc/P0299">P0299 – Turbocharger underboost</a></li>
+          <li><a href="/dtc/P0300">P0300 – Random/multiple cylinder misfire</a></li>
+          <li><a href="/dtc/P0301">P0301 – Cylinder 1 misfire</a></li>
+          <li><a href="/dtc/P0335">P0335 – Crankshaft position sensor circuit</a></li>
+          <li><a href="/dtc/P0340">P0340 – Camshaft position sensor circuit</a></li>
+          <li><a href="/dtc/P0401">P0401 – EGR flow insufficient</a></li>
+          <li><a href="/dtc/P0420">P0420 – Catalyst efficiency below threshold (Bank 1)</a></li>
+          <li><a href="/dtc/P0430">P0430 – Catalyst efficiency below threshold (Bank 2)</a></li>
+          <li><a href="/dtc/P0442">P0442 – EVAP system small leak detected</a></li>
+          <li><a href="/dtc/P0455">P0455 – EVAP system large leak detected</a></li>
+          <li><a href="/dtc/P0500">P0500 – Vehicle speed sensor malfunction</a></li>
+          <li><a href="/dtc/P0562">P0562 – System voltage low</a></li>
+          <li><a href="/dtc/P0700">P0700 – Transmission control system malfunction</a></li>
+          <li><a href="/dtc/P0741">P0741 – Torque converter clutch performance/stuck off</a></li>
+          <li><a href="/dtc/P2463">P2463 – Diesel particulate filter soot accumulation</a></li>
+        </ul>
+      </section>
       <p class="dtc-disclaimer">Coverage: generic OBD-II codes only; manufacturer-specific codes may not be included. Reference data: OBDex (CC0). A fault code does not prove a part has failed. Confirm results using vehicle-specific service information.</p>
     </section>
   </main>
@@ -124,9 +160,15 @@
       return databasePromise;
     }
 
+    // Allow a code-specific landing page to open this same search tool with its code ready.
+    const initialCode = new URLSearchParams(window.location.search).get('q');
+    if (initialCode && /^[PBCU][0-3][0-9A-F]{3}$/i.test(initialCode.trim())) input.value = initialCode.trim().toUpperCase();
+
     // Start loading as soon as the page opens, not after the visitor clicks Search.
     loadDatabase().then(database => {
-      if (!input.value.trim()) status.textContent = 'DTC database ready · ' + database.count.toLocaleString() + ' codes loaded. Search now.';
+      if (initialCode && /^[PBCU][0-3][0-9A-F]{3}$/i.test(initialCode.trim())) {
+        form.requestSubmit();
+      } else if (!input.value.trim()) status.textContent = 'DTC database ready · ' + database.count.toLocaleString() + ' codes loaded. Search now.';
     }).catch(() => {
       if (!input.value.trim()) status.textContent = 'DTC database is taking longer to load. You can still try a search.';
     });

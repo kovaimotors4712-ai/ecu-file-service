@@ -569,6 +569,30 @@ async function call(pathname, { method = 'GET', body, token } = {}) {
   return { response, payload };
 }
 
+test('dynamic DTC landing pages render known generic codes and return 404 for unknown codes', async () => {
+  const fixture = [
+    { code: 'P0420', title: { en: 'Catalyst Efficiency Below Threshold' }, description: { en: 'The catalyst monitor reports efficiency below its threshold.' }, common_causes: [{ label: { en: 'Catalyst performance issue' } }], symptoms: [{ en: 'Check engine light' }], related_codes: ['P0430'] },
+    { code: 'P2463', title: { en: 'Diesel Particulate Filter Soot Accumulation' }, description: { en: 'Soot accumulation in the diesel particulate filter.' } }
+  ];
+  setTestUpstreamRequest(async (urlValue, options = {}) => {
+    if (String(urlValue).includes('/OBDex/generic.min.json')) return response(200, fixture);
+    return upstream(urlValue, options);
+  });
+  try {
+    const page = await call('/dtc/P0420');
+    assert.equal(page.response.status, 200);
+    assert.match(page.response.headers.get('content-type') || '', /text\/html/);
+    assert.match(page.payload, /<title>P0420 Code: Catalyst Efficiency Below Threshold/);
+    assert.match(page.payload, /Catalyst performance issue/);
+    assert.match(page.payload, /href="\/dtc\/P0430"/);
+    assert.match(page.payload, /rel="canonical" href="https:\/\/ecufileservice\.in\/dtc\/P0420"/);
+    const missing = await call('/dtc/P0999');
+    assert.equal(missing.response.status, 404);
+  } finally {
+    setTestUpstreamRequest(upstream);
+  }
+});
+
 function customerRequest() {
   const fileText = 'TEST ECU FILE CONTENT';
   const request = {
@@ -664,6 +688,9 @@ test('serves customer and admin pages', async () => {
   const admin = await call('/admin.html');
   const adminJs = await call('/admin.js');
   const ecuSeo = await call('/ecu-file-services.html');
+  const dtcSearch = await call('/dtc-search.html');
+  const sitemap = await call('/sitemap.xml');
+  const invalidDtc = await call('/dtc/not-a-code');
   const airbagSeo = await call('/airbag-crash-clear.html');
   const guides = await call('/guides.html');
   const guidesCss = await call('/guides.css');
@@ -671,6 +698,12 @@ test('serves customer and admin pages', async () => {
   assert.equal(admin.response.status, 200);
   assert.equal(adminJs.response.status, 200);
   assert.equal(ecuSeo.response.status, 200);
+  assert.equal(dtcSearch.response.status, 200);
+  assert.equal(sitemap.response.status, 200);
+  assert.doesNotMatch(sitemap.payload, /<loc>https:\/\/ecufileservice\.in\/dtc\//);
+  assert.equal(invalidDtc.response.status, 404);
+  assert.match(dtcSearch.payload, /href="\/dtc\/P0420"/);
+  assert.match(dtcSearch.payload, /href="\/dtc\/P2463"/);
   assert.equal(airbagSeo.response.status, 200);
   assert.equal(guides.response.status, 200);
   assert.equal(guidesCss.response.status, 200);
@@ -691,13 +724,13 @@ test('serves customer and admin pages', async () => {
   assert.match(workshops.payload, /href="#workshop-registration">Register your workshop/);
   assert.match(workshops.payload, /id="workshop-registration"/);
   assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
-  assert.match(ecuSeo.payload,/<title>Remote ECU File Support for Workshops \| ECU File Service India<\/title>/);
-  assert.match(ecuSeo.payload,/name="twitter:title" content="Remote ECU File Support for Workshops \| ECU File Service India"/);
+  assert.match(ecuSeo.payload,/<title>Automotive ECU Service &amp; File Support \| ECU File Service India<\/title>/);
+  assert.match(ecuSeo.payload,/name="twitter:title" content="Automotive ECU Service &amp; File Support \| ECU File Service India"/);
   assert.match(ecuSeo.payload,/"areaServed": \[/);
   assert.match(ecuSeo.payload,/"name": "Remote ECU File Support for Workshops in India and Worldwide"/);
   assert.match(ecuSeo.payload,/"name": "International markets"/);
-  assert.match(ecuSeo.payload,/for India &amp; worldwide workshops/);
-  assert.match(ecuSeo.payload,/Tamil Nadu, Kerala, Karnataka, Andhra Pradesh and across India/);
+  assert.match(ecuSeo.payload,/file support worldwide/);
+  assert.match(ecuSeo.payload,/Workshops in India and other countries/);
   assert.match(ecuSeo.payload,/DPF \/ EGR Diagnostics/);
   assert.match(ecuSeo.payload,/AdBlue \/ SCR Diagnostics/);
   assert.doesNotMatch(ecuSeo.payload,/<span>DPF &amp; EGR Off<\/span>/);
@@ -711,8 +744,8 @@ test('serves customer and admin pages', async () => {
   assert.match(airbagSeo.payload,/SRS Module File Review/);
   assert.match(airbagSeo.payload,/File work alone does not verify that the complete airbag system is safe/);
   assert.doesNotMatch(airbagSeo.payload,/tested crash-cleared file ready to write back/);
-  assert.match(customer.payload,/name="twitter:title" content="ECU File Services India &amp; Worldwide \| ECU File Service India"/);
-  assert.match(customer.payload,/<title>ECU File Services India &amp; Worldwide \| ECU File Service India<\/title>/);
+  assert.match(customer.payload,/name="twitter:title" content="ECU Service &amp; Diagnostics \| ECU File Service India"/);
+  assert.match(customer.payload,/<title>ECU Service &amp; Diagnostics \| ECU File Service India<\/title>/);
   assert.notEqual(customer.payload.match(/<title>(.*?)<\/title>/)?.[1], ecuSeo.payload.match(/<title>(.*?)<\/title>/)?.[1], 'homepage and service page titles should target distinct search intent');
   assert.match((await call('/car-diagnostic-help.html')).payload,/property="og:title" content="Common Car Problems &amp; Questions Answered \| ECU File Service India"/);
   assert.match((await call('/car-electrical-diagnostics.html')).payload,/property="og:title" content="Car Electrical Diagnostics &amp; ECU Fault Help Worldwide \| ECU File Service India"/);
