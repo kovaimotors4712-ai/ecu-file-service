@@ -58,7 +58,7 @@ function isUnsupportedElectricModel(brand, model) {
   });
 }
 
-const publicFiles = new Set(['index.html', 'car-diagnostic-help.html', 'dtc-search.html', 'car-electrical-diagnostics.html', 'workshops.html', 'admin.html', 'advertising-quote.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'ecu-fault-code-diagnosis.html', 'ecu-file-identification-original-backup.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'terms.html', 'privacy.html', 'contact.html', 'about.html', 'international-ecu-file-support.html', 'googlea2bbe9d2fd8bede2.html', '9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d.txt', 'dtc/p0241.html']);
+const publicFiles = new Set(['index.html', 'car-diagnostic-help.html', 'dtc-search.html', 'car-electrical-diagnostics.html', 'workshops.html', 'admin.html', 'advertising-quote.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'ecu-fault-code-diagnosis.html', 'ecu-file-identification-original-backup.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'terms.html', 'privacy.html', 'contact.html', 'about.html', 'international-ecu-file-support.html', 'googlea2bbe9d2fd8bede2.html', '9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d.txt']);
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
@@ -2166,17 +2166,6 @@ async function handlePublicSoftwareSeoRequest(request, response, pathname) {
     let sitemap;
     try { sitemap = await fs.promises.readFile(path.join(root, 'sitemap.xml'), 'utf8'); }
     catch { response.writeHead(500).end(); return true; }
-    if (sitemap.includes('</urlset>')) {
-      try {
-        const dtcData = await loadDtcReference();
-        const dtcEntries = dtcData.map(item => String(item && item.code || '').toUpperCase())
-          .filter(code => /^[PBCU][0-3][0-9A-F]{3}$/.test(code))
-          .map(code => '<url><loc>https://ecufileservice.in/dtc/' + code + '</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>').join('');
-        if (dtcEntries) sitemap = sitemap.replace('</urlset>', dtcEntries + '</urlset>');
-      } catch (error) {
-        console.warn('[dtc-seo] Dynamic DTC sitemap unavailable; serving base sitemap.', {message:error.message});
-      }
-    }
     if (supabaseServiceRoleKey && sitemap.includes('</urlset>')) {
       try {
         const result = await supabaseRequest(serviceToken(),
