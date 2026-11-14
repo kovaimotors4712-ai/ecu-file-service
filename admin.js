@@ -952,36 +952,17 @@
       adminForumMessage.classList.remove('admin-error');
       adminForumMessage.textContent = 'Publishing question…';
       try {
-        const created = await backend.rest('forum_topics?select=id', {
+        await backend.rest('rpc/admin_create_forum_post_pair', {
           method: 'POST',
           body: {
-            category_id: categoryId,
-            author_id: actor.id,
-            title,
-            body: question,
-            author_display_name: questionName,
-            author_label: 'Community Contributor · Editorial'
-          },
-          prefer: 'return=representation'
+            p_category_id: categoryId,
+            p_title: title,
+            p_question: question,
+            p_answer: answer,
+            p_question_name: questionName,
+            p_answer_name: answerName
+          }
         });
-        const topic = Array.isArray(created) ? created[0] : created;
-        if (!topic || !topic.id) throw new Error('The question was not confirmed as published.');
-        adminForumMessage.textContent = 'Question published. Publishing the answer…';
-        try {
-          await backend.rest('forum_replies', {
-            method: 'POST',
-            body: {
-              topic_id: topic.id,
-              author_id: actor.id,
-              body: answer,
-              author_display_name: answerName,
-              author_label: 'Community Contributor · Editorial'
-            },
-            prefer: 'return=minimal'
-          });
-        } catch (replyError) {
-          throw new Error('Question is live, but its answer was not published: ' + (replyError.message || 'Please retry the answer from Forum moderation.'));
-        }
         adminForumMessage.textContent = 'Question and answer published successfully. Both display names are editorial pseudonyms.';
         adminForumForm.elements.namedItem('title').value = '';
         adminForumForm.elements.namedItem('question').value = '';
