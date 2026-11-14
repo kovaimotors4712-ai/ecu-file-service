@@ -47,6 +47,25 @@
         <div><span class="form-kicker">OPERATIONS</span><h1>Orders</h1><p>Review customer requests, update status and deliver processed files. Use Archive/Restore for orders; permanent deletion is restricted to unpaid private requests with no payment or delivery history.</p></div>
         <button id="refresh-orders" class="button button-ghost" type="button">↻ Refresh</button>
       </div>
+      <section class="pricing-settings" aria-labelledby="forum-post-manager-title" style="margin-top:28px;display:block">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+          <div><span class="form-kicker">COMMUNITY CONTENT</span><h2 id="forum-post-manager-title">Forum Post Manager</h2><p>Create a technical discussion and its first answer in one place. Display names are rotating editorial pseudonyms, not member accounts.</p></div>
+          <a class="button button-ghost" href="#forum-post-manager">Open shortcut ↓</a>
+        </div>
+        <div id="forum-post-manager" style="scroll-margin-top:24px">
+          <form id="admin-forum-post-form" class="pricing-form" style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+            <label>Forum category<select name="category_id" id="admin-forum-category" required><option value="">Loading categories…</option></select></label>
+            <label>Question display name<input name="question_name" id="admin-forum-question-name" maxlength="32" required></label>
+            <label style="grid-column:1/-1">Question title<input name="title" maxlength="160" minlength="8" required placeholder="Example: Maruti Swift P0420 — what should be checked first?"></label>
+            <label style="grid-column:1/-1">Question details<textarea name="question" rows="4" maxlength="12000" minlength="20" required placeholder="Vehicle, symptoms, fault code and checks already completed…"></textarea></label>
+            <label>Answer display name<input name="answer_name" id="admin-forum-answer-name" maxlength="32" required></label>
+            <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="admin-forum-new-names" checked> Generate new display names each time</label>
+            <label style="grid-column:1/-1">Technical answer<textarea name="answer" rows="5" maxlength="8000" minlength="2" required placeholder="Evidence-led diagnostic steps, expected readings and safety notes…"></textarea></label>
+            <div style="grid-column:1/-1"><p class="admin-section-help">Public author labels will say “Community Contributor · Editorial”. These are editorial posts, not posts from separate customer accounts.</p><button class="button button-dark" type="submit">Publish question + answer →</button><button class="button button-ghost" id="admin-forum-generate-names" type="button">Generate display names</button><p id="admin-forum-post-message" class="admin-message" role="status"></p></div>
+          </form>
+        </div>
+      </section>
+
       <section class="pricing-settings" aria-labelledby="pricing-settings-title">
         <div><span class="form-kicker">SERVICE PRICING</span><h2 id="pricing-settings-title">File Verification</h2><p>Set the optional customer fee. Changes apply to new requests; submitted orders keep their price snapshot.</p></div>
         <form id="pricing-form" class="pricing-form">
