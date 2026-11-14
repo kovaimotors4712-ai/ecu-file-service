@@ -130,6 +130,19 @@
           });
         } catch (_) { /* Topic browsing remains available if reply counts cannot be loaded. */ }
       }
+      if (topicIds.length) {
+        try {
+          const editorialRows = await api.rest('forum_topics?select=id,author_display_name,author_label&id=in.(' + topicIds.join(',') + ')');
+          const editorialById = {};
+          (Array.isArray(editorialRows) ? editorialRows : []).forEach(function (row) { editorialById[row.id] = row; });
+          topics.forEach(function (topic) {
+            if (editorialById[topic.id]) {
+              topic.author_display_name = editorialById[topic.id].author_display_name;
+              topic.author_label = editorialById[topic.id].author_label;
+            }
+          });
+        } catch (_) { /* Search RPC may be on an older schema until the additive migration is applied. */ }
+      }
       topicList._profiles = await profilesFor(topics.map(function (topic) { return topic.author_id; }));
       setMessage(topicsMessage, '');
       renderTopics();
