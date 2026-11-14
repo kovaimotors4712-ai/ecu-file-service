@@ -45,7 +45,7 @@
     <section id="admin-dashboard" hidden>
       <div class="admin-title">
         <div><span class="form-kicker">OPERATIONS</span><h1>Orders</h1><p>Review customer requests, update status and deliver processed files. Use Archive/Restore for orders; permanent deletion is restricted to unpaid private requests with no payment or delivery history.</p></div>
-        <button id="refresh-orders" class="button button-ghost" type="button">↻ Refresh</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="button button-dark" href="#forum-post-manager">Forum Post Manager</a><button id="refresh-orders" class="button button-ghost" type="button">↻ Refresh</button></div>
       </div>
       <section class="pricing-settings" aria-labelledby="forum-post-manager-title" style="margin-top:28px;display:block">
         <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
@@ -170,6 +170,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js"></script>
   <script src="auth.js?v=20261025-admin-actions"></script>
-  <script src="admin.js?v=20261101-message-notifications"></script>
+  <script src="admin.js?v=20261114-forum-post-manager"></script>
 </body>
 </html>
