@@ -26,7 +26,7 @@ CREATE OR REPLACE FUNCTION public.forum_guard_editorial_author_fields()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   IF NEW.author_display_name IS NOT NULL OR NEW.author_label IS NOT NULL THEN
     IF COALESCE(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'admin' THEN
@@ -40,7 +40,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 CREATE TRIGGER forum_topics_guard_editorial_author_fields
 BEFORE INSERT OR UPDATE ON public.forum_topics
@@ -64,7 +64,7 @@ RETURNS uuid
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_topic_id uuid;
 BEGIN
@@ -95,7 +95,7 @@ BEGIN
 
   RETURN v_topic_id;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.admin_create_forum_post_pair(uuid, text, text, text, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_create_forum_post_pair(uuid, text, text, text, text, text) TO authenticated;
