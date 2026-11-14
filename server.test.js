@@ -712,8 +712,8 @@ test('serves customer and admin pages', async () => {
   assert.match(airbagSeo.payload,/SRS Module File Review/);
   assert.match(airbagSeo.payload,/File work alone does not verify that the complete airbag system is safe/);
   assert.doesNotMatch(airbagSeo.payload,/tested crash-cleared file ready to write back/);
-  assert.match(customer.payload,/name="twitter:title" content="ECU File Services India &amp; Worldwide \| ECU File Service India"/);
-  assert.match(customer.payload,/<title>ECU File Services India &amp; Worldwide \| ECU File Service India<\/title>/);
+  assert.match(customer.payload,/name="twitter:title" content="ECU Service &amp; Diagnostics \| ECU File Service India"/);
+  assert.match(customer.payload,/<title>ECU Service &amp; Diagnostics \| ECU File Service India<\/title>/);
   assert.notEqual(customer.payload.match(/<title>(.*?)<\/title>/)?.[1], ecuSeo.payload.match(/<title>(.*?)<\/title>/)?.[1], 'homepage and service page titles should target distinct search intent');
   assert.match((await call('/car-diagnostic-help.html')).payload,/property="og:title" content="Common Car Problems &amp; Questions Answered \| ECU File Service India"/);
   assert.match((await call('/car-electrical-diagnostics.html')).payload,/property="og:title" content="Car Electrical Diagnostics &amp; ECU Fault Help Worldwide \| ECU File Service India"/);
