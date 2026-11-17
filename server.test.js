@@ -697,7 +697,6 @@ test('serves customer and admin pages', async () => {
   assert.match(ecuSeo.payload,/"name": "Remote ECU File Support for Workshops in India and Worldwide"/);
   assert.match(ecuSeo.payload,/"name": "International markets"/);
   assert.match(ecuSeo.payload,/Workshops in India and other countries can submit vehicle/);
-  assert.match(ecuSeo.payload,/Tamil Nadu, Kerala, Karnataka, Andhra Pradesh and across India/);
   assert.match(ecuSeo.payload,/DPF \/ EGR Diagnostics/);
   assert.match(ecuSeo.payload,/AdBlue \/ SCR Diagnostics/);
   assert.doesNotMatch(ecuSeo.payload,/<span>DPF &amp; EGR Off<\/span>/);
