@@ -4,6 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101a19">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/app-icon-192.svg">
   <meta name="description" content="Automotive ECU service, ECU file support, car diagnostics, DTC fault-code help, wiring diagram guidance and workshop software for India and worldwide.">
   <link rel="canonical" href="https://ecufileservice.in/">
   <title>ECU Service &amp; Diagnostics | ECU File Service India</title>
@@ -62,7 +67,7 @@
       <span class="brand-name">ECU FILE SERVICE INDIA</span>
     </a>
     <nav class="desktop-nav" aria-label="Main navigation"><a href="#services">Services</a><a href="/ecu-file-services.html">ECU File Services</a><a href="#how-it-works">How it works</a><a href="#tools">Tools</a><a href="/forum.html">Forum</a><a href="/workshops.html">Find a workshop</a><a href="/guides.html">Guides</a><a href="/announcements.html">Offers & updates</a><a href="/advertise.html">Advertise</a><a href="/store.html">Store</a><a href="/membership.html">Membership</a></nav>
-    <div class="header-actions"><a class="forum-header-cta" href="/forum.html">Forum</a><button class="account-trigger" id="account-trigger" type="button"><span id="account-trigger-label">My account</span><span id="account-notification-badge" class="account-notification-badge" aria-label="Unread notifications" hidden></span></button></div>
+    <div class="header-actions"><button class="pwa-install-button" id="pwa-install-button" type="button" hidden>Install App</button><a class="forum-header-cta" href="/forum.html">Forum</a><button class="account-trigger" id="account-trigger" type="button"><span id="account-trigger-label">My account</span><span id="account-notification-badge" class="account-notification-badge" aria-label="Unread notifications" hidden></span></button></div>
     <button class="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button>
   </header>
   <div id="live-announcement-slot" aria-live="polite" hidden></div>
@@ -499,5 +504,20 @@ window.setInterval(refreshLiveChat,12000);
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase.js?v=ba583d0"></script><script src="auth.js?v=20261101-message-notifications"></script><script src="app.js?v=20261025-homepage-order"></script>
+
+  <script>
+  (function(){
+    const button=document.getElementById('pwa-install-button');
+    if(!button)return;
+    let installPrompt=null;
+    const standalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+    const ios=/iphone|ipad|ipod/i.test(window.navigator.userAgent);
+    if(ios&&!standalone){button.hidden=false;button.addEventListener('click',()=>alert('To install: tap the Share button in Safari, then choose “Add to Home Screen”.'));}
+    window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;button.hidden=false;});
+    button.addEventListener('click',async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;button.hidden=true;});
+    window.addEventListener('appinstalled',()=>{button.hidden=true;installPrompt=null;});
+    if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(()=>{});
+  })();
+  </script>
 </body>
 </html>
