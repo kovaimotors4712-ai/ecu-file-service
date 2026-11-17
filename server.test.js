@@ -691,8 +691,8 @@ test('serves customer and admin pages', async () => {
   assert.match(workshops.payload, /href="#workshop-registration">Register your workshop/);
   assert.match(workshops.payload, /id="workshop-registration"/);
   assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
-  assert.match(ecuSeo.payload,/<title>Remote ECU File Support for Workshops \| ECU File Service India<\/title>/);
-  assert.match(ecuSeo.payload,/name="twitter:title" content="Remote ECU File Support for Workshops \| ECU File Service India"/);
+  assert.match(ecuSeo.payload,/<title>Automotive ECU Service &amp; File Support \| ECU File Service India<\/title>/);
+  assert.match(ecuSeo.payload,/name="twitter:title" content="Automotive ECU Service &amp; File Support \| ECU File Service India"/);
   assert.match(ecuSeo.payload,/"areaServed": \[/);
   assert.match(ecuSeo.payload,/"name": "Remote ECU File Support for Workshops in India and Worldwide"/);
   assert.match(ecuSeo.payload,/"name": "International markets"/);
