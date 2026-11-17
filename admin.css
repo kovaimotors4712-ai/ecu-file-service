@@ -324,3 +324,15 @@
  .admin-folder-nav{grid-template-columns:1fr}
  .admin-folder-shortcut{min-height:46px}
 }
+
+
+/* Responsive admin shortcuts: keep the six workspace folders usable on tablets and phones. */
+@media (max-width: 1024px) {
+  .admin-folder-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .admin-folder-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px 0 12px; }
+  .admin-folder-shortcut { min-height: 48px; padding: 10px; font-size: 11px; }
+  .admin-folder-content { padding: 12px; }
+  .admin-folder > summary { padding: 14px 12px; }
+}
