@@ -102,8 +102,12 @@
 
     function loadDatabase() {
       if (!databasePromise) {
+        // A stalled request must not leave a permanently pending cached promise.
+        const requestController = new AbortController();
+        const requestTimeout = setTimeout(() => requestController.abort(), 24000);
         databasePromise = fetch(dataUrl, {
-          mode: 'cors', credentials: 'omit', cache: 'force-cache'
+          mode: 'cors', credentials: 'omit', cache: 'force-cache',
+          signal: requestController.signal
         }).then(response => {
           if (!response.ok) throw new Error('DTC reference server returned HTTP ' + response.status + '.');
           return response.json();
@@ -119,7 +123,7 @@
         }).catch(error => {
           databasePromise = null;
           throw error;
-        });
+        }).finally(() => clearTimeout(requestTimeout));
       }
       return databasePromise;
     }
