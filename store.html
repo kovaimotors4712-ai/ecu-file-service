@@ -125,7 +125,7 @@ const chip=document.createElementNS(ns,'rect');chip.setAttribute('x','235');chip
 for(let i=0;i<4;i++){const pin=document.createElementNS(ns,'path');const p=65+i*11;pin.setAttribute('d','M225 '+p+' H235 M289 '+p+' H299 M'+(245+i*11)+' 44 V54 M'+(245+i*11)+' 108 V118');pin.setAttribute('stroke',palette);pin.setAttribute('stroke-width','2');pin.setAttribute('stroke-linecap','round');svg.append(pin);}
 const chipText=document.createElementNS(ns,'text');chipText.setAttribute('x','262');chipText.setAttribute('y','86');chipText.setAttribute('text-anchor','middle');chipText.setAttribute('font-size','12');chipText.setAttribute('font-weight','800');chipText.setAttribute('fill','#f4f7f2');chipText.textContent='ECU';svg.append(chipText);
 const brand=document.createElementNS(ns,'text');brand.setAttribute('x','20');brand.setAttribute('y','27');brand.setAttribute('font-size','9');brand.setAttribute('font-weight','700');brand.setAttribute('letter-spacing','2');brand.setAttribute('fill',palette);brand.textContent='ECU FILE SERVICE INDIA';svg.append(brand);
-const name=String(item.title||'AUTOMOTIVE SOFTWARE').replace(/\\s+/g,' ').trim().toUpperCase();
+const name=String(item.title||'AUTOMOTIVE SOFTWARE').replace(/\s+/g,' ').trim().toUpperCase();
 const words=name.split(' ');let first='',second='';
 for(const word of words){if((first+' '+word).trim().length<=20)first=(first+' '+word).trim();else second=(second+' '+word).trim();}
 const title1=document.createElementNS(ns,'text');title1.setAttribute('x','20');title1.setAttribute('y','83');title1.setAttribute('font-size',first.length>17?'15':'19');title1.setAttribute('font-weight','800');title1.setAttribute('fill','#ffffff');title1.textContent=first.slice(0,22);svg.append(title1);
