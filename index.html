@@ -116,7 +116,7 @@
 
     <section class="section software-home-section" id="software-store" aria-labelledby="software-store-title">
 <div class="section-heading"><div><span class="section-eyebrow">SOFTWARE & WORKSHOP TOOLS</span><h2 id="software-store-title">Software Store</h2><p>Professional ECU tools and workshop software, curated for real-world diagnostics and repair.</p></div><a class="button button-ghost" href="/store.html">View all listings ↗</a></div>
-<div id="homepage-software-grid" class="software-home-grid" aria-live="polite"><article class="software-home-empty">Loading software listings…</article></div></section>
+<div id="homepage-software-grid" class="software-home-grid" aria-live="polite"><article class="software-home-empty">Browse automotive diagnostic software and ECU workshop tools, including Toyota Techstream, FORScan, Bosch ESI[tronic], PCMflash, BMW ISTA, Honda i-HDS, Volvo Premium Tech Tool and TEXA IDC5. <a href="/store.html">View the complete software catalogue ↗</a></article></div></section>
 
     <section class="section homepage-forum-section" id="workshop-forum-preview" aria-labelledby="homepage-forum-title">
   <div class="section-heading"><div><span class="section-eyebrow">WORKSHOP COMMUNITY</span><h2 id="homepage-forum-title">Workshop Forum</h2><p>Exchange diagnostic knowledge, discuss repairs and connect with the workshop community.</p></div><a class="button button-dark" href="/forum.html">Open full forum ↗</a></div>
@@ -483,13 +483,30 @@ window.setInterval(refreshLiveChat,12000);
     const grid=document.getElementById('homepage-software-grid');if(!grid)return;
     const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
     const https=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch(_){return '';}};
+    const softwareImageFor=item=>{
+      const title=String(item&&item.title||'');
+      const rules=[
+        [/^PCMflash ECU Programming Software/i,'https://images.dkgcc.com/files/2025/4/4862_PCMflash_logo.jpg'],
+        [/^FORScan Vehicle Diagnostic Software/i,'https://mloads.com/uploads/posts/2025-01/forscan.webp'],
+        [/^Bosch ESI/i,'https://garagewire.co.uk/wp-content/uploads/2018/10/ESItronic_Symbol_760x500-760x500.jpg'],
+        [/^ZF MultiScan Professional/i,'https://aftermarket.zf.com/media/master/other/zf-scan-images/0_0ycp6x21_bs_d_xl_6.jpg?v=1323426008'],
+        [/^Autocom CARS & TRUCKS/i,'https://www.datocms-assets.com/134622/1724417730-restart-software-1200x721.jpg?fit=clamp&fm=webp'],
+        [/^BMW ISTA/i,'https://www.go-parts.com/media/garage-images/body-control-module-bmw-m3-bmw-328i-bmw-335i-2007-2013/body-control-module-bmw-m3-bmw-328i-bmw-335i-ista-diagnostic-software-coding-screen-800w.webp'],
+        [/^Honda i-HDS/i,'https://icarpc.com.ua/image/cache/catalog/products_2023/ustanovka-Honda-Diagnostic-System-i-HDS-ukraine-04-1000x1000.jpg'],
+        [/^Volvo Premium Tech Tool/i,'https://www.diesellaptops.com/cdn/shop/files/PTT-Volvo.jpg?v=1759927368'],
+        [/^TEXA IDC5/i,'https://www.balticdiag.com/image/cache/catalog/texa/software/car%20software-700x700.jpg'],
+        [/^Mercedes-Benz XENTRY/i,'https://xentry-shop.mercedes-benz.com/out/pictures/master/product/1/xentry-diagnosis-for-kit-4.jpg']
+      ];
+      const match=rules.find(([pattern])=>pattern.test(title));
+      return match?match[1]:'';
+    };
     fetch('/api/software-products',{headers:{Accept:'application/json'}}).then(r=>r.ok?r.json():Promise.reject()).then(data=>{
       const items=Array.isArray(data.items)?data.items:[];
       grid.replaceChildren();
       if(!items.length){const empty=el('article','Software listings are being prepared. Please check back soon or contact the site team to ask about a specific tool.');empty.className='software-home-empty';grid.append(empty);return;}
       items.slice(0,6).forEach(item=>{
         const card=el('article');card.className='software-home-card';
-        const image=https(item.image_url);const cover=el('div');cover.className='software-home-cover';if(image){const img=el('img');img.src=image;img.alt=(item.title||'Software')+' software image';img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.onerror=()=>{cover.classList.add('is-image-unavailable');img.remove();cover.textContent='IMAGE PREVIEW UNAVAILABLE';};cover.append(img);}else{cover.classList.add('is-image-unavailable');cover.textContent='SOFTWARE PREVIEW';}card.append(cover);
+        const image=https(item.image_url)||https(softwareImageFor(item));const cover=el('div');cover.className='software-home-cover';if(image){const img=el('img');img.src=image;img.alt=(item.title||'Software')+' software image';img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.onerror=()=>{cover.classList.add('is-image-unavailable');img.remove();cover.textContent='IMAGE PREVIEW UNAVAILABLE';};cover.append(img);}else{cover.classList.add('is-image-unavailable');cover.textContent='SOFTWARE PREVIEW';}card.append(cover);
         const version=el('span',item.version?'VERSION '+item.version:'SOFTWARE LISTING');version.className='software-version';card.append(version);
         card.append(el('h3',item.title||'Software'));
         
