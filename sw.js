@@ -17,7 +17,7 @@ self.addEventListener('fetch',event=>{
     }));
     return;
   }
-  if(/\\.(?:css|js|svg|json)$/.test(url.pathname)){
+  if(/\.(?:css|js|svg|json)$/.test(url.pathname)){
     event.respondWith(caches.match(request,{ignoreSearch:true}).then(cached=>cached||fetch(request).then(response=>{
       if(response.ok)caches.open(CACHE_NAME).then(cache=>cache.put(request,response.clone()));
       return response;
