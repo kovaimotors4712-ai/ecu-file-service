@@ -2102,8 +2102,8 @@ test('admin controls enforce readable contrast and cache-busted current assets',
   assert.match(adminCss, /\.admin-page select option[\s\S]*?color:#111a19 !important/);
   assert.match(adminCss, /#site-content-list \.button-ghost[\s\S]*?opacity:1 !important/);
   assert.match(adminCss, /button:disabled[\s\S]*?opacity:1 !important/);
-  assert.match(adminHtml, /admin\.css\?v=20261101-message-summary/);
-  assert.match(adminHtml, /admin\.js\?v=20261101-message-notifications/);
+  assert.match(adminHtml, /admin\.css\?v=20261117-admin-mobile/);
+  assert.match(adminHtml, /admin\.js\?v=20261118-software-catalogue-pages/);
   assert.match(adminJs, /<details class=\"admin-order-detail\">/);
   assert.match(adminJs, /admin-order-summary-meta/);
   assert.match(adminCss, /\.admin-order-detail>summary/);
