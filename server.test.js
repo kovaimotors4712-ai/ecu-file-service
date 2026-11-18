@@ -2031,8 +2031,12 @@ test('admin software catalogue loads all records and searches with stable page c
   assert.match(page, /id="software-product-pagination"/);
   assert.match(admin, /const softwareProductPageSize=50/);
   assert.match(admin, /softwareProductItems\.filter\(item=>!query/);
-  assert.match(admin, /setFolderBadge\('software',softwareProductItems\.length\)/);
-  assert.doesNotMatch(admin, /function renderSoftwareProducts\([\s\S]*?updateAdminFolderBadges\(\)/);
+  const renderStart = admin.indexOf('function renderSoftwareProducts(){');
+  const loadStart = admin.indexOf('async function loadSoftwareProducts(){', renderStart);
+  assert.ok(renderStart >= 0 && loadStart > renderStart);
+  const renderSource = admin.slice(renderStart, loadStart);
+  assert.match(renderSource, /setFolderBadge\('software',softwareProductItems\.length\)/);
+  assert.doesNotMatch(renderSource, /updateAdminFolderBadges\(\)/);
 });
 
 test('customer software requests appear in the same order timeline as file requests', () => {
