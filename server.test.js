@@ -2022,6 +2022,19 @@ test('software catalogue supports optional quote-on-request pricing and public p
   assert.doesNotMatch(page, /name="price"[^>]*required/);
 });
 
+test('admin software catalogue loads all records and searches with stable page counts', () => {
+  const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const page = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
+  assert.match(server, /software_products\?select=\*&order=sort_order\.asc,created_at\.desc&limit=1000/);
+  assert.match(page, /id="software-product-search"/);
+  assert.match(page, /id="software-product-pagination"/);
+  assert.match(admin, /const softwareProductPageSize=50/);
+  assert.match(admin, /softwareProductItems\.filter\(item=>!query/);
+  assert.match(admin, /setFolderBadge\('software',softwareProductItems\.length\)/);
+  assert.doesNotMatch(admin, /function renderSoftwareProducts\([\s\S]*?updateAdminFolderBadges\(\)/);
+});
+
 test('customer software requests appear in the same order timeline as file requests', () => {
   const customerSource = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
   assert.match(customerSource, /async function loadCustomerOrders\(\)/);
