@@ -15,7 +15,18 @@
   let ordersSubscriptionPending = false;
 
   function readSession() {
-    try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; }
+    try {
+      const stored = localStorage.getItem(SESSION_KEY);
+      if (stored) return JSON.parse(stored);
+      // Migrate sessions created by the older tab-only storage so existing
+      // customers do not have to sign in again after this update.
+      const legacy = sessionStorage.getItem(SESSION_KEY);
+      if (!legacy) return null;
+      const migrated = JSON.parse(legacy);
+      if (migrated?.access_token && migrated?.refresh_token) localStorage.setItem(SESSION_KEY, legacy);
+      sessionStorage.removeItem(SESSION_KEY);
+      return migrated;
+    } catch { return null; }
   }
   function withExpiry(value) {
     return { ...value, expires_at: value.expires_at || Math.floor(Date.now() / 1000) + Number(value.expires_in || 3600) };
@@ -88,7 +99,14 @@
   function saveSession(next) {
     const previousUserId = session?.user?.id;
     session = next;
-    if (next) sessionStorage.setItem(SESSION_KEY, JSON.stringify(next)); else sessionStorage.removeItem(SESSION_KEY);
+    if (next) {
+      const serialized = JSON.stringify(next);
+      try { localStorage.setItem(SESSION_KEY, serialized); } catch { /* Storage may be unavailable in restricted browser modes. */ }
+      try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    } else {
+      try { localStorage.removeItem(SESSION_KEY); } catch {}
+      try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    }
     if (previousUserId && previousUserId !== next?.user?.id) unsubscribeRealtime();
     if (next?.access_token && realtimeClient) { try { realtimeClient.realtime.setAuth(next.access_token); } catch {} }
     renderAccountState();
