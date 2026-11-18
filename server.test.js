@@ -2039,6 +2039,12 @@ test('admin software catalogue loads all records and searches with stable page c
   assert.doesNotMatch(renderSource, /updateAdminFolderBadges\(\)/);
 });
 
+test('admin folder controls stay visible while scrolling long sections', () => {
+  const styles = fs.readFileSync(path.join(__dirname, 'admin.css'), 'utf8');
+  assert.match(styles, /\.admin-folder>summary\{position:sticky;top:0;z-index:5/);
+  assert.match(styles, /\.admin-folder\{[^}]*overflow:clip/);
+});
+
 test('customer software requests appear in the same order timeline as file requests', () => {
   const customerSource = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
   assert.match(customerSource, /async function loadCustomerOrders\(\)/);
