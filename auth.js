@@ -40,7 +40,7 @@
         });
         if (!response.ok) { saveSession(null); return null; }
         saveSession(withExpiry(await response.json()));
-      } catch { saveSession(null); return null; }
+      } catch { return null; } // Keep the stored refresh token on temporary network errors; retry on the next request.
     }
     return session?.access_token || null;
   }
