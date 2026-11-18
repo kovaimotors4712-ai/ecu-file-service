@@ -10,15 +10,21 @@ test('auth.js handleAuthCallback handles signup correctly', async (t) => {
 
   // Mock environment
   const mockStorage = new Map();
+  const legacyStorage = new Map();
   const globals = {
     window: {
       SUPABASE_URL: 'https://test.supabase.co',
       SUPABASE_ANON_KEY: 'test-key',
     },
-    sessionStorage: {
+    localStorage: {
       getItem: (key) => mockStorage.get(key) || null,
       setItem: (key, val) => mockStorage.set(key, val),
       removeItem: (key) => mockStorage.delete(key),
+    },
+    sessionStorage: {
+      getItem: (key) => legacyStorage.get(key) || null,
+      setItem: (key, val) => legacyStorage.set(key, val),
+      removeItem: (key) => legacyStorage.delete(key),
     },
     location: {
       search: '',
@@ -108,6 +114,27 @@ test('auth.js handleAuthCallback handles signup correctly', async (t) => {
     const fn = new Function(...Object.keys(globals), authJs);
     fn(...Object.values(globals));
   };
+
+  await t.test('migrates an existing tab-only session into persistent storage', () => {
+    mockStorage.clear();
+    legacyStorage.clear();
+    const existing = JSON.stringify({ access_token: 'old_access', refresh_token: 'old_refresh', user: { id: 'user1' } });
+    legacyStorage.set('efsi-auth-session', existing);
+    run('', '');
+    assert.equal(mockStorage.get('efsi-auth-session'), existing, 'Existing session should be copied to persistent localStorage');
+    assert.equal(legacyStorage.has('efsi-auth-session'), false, 'Legacy session should be removed after migration');
+  });
+
+  await t.test('keeps a successful login in persistent storage for the next app launch', () => {
+    mockStorage.clear();
+    legacyStorage.clear();
+    run('', '#type=signup&access_token=persistent_access&refresh_token=persistent_refresh&expires_in=3600');
+    const saved = JSON.parse(mockStorage.get('efsi-auth-session'));
+    assert.equal(saved.access_token, 'persistent_access');
+    assert.equal(saved.refresh_token, 'persistent_refresh');
+    // localStorage survives closing and reopening the installed PWA/browser.
+    assert.ok(mockStorage.has('efsi-auth-session'));
+  });
 
   await t.test('handles signup with access_token in hash', () => {
     mockStorage.clear();
