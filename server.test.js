@@ -2175,7 +2175,7 @@ test('admin controls enforce readable contrast and cache-busted current assets',
   assert.match(adminCss, /#site-content-list \.button-ghost[\s\S]*?opacity:1 !important/);
   assert.match(adminCss, /button:disabled[\s\S]*?opacity:1 !important/);
   assert.match(adminHtml, /admin\.css\?v=20261118-sticky-folders/);
-  assert.match(adminHtml, /admin\.js\?v=20261118-software-catalogue-pages/);
+  assert.match(adminHtml, /admin\.js\?v=20261119-forum-post-manager/);
   assert.match(adminJs, /<details class=\"admin-order-detail\">/);
   assert.match(adminJs, /admin-order-summary-meta/);
   assert.match(adminCss, /\.admin-order-detail>summary/);
