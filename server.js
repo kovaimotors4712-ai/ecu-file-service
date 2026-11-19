@@ -1382,7 +1382,7 @@ function announcementPayload(body, adminId, partial = false) {
 async function handlePublicSiteContent(request, response) {
   if (request.method !== 'GET') { jsonResponse(response, 405, { error: 'Method Not Allowed' }); return true; }
   if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error: 'Site content is temporarily unavailable.' }); return true; }
-  const result = await supabaseRequest(serviceToken(), 'rest/v1/site_announcements?select=id,kind,title,body,image_url,cta_label,cta_url,placement,starts_at,ends_at&is_published=eq.true&order=created_at.desc&limit=100', { timeoutMs: 12000 });
+  const result = await supabaseRequest(serviceToken(), 'rest/v1/site_announcements?select=id,kind,title,body,image_url,cta_label,cta_url,placement,starts_at,ends_at&is_published=eq.true&order=sort_order.asc,created_at.desc&limit=1000', { timeoutMs: 12000 });
   if (!result.ok) {
     const detail = await result.text().catch(() => '');
     console.warn('[site-content] Public query failed', { status: result.status, detail: String(detail || '').slice(0, 300) });
