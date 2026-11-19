@@ -38,7 +38,23 @@
         const response = await fetch(`${API}auth/v1/token?grant_type=refresh_token`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: session.refresh_token })
         });
-        if (!response.ok) { saveSession(null); return null; }
+        if (!response.ok) {
+          let failure = {};
+          try { failure = await response.json(); } catch {}
+          const code = String(failure.error || failure.code || '').toLowerCase();
+          const detail = String(failure.error_description || failure.message || '').toLowerCase();
+          const refreshTokenRejected = response.status === 401
+            || (response.status === 400 && (
+              code === 'invalid_grant'
+              || code === 'refresh_token_not_found'
+              || /invalid refresh token|refresh token (is )?(expired|invalid|not found)/i.test(detail)
+            ));
+          // Clear a session only when Supabase explicitly rejects the refresh
+          // token. Rate limits, gateway errors and other temporary failures
+          // must not turn an installed app into an unexpected sign-out.
+          if (refreshTokenRejected) saveSession(null);
+          return null;
+        }
         saveSession(withExpiry(await response.json()));
       } catch { return null; } // Keep the stored refresh token on temporary network errors; retry on the next request.
     }
