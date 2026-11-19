@@ -1400,11 +1400,14 @@ async function handlePublicSiteContent(request, response) {
 }
 async function handlePublicSiteSettings(request, response) {
   if (request.method !== 'GET') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
-  if (!supabaseServiceRoleKey) { jsonResponse(response, 200, { settings:{ whatsapp_url:'' } }); return true; }
+  if (!supabaseServiceRoleKey) { jsonResponse(response, 200, { settings:{ telegram_url:'' } }); return true; }
+  // The legacy database column is retained for compatibility, but only Telegram URLs are ever exposed.
   const result = await supabaseRequest(serviceToken(), 'rest/v1/site_public_settings?select=whatsapp_url&id=eq.true&limit=1', { timeoutMs:12000 });
-  if (!result.ok) { jsonResponse(response, 200, { settings:{ whatsapp_url:'' } }); return true; }
+  if (!result.ok) { jsonResponse(response, 200, { settings:{ telegram_url:'' } }); return true; }
   const row = (await result.json())?.[0] || {};
-  jsonResponse(response, 200, { settings:{ whatsapp_url:row.whatsapp_url||'' } });
+  const stored=String(row.whatsapp_url||'');
+  const valid=/^https:\/\/t\.me\/[A-Za-z0-9_]{5,32}\/?$/.test(stored) ? stored.replace(/\/$/,'') : '';
+  jsonResponse(response, 200, { settings:{ telegram_url:valid } });
   return true;
 }
 async function handleAdminSiteSettings(request, response) {
@@ -1414,28 +1417,30 @@ async function handleAdminSiteSettings(request, response) {
   const token = serviceToken();
   if (request.method === 'GET') {
     const result = await supabaseRequest(token, 'rest/v1/site_public_settings?select=whatsapp_url&id=eq.true&limit=1', { timeoutMs:12000 });
-    if (!result.ok) { jsonResponse(response, 502, { error:'WhatsApp settings could not be loaded.' }); return true; }
+    if (!result.ok) { jsonResponse(response, 502, { error:'Telegram settings could not be loaded.' }); return true; }
     const row=(await result.json())?.[0]||{};
-    jsonResponse(response,200,{settings:{whatsapp_url:row.whatsapp_url||''}});return true;
+    const stored=String(row.whatsapp_url||'');
+    const valid=/^https:\/\/t\.me\/[A-Za-z0-9_]{5,32}\/?$/.test(stored) ? stored.replace(/\/$/,'') : '';
+    jsonResponse(response,200,{settings:{telegram_url:valid}});return true;
   }
   if (request.method === 'PATCH') {
     try {
       const body=await readJson(request,4096);
-      const raw=cleanSiteText(body.whatsapp_url,300);
-      let whatsapp='';
+      const raw=cleanSiteText(body.telegram_url,300);
+      let telegram='';
       if (raw) {
         let parsed;
-        try { parsed=new URL(raw); } catch { throw Object.assign(new Error('Enter a valid WhatsApp link such as https://wa.me/91XXXXXXXXXX.'),{statusCode:400}); }
-        if (parsed.protocol!=='https:' || parsed.hostname.toLowerCase()!=='wa.me' || parsed.username || parsed.password || !/^[0-9]{7,15}$/.test(parsed.pathname.slice(1)) || parsed.hash || parsed.search) {
-          throw Object.assign(new Error('Use a WhatsApp link in this format: https://wa.me/ followed by 7 to 15 digits.'),{statusCode:400});
+        try { parsed=new URL(raw); } catch { throw Object.assign(new Error('Enter a valid Telegram link such as https://t.me/YourChannel.'),{statusCode:400}); }
+        if (parsed.protocol!=='https:' || parsed.hostname.toLowerCase()!=='t.me' || parsed.username || parsed.password || !/^\/[A-Za-z0-9_]{5,32}\/?$/.test(parsed.pathname) || parsed.hash || parsed.search) {
+          throw Object.assign(new Error('Use a Telegram link in this format: https://t.me/YourChannel.'),{statusCode:400});
         }
-        whatsapp='https://wa.me/'+parsed.pathname.slice(1);
+        telegram='https://t.me/'+parsed.pathname.split('/').filter(Boolean)[0];
       }
-      const payload={id:true,whatsapp_url:whatsapp,updated_at:new Date().toISOString(),updated_by:admin.id};
+      const payload={id:true,whatsapp_url:telegram,updated_at:new Date().toISOString(),updated_by:admin.id};
       const result=await supabaseRequest(token,'rest/v1/site_public_settings?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=representation',body:payload,timeoutMs:12000});
-      if(!result.ok){jsonResponse(response,502,{error:'WhatsApp link could not be saved.'});return true;}
-      jsonResponse(response,200,{settings:{whatsapp_url:whatsapp}});return true;
-    } catch(error) { jsonResponse(response,error.statusCode||400,{error:error.message||'Invalid WhatsApp link.'});return true; }
+      if(!result.ok){jsonResponse(response,502,{error:'Telegram link could not be saved.'});return true;}
+      jsonResponse(response,200,{settings:{telegram_url:telegram}});return true;
+    } catch(error) { jsonResponse(response,error.statusCode||400,{error:error.message||'Invalid Telegram link.'});return true; }
   }
   jsonResponse(response,405,{error:'Method Not Allowed'});return true;
 }
