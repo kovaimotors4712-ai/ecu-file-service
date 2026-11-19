@@ -2118,6 +2118,15 @@ test('software payment verification is confirmed directly with Razorpay before m
 });
 
 
+test('customer session refresh preserves stored login on temporary HTTP failures', () => {
+  const auth = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  assert.match(auth, /response\.status === 401/);
+  assert.match(auth, /code === 'invalid_grant'/);
+  assert.match(auth, /code === 'refresh_token_not_found'/);
+  assert.match(auth, /if \(refreshTokenRejected\) saveSession\(null\)/);
+  assert.doesNotMatch(auth, /if \(!response\.ok\) \{ saveSession\(null\); return null; \}/);
+});
+
 test('admin controls enforce readable contrast and cache-busted current assets', () => {
   const adminCss = fs.readFileSync(path.join(__dirname, 'admin.css'), 'utf8');
   const adminHtml = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
