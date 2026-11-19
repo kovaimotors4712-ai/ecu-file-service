@@ -2520,9 +2520,12 @@ test('international workshop support page is indexable, covers target regions an
 });
 
 
-test('public software catalogue API filters licence-status wording without changing stored records', async () => {
+test('public software catalogue API loads up to 1000 published products in admin display order', async () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  assert.match(serverSource, /is_published=eq\\.true&order=sort_order\\.asc,created_at\\.desc&limit=1000/);
   const result = await call('/api/software-products');
   assert.equal(result.response.status, 200);
   const items = result.payload.items || [];
   for (const item of items) assert.doesNotMatch(String(item.description || ''), /licen[cs]e|licensing/i);
 });
+
