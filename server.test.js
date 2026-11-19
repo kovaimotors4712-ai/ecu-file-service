@@ -1301,33 +1301,35 @@ test('static source contains category field isolation, provider routes, Resend, 
   assert.match(serverSource,/notification_outbox/);
 });
 
-test('public homepage contact is WhatsApp-only and retains a private support fallback', () => {
+test('public contact uses Telegram only and retains private support paths', () => {
   const homepage = fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
   const admin = fs.readFileSync(path.join(__dirname,'admin.html'),'utf8');
+  const adminJs = fs.readFileSync(path.join(__dirname,'admin.js'),'utf8');
   const server = fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
   const publicSettings = server.slice(server.indexOf('async function handlePublicSiteSettings'),server.indexOf('async function resolveSoftwareRequestProduct'));
-  assert.match(homepage,/whatsapp_url/);
-  assert.ok(homepage.includes('wa.me'));
-  assert.match(homepage,/PRIVATE SUPPORT/);
+  assert.match(homepage,/https:\/\/t\.me\/ECUFileServiceIndia/);
+  assert.match(homepage,/TELEGRAM/);
+  assert.doesNotMatch(homepage,/whatsapp|wa\.me/i);
   assert.doesNotMatch(homepage,/href=["']tel:/i);
-  assert.ok(!homepage.includes('t.me/ECUFileServiceIndia'));
-  assert.doesNotMatch(homepage,/contact_phone|telegram_url|contact_email/);
-  assert.match(admin,/name="whatsapp_url"/);
-  assert.doesNotMatch(admin,/name="contact_phone"|name="telegram_url"|name="contact_email"/);
-  assert.match(publicSettings,/select=whatsapp_url/);
-  assert.match(publicSettings,/whatsapp_url:whatsapp/);
+  assert.match(admin,/name="telegram_url"/);
+  assert.match(adminJs,/telegram_url/);
+  assert.doesNotMatch(admin,/whatsapp|wa\.me|name="contact_phone"|name="contact_email"/i);
+  assert.match(publicSettings,/telegram_url/);
+  assert.doesNotMatch(publicSettings,/wa\.me|whatsapp_url:whatsapp/i);
   const contact = fs.readFileSync(path.join(__dirname,'contact.html'),'utf8');
-  assert.match(contact,/href="https:\/\/wa\.me\/918300409707"/);
-  assert.match(contact,/Message us on WhatsApp/);
-  assert.doesNotMatch(contact,/href=["']tel:/i);
-  assert.doesNotMatch(publicSettings,/contact_phone|telegram_url|contact_email/);
+  assert.match(contact,/href="https:\/\/t\.me\/ECUFileServiceIndia"/);
+  assert.match(contact,/Message us on Telegram/);
+  assert.doesNotMatch(contact,/whatsapp|wa\.me|href=["']tel:/i);
   for (const page of ['airbag-crash-clear.html','ecu-file-services.html']) {
     const html=fs.readFileSync(path.join(__dirname,page),'utf8');
     assert.ok(html.includes('public-contact-links'),page+' contact slot');
-    assert.ok(html.includes('whatsapp_url'),page+' WhatsApp settings');
-    assert.ok(html.includes('WHATSAPP'),page+' WhatsApp label');
-    assert.ok(!html.includes('t.me/ECUFileServiceIndia'),page+' legacy Telegram removed');
+    assert.ok(html.includes('telegram_url'),page+' Telegram settings');
+    assert.ok(html.includes('TELEGRAM'),page+' Telegram label');
+    assert.ok(html.includes('t.me/ECUFileServiceIndia'),page+' Telegram fallback');
+    assert.doesNotMatch(html,/whatsapp|wa\.me/i,page+' must not expose WhatsApp');
   }
+  const workshops=fs.readFileSync(path.join(__dirname,'workshops.html'),'utf8');
+  assert.doesNotMatch(workshops,/whatsapp|wa\.me/i);
 });
 test('repository contains no stale local payment-state instructions', () => {
   const files = [];
