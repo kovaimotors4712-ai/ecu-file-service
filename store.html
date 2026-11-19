@@ -120,23 +120,6 @@ if(!grid)return;
 const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
 const https=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch(_){return '';}};
 const softwareSlug=value=>String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,90)||'software';
-const softwareImageFor=item=>{
-const title=String(item&&item.title||'');
-const rules=[
-[/^PCMflash ECU Programming Software/i,'https://images.dkgcc.com/files/2025/4/4862_PCMflash_logo.jpg'],
-[/^FORScan Vehicle Diagnostic Software/i,'https://mloads.com/uploads/posts/2025-01/forscan.webp'],
-[/^Bosch ESI/i,'https://garagewire.co.uk/wp-content/uploads/2018/10/ESItronic_Symbol_760x500-760x500.jpg'],
-[/^ZF MultiScan Professional/i,'https://aftermarket.zf.com/media/master/other/zf-scan-images/0_0ycp6x21_bs_d_xl_6.jpg?v=1323426008'],
-[/^Autocom CARS & TRUCKS/i,'https://www.datocms-assets.com/134622/1724417730-restart-software-1200x721.jpg?fit=clamp&fm=webp'],
-[/^BMW ISTA/i,'https://www.go-parts.com/media/garage-images/body-control-module-bmw-m3-bmw-328i-bmw-335i-2007-2013/body-control-module-bmw-m3-bmw-328i-bmw-335i-ista-diagnostic-software-coding-screen-800w.webp'],
-[/^Honda i-HDS/i,'https://icarpc.com.ua/image/cache/catalog/products_2023/ustanovka-Honda-Diagnostic-System-i-HDS-ukraine-04-1000x1000.jpg'],
-[/^Volvo Premium Tech Tool/i,'https://www.diesellaptops.com/cdn/shop/files/PTT-Volvo.jpg?v=1759927368'],
-[/^TEXA IDC5/i,'https://www.balticdiag.com/image/cache/catalog/texa/software/car%20software-700x700.jpg'],
-[/^Mercedes-Benz XENTRY/i,'https://xentry-shop.mercedes-benz.com/out/pictures/master/product/1/xentry-diagnosis-for-kit-4.jpg']
-];
-const match=rules.find(([pattern])=>pattern.test(title));
-return match?match[1]:'';
-};
 const canHaveSearchPage=item=>/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id||''))&&String(item.description||'').replace(/\s+/g,' ').trim().length>=120;
 const categoryOf=item=>{
 const text=(String(item.title||'')+' '+String(item.description||'')).toLowerCase();
