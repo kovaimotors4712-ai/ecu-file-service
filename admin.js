@@ -769,7 +769,7 @@
     requests.innerHTML='<div><span class="form-kicker">CUSTOMER INBOX</span><h2>Customer requirements</h2><p>Private requests from customers. Only authorized administrators can review and reply.</p></div><p id="admin-customer-requests-message" class="admin-message" role="status">Loading customer requirements…</p><div id="admin-customer-requests-list" class="admin-order-list"></div>';
     const notifications=document.createElement('section');notifications.className='admin-notifications-panel';
     notifications.innerHTML='<span class="form-kicker">WORK QUEUE</span><h2>Notifications & pending work</h2><p>Counts summarize current pending queues. Open a folder to review the actual records.</p><div id="admin-notifications-list" class="admin-notifications-list"></div>';
-    const defs=[{key:'notifications',title:'Overview & Alerts',nodes:[notifications]},{key:'orders',title:'Orders',nodes:[]},{key:'requirements',title:'Customer Inbox',nodes:[requests]},{key:'software',title:'Software Store',nodes:[]},{key:'advertising',title:'Announcements',nodes:[]},{key:'settings',title:'Settings',nodes:[]}];
+    const defs=[{key:'notifications',title:'Overview & Alerts',nodes:[notifications]},{key:'orders',title:'Orders',nodes:[]},{key:'requirements',title:'Customer Inbox',nodes:[requests]},{key:'software',title:'Software Store',nodes:[]},{key:'advertising',title:'Announcements',nodes:[]},{key:'forum',title:'Forum Post Manager',nodes:[pick('#forum-post-manager-section')]},{key:'settings',title:'Settings',nodes:[]}];
     const pick=function(selector){return dashboard.querySelector(selector);};
     defs.find(x=>x.key==='orders').nodes=[pick('.admin-dashboard-controls'),...Array.from(dashboard.querySelectorAll('.admin-analytics-section')),pick('#orders-message'),pick('#order-list')].filter(Boolean);
     defs.find(x=>x.key==='advertising').nodes=[pick('[aria-labelledby="site-content-title"]')].filter(Boolean);
@@ -929,6 +929,87 @@
   if(memberSearch)memberSearch.addEventListener('input',renderMembers);
   document.querySelector('#refresh-members').addEventListener('click',loadMembers);
 
+  const adminForumForm = document.querySelector('#admin-forum-post-form');
+  const adminForumCategory = document.querySelector('#admin-forum-category');
+  const adminForumMessage = document.querySelector('#admin-forum-post-message');
+  const adminForumFirstNames = ['Arun','Kumar','Vijay','Ravi','Prakash','Suresh','Karthik','Manoj','Rahul','Ajay','Naveen','Dinesh','Santhosh','Imran','Farhan','Sanjay'];
+  const adminForumInitials = ['A','B','C','D','K','M','P','R','S','V'];
+  function randomForumDisplayName() {
+    const first = adminForumFirstNames[Math.floor(Math.random() * adminForumFirstNames.length)];
+    const initial = adminForumInitials[Math.floor(Math.random() * adminForumInitials.length)];
+    const suffix = String(Math.floor(100 + Math.random() * 900));
+    return first + ' ' + initial + '. ' + suffix;
+  }
+  function generateForumDisplayNames() {
+    document.querySelector('#admin-forum-question-name').value = randomForumDisplayName();
+    document.querySelector('#admin-forum-answer-name').value = randomForumDisplayName();
+  }
+  async function loadAdminForumCategories() {
+    if (!adminForumCategory) return;
+    try {
+      const rows = await backend.rest('forum_categories?select=id,title&is_active=eq.true&order=sort_order.asc');
+      adminForumCategory.innerHTML = '<option value="">Select a category</option>' + (Array.isArray(rows) ? rows : []).map(row => '<option value="' + escape(row.id) + '">' + escape(row.title) + '</option>').join('');
+      if (!rows || !rows.length) adminForumCategory.innerHTML = '<option value="">No active categories found</option>';
+    } catch (error) {
+      adminForumCategory.innerHTML = '<option value="">Could not load categories</option>';
+      adminForumMessage.textContent = error.message || 'Forum categories could not be loaded.';
+      adminForumMessage.classList.add('admin-error');
+    }
+  }
+  document.querySelector('#admin-forum-generate-names')?.addEventListener('click', generateForumDisplayNames);
+  if (adminForumForm) {
+    generateForumDisplayNames();
+    adminForumForm.addEventListener('submit', async function(event) {
+      event.preventDefault();
+      const session = backend.getSession();
+      const actor = session && session.user;
+      if (!actor || actor.app_metadata?.role !== 'admin') {
+        adminForumMessage.textContent = 'Administrator sign-in is required.';
+        adminForumMessage.classList.add('admin-error');
+        return;
+      }
+      const data = new FormData(adminForumForm);
+      const categoryId = String(data.get('category_id') || '');
+      const title = String(data.get('title') || '').trim();
+      const question = String(data.get('question') || '').trim();
+      const answer = String(data.get('answer') || '').trim();
+      const questionName = String(data.get('question_name') || '').trim();
+      const answerName = String(data.get('answer_name') || '').trim();
+      if (!categoryId || title.length < 8 || title.length > 160 || question.length < 20 || question.length > 12000 || !answer || answer.length > 8000 || !questionName || !answerName) {
+        adminForumMessage.textContent = 'Complete the category, title, question, answer and both display names.';
+        adminForumMessage.classList.add('admin-error');
+        return;
+      }
+      const button = adminForumForm.querySelector('button[type="submit"]');
+      button.disabled = true;
+      adminForumMessage.classList.remove('admin-error');
+      adminForumMessage.textContent = 'Publishing question…';
+      try {
+        await backend.rest('rpc/admin_create_forum_post_pair', {
+          method: 'POST',
+          body: {
+            p_category_id: categoryId,
+            p_title: title,
+            p_question: question,
+            p_answer: answer,
+            p_question_name: questionName,
+            p_answer_name: answerName
+          }
+        });
+        adminForumMessage.textContent = 'Question and answer published successfully. Both display names are editorial pseudonyms.';
+        adminForumForm.elements.namedItem('title').value = '';
+        adminForumForm.elements.namedItem('question').value = '';
+        adminForumForm.elements.namedItem('answer').value = '';
+        if (document.querySelector('#admin-forum-new-names').checked) generateForumDisplayNames();
+      } catch (error) {
+        adminForumMessage.textContent = error.message || 'Forum post could not be published.';
+        adminForumMessage.classList.add('admin-error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
   async function enterAdmin(){
     const session = backend.getSession();
     if (!session?.user) { setSignedOut(); return; }
@@ -941,6 +1022,7 @@
     dashboard.hidden = false;
     document.querySelector('#admin-signout').hidden = false;
     setupAdminFolders();
+    await loadAdminForumCategories();
     await loadPricing();
     await loadOrders();
     await loadAdvertisingInquiries();
