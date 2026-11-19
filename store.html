@@ -147,7 +147,7 @@ grid.replaceChildren();
 if(!visible.length){const empty=el('p','No matching software found. Try another keyword or select All categories.');empty.className='store-empty';grid.append(empty);return;}
 visible.forEach(({card})=>grid.append(card));
 };
-const cleanDetails=item=>String(item.description||'').replace(/\\r\\n?/g,'\\n').split(/\\n+/).map(line=>line.trim()).filter(line=>line&&!/(https?:\\/\\/|www\\.|official|source|website|download|publisher|developer)/i.test(line)).join('\\n\\n');
+const cleanDetails=item=>String(item.description||'').replace(/\r\n?/g,'\n').split(/\n+/).map(line=>line.trim()).filter(line=>line&&!/(https?:\/\/|www\.|official|source|website|download|publisher|developer)/i.test(line)).join('\n\n');
 const openDetails=item=>{
 selectedItem=item;detailTitle.textContent=item.title||'Software';
 detailDescription.textContent=cleanDetails(item)||'No additional details are available for this software yet.';
@@ -168,7 +168,7 @@ const item=selectedItem,api=window.EfsiSupabase,session=api?.getSession?.();
 if(!api?.rest||!session?.user?.id){detailDialog.close();document.querySelector('#account-trigger')?.click();alert('Please sign in to request a software price.');return;}
 detailRequest.disabled=true;
 try{
-await api.rest('forum_customer_requests',{method:'POST',prefer:'return=minimal',body:{user_id:session.user.id,request_type:'software_requirement',title:'Software price request: '+String(item.title||'Software').slice(0,90),body:'Software: '+(item.title||'Software')+'\\nVersion: '+(item.version||'Not specified')+'\\nProduct ID: '+item.id+'\\nPlease provide a price quote and payment link.',status:'open',admin_reply:'',software_product_id:item.id,software_status:'requested',customer_auto_reply:'Your software request has been received. Check My Account → Private requests for your quote, payment link and delivery update.'}});
+await api.rest('forum_customer_requests',{method:'POST',prefer:'return=minimal',body:{user_id:session.user.id,request_type:'software_requirement',title:'Software price request: '+String(item.title||'Software').slice(0,90),body:'Software: '+(item.title||'Software')+'\nVersion: '+(item.version||'Not specified')+'\nProduct ID: '+item.id+'\nPlease provide a price quote and payment link.',status:'open',admin_reply:'',software_product_id:item.id,software_status:'requested',customer_auto_reply:'Your software request has been received. Check My Account → Private requests for your quote, payment link and delivery update.'}});
 detailRequest.textContent='Request sent';alert('Request sent. Check My Account → Private requests for updates.');
 }catch(error){alert(error.message||'Could not send request. Please sign in and retry.');}
 finally{detailRequest.disabled=false;}
@@ -186,8 +186,6 @@ if(imgUrl){const img=el('img');img.src=imgUrl;img.alt=String(item.title||'Softwa
 else{const unavailable=el('span','IMAGE NOT AVAILABLE');unavailable.className='image-unavailable';cover.append(unavailable);}
 card.append(cover);
 card.append(el('h3',item.title||'Software'));
-const detailText=String(item.description||'').replace(/\r\n?/g,'\n').split(/\n+/).map(line=>line.trim()).filter(line=>line&&!/(https?:\/\/|www\.|official|source|website|download|publisher|developer)/i.test(line)).join('\n\n');
-if(detailText){const details=el('p',detailText);details.className='software-details';card.append(details);}
 return {item,group,card};
 });
 if(categoryIndex){
