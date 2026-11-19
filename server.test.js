@@ -2022,6 +2022,29 @@ test('software catalogue supports optional quote-on-request pricing and public p
   assert.doesNotMatch(page, /name="price"[^>]*required/);
 });
 
+test('admin software catalogue loads all records and searches with stable page counts', () => {
+  const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const page = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
+  assert.match(server, /software_products\?select=\*&order=sort_order\.asc,created_at\.desc&limit=1000/);
+  assert.match(page, /id="software-product-search"/);
+  assert.match(page, /id="software-product-pagination"/);
+  assert.match(admin, /const softwareProductPageSize=50/);
+  assert.match(admin, /softwareProductItems\.filter\(item=>!query/);
+  const renderStart = admin.indexOf('function renderSoftwareProducts(){');
+  const loadStart = admin.indexOf('async function loadSoftwareProducts(){', renderStart);
+  assert.ok(renderStart >= 0 && loadStart > renderStart);
+  const renderSource = admin.slice(renderStart, loadStart);
+  assert.match(renderSource, /setFolderBadge\('software',softwareProductItems\.length\)/);
+  assert.doesNotMatch(renderSource, /updateAdminFolderBadges\(\)/);
+});
+
+test('admin folder controls stay visible while scrolling long sections', () => {
+  const styles = fs.readFileSync(path.join(__dirname, 'admin.css'), 'utf8');
+  assert.match(styles, /\.admin-folder>summary\{position:sticky;top:0;z-index:5/);
+  assert.match(styles, /\.admin-folder\{[^}]*overflow:clip/);
+});
+
 test('customer software requests appear in the same order timeline as file requests', () => {
   const customerSource = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
   assert.match(customerSource, /async function loadCustomerOrders\(\)/);
@@ -2095,6 +2118,15 @@ test('software payment verification is confirmed directly with Razorpay before m
 });
 
 
+test('customer session refresh preserves stored login on temporary HTTP failures', () => {
+  const auth = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
+  assert.match(auth, /response\.status === 401/);
+  assert.match(auth, /code === 'invalid_grant'/);
+  assert.match(auth, /code === 'refresh_token_not_found'/);
+  assert.match(auth, /if \(refreshTokenRejected\) saveSession\(null\)/);
+  assert.doesNotMatch(auth, /if \(!response\.ok\) \{ saveSession\(null\); return null; \}/);
+});
+
 test('admin controls enforce readable contrast and cache-busted current assets', () => {
   const adminCss = fs.readFileSync(path.join(__dirname, 'admin.css'), 'utf8');
   const adminHtml = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
@@ -2102,8 +2134,8 @@ test('admin controls enforce readable contrast and cache-busted current assets',
   assert.match(adminCss, /\.admin-page select option[\s\S]*?color:#111a19 !important/);
   assert.match(adminCss, /#site-content-list \.button-ghost[\s\S]*?opacity:1 !important/);
   assert.match(adminCss, /button:disabled[\s\S]*?opacity:1 !important/);
-  assert.match(adminHtml, /admin\.css\?v=20261101-message-summary/);
-  assert.match(adminHtml, /admin\.js\?v=20261101-message-notifications/);
+  assert.match(adminHtml, /admin\.css\?v=20261118-sticky-folders/);
+  assert.match(adminHtml, /admin\.js\?v=20261118-software-catalogue-pages/);
   assert.match(adminJs, /<details class=\"admin-order-detail\">/);
   assert.match(adminJs, /admin-order-summary-meta/);
   assert.match(adminCss, /\.admin-order-detail>summary/);

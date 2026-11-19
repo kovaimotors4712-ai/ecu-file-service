@@ -15,7 +15,18 @@
   let ordersSubscriptionPending = false;
 
   function readSession() {
-    try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; }
+    try {
+      const stored = localStorage.getItem(SESSION_KEY);
+      if (stored) return JSON.parse(stored);
+      // Migrate sessions created by the older tab-only storage so existing
+      // customers do not have to sign in again after this update.
+      const legacy = sessionStorage.getItem(SESSION_KEY);
+      if (!legacy) return null;
+      const migrated = JSON.parse(legacy);
+      if (migrated?.access_token && migrated?.refresh_token) localStorage.setItem(SESSION_KEY, legacy);
+      sessionStorage.removeItem(SESSION_KEY);
+      return migrated;
+    } catch { return null; }
   }
   function withExpiry(value) {
     return { ...value, expires_at: value.expires_at || Math.floor(Date.now() / 1000) + Number(value.expires_in || 3600) };
@@ -27,9 +38,25 @@
         const response = await fetch(`${API}auth/v1/token?grant_type=refresh_token`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: session.refresh_token })
         });
-        if (!response.ok) { saveSession(null); return null; }
+        if (!response.ok) {
+          let failure = {};
+          try { failure = await response.json(); } catch {}
+          const code = String(failure.error || failure.code || '').toLowerCase();
+          const detail = String(failure.error_description || failure.message || '').toLowerCase();
+          const refreshTokenRejected = response.status === 401
+            || (response.status === 400 && (
+              code === 'invalid_grant'
+              || code === 'refresh_token_not_found'
+              || /invalid refresh token|refresh token (is )?(expired|invalid|not found)/i.test(detail)
+            ));
+          // Clear a session only when Supabase explicitly rejects the refresh
+          // token. Rate limits, gateway errors and other temporary failures
+          // must not turn an installed app into an unexpected sign-out.
+          if (refreshTokenRejected) saveSession(null);
+          return null;
+        }
         saveSession(withExpiry(await response.json()));
-      } catch { saveSession(null); return null; }
+      } catch { return null; } // Keep the stored refresh token on temporary network errors; retry on the next request.
     }
     return session?.access_token || null;
   }
@@ -88,7 +115,14 @@
   function saveSession(next) {
     const previousUserId = session?.user?.id;
     session = next;
-    if (next) sessionStorage.setItem(SESSION_KEY, JSON.stringify(next)); else sessionStorage.removeItem(SESSION_KEY);
+    if (next) {
+      const serialized = JSON.stringify(next);
+      try { localStorage.setItem(SESSION_KEY, serialized); } catch { /* Storage may be unavailable in restricted browser modes. */ }
+      try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    } else {
+      try { localStorage.removeItem(SESSION_KEY); } catch {}
+      try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    }
     if (previousUserId && previousUserId !== next?.user?.id) unsubscribeRealtime();
     if (next?.access_token && realtimeClient) { try { realtimeClient.realtime.setAuth(next.access_token); } catch {} }
     renderAccountState();

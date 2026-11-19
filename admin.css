@@ -83,8 +83,9 @@
 .admin-folder-shortcut{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;padding:12px 10px;border:1px solid #dbe3d5;border-radius:7px;background:#fff;color:#24332a;text-align:left;font:700 12px/1.4 var(--sans);cursor:pointer}
 .admin-folder-shortcut:hover{background:#f3f7eb;border-color:#a7b96b}
 .admin-folder-grid{display:grid;gap:10px;margin-bottom:20px}
-.admin-folder{border:1px solid #dfe6d8;border-radius:9px;background:#fff;overflow:hidden;scroll-margin-top:14px}
-.admin-folder>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;background:#f6f8f2;cursor:pointer;list-style:none;font-weight:800;color:#24332a}
+.admin-folder{border:1px solid #dfe6d8;border-radius:9px;background:#fff;overflow:clip;scroll-margin-top:14px}
+/* Keep the folder control visible while its long contents are scrolled. Tapping the sticky summary closes the folder without returning to the top. */
+.admin-folder>summary{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;background:#f6f8f2;box-shadow:0 2px 8px #24332a0a;cursor:pointer;list-style:none;font-weight:800;color:#24332a;scroll-margin-top:8px}
 .admin-folder>summary::-webkit-details-marker{display:none}
 .admin-folder>summary:after{content:'+';font-size:20px;color:#70852e}
 .admin-folder[open]>summary:after{content:'−'}
