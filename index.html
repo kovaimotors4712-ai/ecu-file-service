@@ -215,6 +215,15 @@ window.setInterval(refreshLiveChat,12000);
   <footer class="site-footer"><a class="brand footer-brand" href="#home"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 10h26v20H7z"/><path d="M12 15h5v10h-5zm11 0h5m-5 5h5m-5 5h5M3 15h4m-4 5h4m-4 5h4m26-10h4m-4 5h4m-4 5h4"/></svg></span><span class="brand-name">ECU FILE SERVICE INDIA</span></a><span class="footer-copy">Professional file support for automotive specialists. <a href="/forum.html" class="footer-guides-link">Automotive forum ↗</a> · <a href="/guides.html" class="footer-guides-link">Diagnostic guides ↗</a> · <a href="/terms.html" class="footer-guides-link">Terms &amp; Conditions</a> · <a href="/privacy.html" class="footer-guides-link">Privacy Policy</a> · <a href="/contact.html" class="footer-guides-link">International Workshop Support ↗</a> · <a href="/international-ecu-file-support.html" class="footer-guides-link">India &amp; Worldwide Workshop Support ↗</a> · <a href="/contact.html" class="footer-guides-link">Contact &amp; Support</a></span><span class="footer-right">© <span id="year"></span> ECU FILE SERVICE INDIA <span class="footer-dot">·</span> BUILT FOR THE WORKSHOP</span></footer>
   <script>
   (function(){
+    const contactLinks=document.getElementById('public-contact-links');
+    fetch('/api/site-settings',{headers:{Accept:'application/json'},cache:'no-store'}).then(async response=>{
+      if(!response.ok)throw new Error('settings unavailable');
+      const data=await response.json();
+      const raw=String(data.settings?.telegram_url||'').trim();
+      let url='';
+      try{const parsed=new URL(raw);if(parsed.protocol==='https:'&&parsed.hostname==='t.me'&&/^\/[A-Za-z0-9_]{5,32}\/?$/.test(parsed.pathname)&&!parsed.search&&!parsed.hash)url='https://t.me/'+parsed.pathname.split('/').filter(Boolean)[0];}catch(_){}
+      if(url&&contactLinks){const link=document.createElement('a');link.className='contact-button';link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.innerHTML='<span class="contact-button-icon">➤</span><span><small>TELEGRAM</small><b>Message us on Telegram</b></span><span class="contact-arrow">↗</span>';contactLinks.replaceChildren(link);}
+    }).catch(()=>{});
     const banner=document.getElementById('live-announcement-slot'),section=document.getElementById('homepage-promotion-slot'),grid=document.getElementById('homepage-promotion-grid');
     const safeUrl=value=>{try{const u=new URL(value);return u.protocol==='https:'?u.href:null;}catch{return null;}};
     const node=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
