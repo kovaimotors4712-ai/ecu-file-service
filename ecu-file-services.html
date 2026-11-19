@@ -170,7 +170,7 @@
       </div>
     </section>
 
-    <section class="contact-banner"><div><span class="eyebrow"><span class="eyebrow-line"></span> TECHNICAL SUPPORT</span><h2>Need help with an<br><span>ECU file?</span></h2></div><div class="contact-buttons" id="public-contact-links"><a href="/contact.html" class="contact-button"><span class="contact-button-icon">↗</span><span><small>PRIVATE SUPPORT</small><b>Send a private support request</b></span><span class="contact-arrow">↗</span></a></div></section>
+    <section class="contact-banner"><div><span class="eyebrow"><span class="eyebrow-line"></span> TECHNICAL SUPPORT</span><h2>Need help with an<br><span>ECU file?</span></h2></div><div class="contact-buttons" id="public-contact-links"><a href="https://t.me/ECUFileServiceIndia" class="contact-button" target="_blank" rel="noopener noreferrer"><span class="contact-button-icon">➤</span><span><small>TELEGRAM</small><b>Message us on Telegram</b></span><span class="contact-arrow">↗</span></a></div></section>
   </main>
   <footer class="site-footer"><a class="brand footer-brand" href="index.html"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 10h26v20H7z"/><path d="M12 15h5v10h-5zm11 0h5m-5 5h5m-5 5h5M3 15h4m-4 5h4m-4 5h4m26-10h4m-4 5h4m-4 5h4"/></svg></span><span class="brand-name">ECU FILE SERVICE INDIA</span></a><span class="footer-copy">Professional file support for automotive specialists. <span class="footer-dot">·</span> <a href="/contact.html" class="footer-guides-link">International workshop enquiries ↗</a></span><span class="footer-right">© <span id="year"></span> ECU FILE SERVICE INDIA <span class="footer-dot">·</span> BUILT FOR THE WORKSHOP</span></footer>
   <script>
@@ -180,10 +180,10 @@
     fetch('/api/site-settings',{headers:{Accept:'application/json'},cache:'no-store'}).then(async response=>{
       if(!response.ok)throw new Error('settings unavailable');
       const data=await response.json();
-      const raw=String(data.settings?.whatsapp_url||'').trim();
+      const raw=String(data.settings?.telegram_url||'').trim();
       let url='';
-      try{const parsed=new URL(raw);if(parsed.protocol==='https:'&&parsed.hostname==='wa.me'&&/^[0-9]{7,15}$/.test(parsed.pathname.slice(1))&&!parsed.search&&!parsed.hash)url=parsed.href;}catch(_){}
-      if(url){const link=document.createElement('a');link.className='contact-button';link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.innerHTML='<span class="contact-button-icon">➤</span><span><small>WHATSAPP</small><b>Message us on WhatsApp</b></span><span class="contact-arrow">↗</span>';target.replaceChildren(link);}
+      try{const parsed=new URL(raw);if(parsed.protocol==='https:'&&parsed.hostname==='t.me'&&/^\/[A-Za-z0-9_]{5,32}\/?$/.test(parsed.pathname)&&!parsed.search&&!parsed.hash)url='https://t.me/'+parsed.pathname.split('/').filter(Boolean)[0];}catch(_){}
+      if(url){const link=document.createElement('a');link.className='contact-button';link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.innerHTML='<span class="contact-button-icon">➤</span><span><small>TELEGRAM</small><b>Message us on Telegram</b></span><span class="contact-arrow">↗</span>';target.replaceChildren(link);}
     }).catch(()=>{});
   })();
 </script>
