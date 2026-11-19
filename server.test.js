@@ -594,6 +594,21 @@ test('dynamic DTC landing pages render known generic codes and return 404 for un
 });
 
 
+
+test('admin forum editorial publishing is labelled and guarded by a single invoker transaction', () => {
+  const adminHtml = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
+  const adminJs = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
+  const forumJs = fs.readFileSync(path.join(__dirname, 'forum.js'), 'utf8');
+  const migration = fs.readFileSync(path.join(__dirname, 'supabase/migrations/20261114_forum_editorial_display_names.sql'), 'utf8');
+  assert.match(adminHtml, /id="admin-forum-post-form"/);
+  assert.match(adminJs, /rpc\/admin_create_forum_post_pair/);
+  assert.match(migration, /SECURITY INVOKER/);
+  assert.match(migration, /auth\.jwt\(\) -> 'app_metadata' ->> 'role'/);
+  assert.match(migration, /Community Contributor · Editorial/);
+  assert.match(forumJs, /authorLabelMarkup/);
+  assert.match(forumJs, /author_display_name/);
+});
+
 function customerRequest() {
   const fileText = 'TEST ECU FILE CONTENT';
   const request = {
