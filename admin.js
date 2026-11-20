@@ -646,6 +646,7 @@
   const softwareProductSearch=document.querySelector('#software-product-search');
   const softwareProductCount=document.querySelector('#software-product-count');
   const softwareProductPagination=document.querySelector('#software-product-pagination');
+  // Quote on request is the legacy equivalent of the compact “Request Price” label.
   function renderSoftwareProducts(){
     if(!softwareProductList)return;
     const query=String(softwareProductSearch?.value||'').trim().toLocaleLowerCase();
