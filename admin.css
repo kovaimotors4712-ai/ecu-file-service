@@ -337,3 +337,8 @@
   .admin-folder-content { padding: 12px; }
   .admin-folder > summary { padding: 14px 12px; }
 }
+.admin-member-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}
+.admin-member-metric{display:grid;gap:6px;padding:14px 16px;border:1px solid #dfe6dc;border-radius:8px;background:#f8faf6}
+.admin-member-metric span{font:700 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#68756f}
+.admin-member-metric strong{font:800 25px var(--display);color:#20342a}
+@media(max-width:600px){.admin-member-summary{grid-template-columns:1fr 1fr}.admin-member-metric:first-child{grid-column:1/-1}}
