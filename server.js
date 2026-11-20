@@ -1401,7 +1401,7 @@ async function handlePublicSiteContent(request, response) {
 async function handlePublicSiteSettings(request, response) {
   if (request.method !== 'GET') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
   if (!supabaseServiceRoleKey) { jsonResponse(response, 200, { settings:{ telegram_url:'' } }); return true; }
-  // The legacy database column is retained for compatibility, but only Telegram URLs are ever exposed.
+  // Only Telegram contact details are stored and exposed.
   const result = await supabaseRequest(serviceToken(), 'rest/v1/site_public_settings?select=telegram_url&id=eq.true&limit=1', { timeoutMs:12000 });
   if (!result.ok) { jsonResponse(response, 200, { settings:{ telegram_url:'' } }); return true; }
   const row = (await result.json())?.[0] || {};
