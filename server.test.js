@@ -1315,7 +1315,8 @@ test('public contact uses Telegram only and retains private support paths', () =
   assert.match(adminJs,/telegram_url/);
   assert.doesNotMatch(admin,/whatsapp|wa\.me|name="contact_phone"|name="contact_email"/i);
   assert.match(publicSettings,/telegram_url/);
-  assert.doesNotMatch(publicSettings,/wa\.me|whatsapp_url:whatsapp/i);
+  assert.doesNotMatch(publicSettings,/whatsapp|wa\.me/i);
+  assert.doesNotMatch(server,/whatsapp_url|wa\.me/i);
   const contact = fs.readFileSync(path.join(__dirname,'contact.html'),'utf8');
   assert.match(contact,/href="https:\/\/t\.me\/ECUFileServiceIndia"/);
   assert.match(contact,/Message us on Telegram/);
