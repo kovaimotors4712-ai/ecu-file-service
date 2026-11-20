@@ -1401,11 +1401,11 @@ async function handlePublicSiteContent(request, response) {
 async function handlePublicSiteSettings(request, response) {
   if (request.method !== 'GET') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
   if (!supabaseServiceRoleKey) { jsonResponse(response, 200, { settings:{ telegram_url:'' } }); return true; }
-  // The legacy database column is retained for compatibility, but only Telegram URLs are ever exposed.
-  const result = await supabaseRequest(serviceToken(), 'rest/v1/site_public_settings?select=whatsapp_url&id=eq.true&limit=1', { timeoutMs:12000 });
+  // Only Telegram contact details are stored and exposed.
+  const result = await supabaseRequest(serviceToken(), 'rest/v1/site_public_settings?select=telegram_url&id=eq.true&limit=1', { timeoutMs:12000 });
   if (!result.ok) { jsonResponse(response, 200, { settings:{ telegram_url:'' } }); return true; }
   const row = (await result.json())?.[0] || {};
-  const stored=String(row.whatsapp_url||'');
+  const stored=String(row.telegram_url||'');
   const valid=/^https:\/\/t\.me\/[A-Za-z0-9_]{5,32}\/?$/.test(stored) ? stored.replace(/\/$/,'') : '';
   jsonResponse(response, 200, { settings:{ telegram_url:valid } });
   return true;
@@ -1416,10 +1416,10 @@ async function handleAdminSiteSettings(request, response) {
   if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'Public contact settings are unavailable.' }); return true; }
   const token = serviceToken();
   if (request.method === 'GET') {
-    const result = await supabaseRequest(token, 'rest/v1/site_public_settings?select=whatsapp_url&id=eq.true&limit=1', { timeoutMs:12000 });
+    const result = await supabaseRequest(token, 'rest/v1/site_public_settings?select=telegram_url&id=eq.true&limit=1', { timeoutMs:12000 });
     if (!result.ok) { jsonResponse(response, 502, { error:'Telegram settings could not be loaded.' }); return true; }
     const row=(await result.json())?.[0]||{};
-    const stored=String(row.whatsapp_url||'');
+    const stored=String(row.telegram_url||'');
     const valid=/^https:\/\/t\.me\/[A-Za-z0-9_]{5,32}\/?$/.test(stored) ? stored.replace(/\/$/,'') : '';
     jsonResponse(response,200,{settings:{telegram_url:valid}});return true;
   }
@@ -1436,7 +1436,7 @@ async function handleAdminSiteSettings(request, response) {
         }
         telegram='https://t.me/'+parsed.pathname.split('/').filter(Boolean)[0];
       }
-      const payload={id:true,whatsapp_url:telegram,updated_at:new Date().toISOString(),updated_by:admin.id};
+      const payload={id:true,telegram_url:telegram,updated_at:new Date().toISOString(),updated_by:admin.id};
       const result=await supabaseRequest(token,'rest/v1/site_public_settings?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=representation',body:payload,timeoutMs:12000});
       if(!result.ok){jsonResponse(response,502,{error:'Telegram link could not be saved.'});return true;}
       jsonResponse(response,200,{settings:{telegram_url:telegram}});return true;
