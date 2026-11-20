@@ -703,7 +703,7 @@
     const pendingOrders=orders.filter(function(o){return ['New','File Review','Processing','Payment Pending'].includes(o.status)||o.payment_status==='PENDING';}).length;
     const openRequests=adminRequestRows.filter(function(r){return ['open','in_review','waiting_for_customer'].includes(r.status||'open');}).length;
     const adItems=document.querySelectorAll('#advertising-inquiry-list .admin-order-card').length;
-    const softwareItems=document.querySelectorAll('#software-product-list .admin-order-card').length;
+    const softwareItems=typeof softwareProductItems!=='undefined'&&Array.isArray(softwareProductItems)?softwareProductItems.length:document.querySelectorAll('#software-product-list .admin-order-card').length;
     const unreadMessages=Array.isArray(adminUnreadMessages)?adminUnreadMessages:[];
     setFolderBadge('orders',pendingOrders);
     setFolderBadge('advertising',adItems);
@@ -770,15 +770,17 @@
     const title=dashboard.querySelector('.admin-title');if(!title)return;dashboard.dataset.folderized='true';
     const nav=document.createElement('nav');nav.className='admin-folder-nav';nav.setAttribute('aria-label','Admin workspace folders');
     const grid=document.createElement('div');grid.className='admin-folder-grid';
+    const pick=function(selector){return dashboard.querySelector(selector);};
     const requests=document.createElement('section');requests.className='pricing-settings admin-customer-requests';
     requests.innerHTML='<div><span class="form-kicker">CUSTOMER INBOX</span><h2>Customer requirements</h2><p>Private requests from customers. Only authorized administrators can review and reply.</p></div><p id="admin-customer-requests-message" class="admin-message" role="status">Loading customer requirements…</p><div id="admin-customer-requests-list" class="admin-order-list"></div>';
     const notifications=document.createElement('section');notifications.className='admin-notifications-panel';
     notifications.innerHTML='<span class="form-kicker">WORK QUEUE</span><h2>Notifications & pending work</h2><p>Counts summarize current pending queues. Open a folder to review the actual records.</p><div id="admin-notifications-list" class="admin-notifications-list"></div>';
-    const defs=[{key:'notifications',title:'Overview & Alerts',nodes:[notifications]},{key:'orders',title:'Orders',nodes:[]},{key:'requirements',title:'Customer Inbox',nodes:[requests]},{key:'software',title:'Software Store',nodes:[]},{key:'advertising',title:'Announcements',nodes:[]},{key:'forum',title:'Forum Post Manager',nodes:[pick('#forum-post-manager-section')]},{key:'settings',title:'Settings',nodes:[]}];
-    const pick=function(selector){return dashboard.querySelector(selector);};
+    const defs=[{key:'notifications',title:'Overview & Alerts',nodes:[notifications]},{key:'orders',title:'Orders',nodes:[]},{key:'requirements',title:'Customer Inbox',nodes:[requests]},{key:'software',title:'Software Store',nodes:[]},{key:'members',title:'Members & Access',nodes:[]},{key:'advertising',title:'Announcements',nodes:[]},{key:'forum',title:'Forum Post Manager',nodes:[]},{key:'settings',title:'Settings',nodes:[]}];
     defs.find(x=>x.key==='orders').nodes=[pick('.admin-dashboard-controls'),...Array.from(dashboard.querySelectorAll('.admin-analytics-section')),pick('#orders-message'),pick('#order-list')].filter(Boolean);
     defs.find(x=>x.key==='advertising').nodes=[pick('[aria-labelledby="site-content-title"]')].filter(Boolean);
     defs.find(x=>x.key==='software').nodes=[pick('[aria-labelledby="software-products-title"]')].filter(Boolean);
+    defs.find(x=>x.key==='members').nodes=[pick('[aria-labelledby="member-management-title"]')].filter(Boolean);
+    defs.find(x=>x.key==='forum').nodes=[pick('#forum-post-manager-section')].filter(Boolean);
     defs.find(x=>x.key==='settings').nodes=[pick('[aria-labelledby="pricing-settings-title"]'),pick('[aria-labelledby="public-contact-title"]')].filter(Boolean);
     defs.forEach(function(def){
       const details=document.createElement('details');details.className='admin-folder';details.dataset.adminFolder=def.key;details.open=def.key==='notifications';
@@ -877,18 +879,28 @@
     if(!response.ok)throw new Error(result.error||'Member action failed.');
     return result;
   }
+  let memberPage=1;
+  const memberPageSize=100;
   function renderMembers(){
     const q=String(memberSearch?.value||'').trim().toLowerCase();
-    const rows=memberUsers.filter(u=>(u.email+' '+u.id).toLowerCase().includes(q));
-    if(!rows.length){memberList.innerHTML='<p>No members match this search.</p>';return;}
+    const filtered=memberUsers.filter(u=>(u.email+' '+u.id).toLowerCase().includes(q));
+    const memberCount=memberUsers.filter(u=>u.role!=='admin').length;
+    const adminCount=memberUsers.length-memberCount;
+    const summary=document.querySelector('#member-summary');
+    if(summary)summary.innerHTML='<div class="admin-member-metric"><span>Total accounts</span><strong>'+memberUsers.length+'</strong></div><div class="admin-member-metric"><span>Members</span><strong>'+memberCount+'</strong></div><div class="admin-member-metric"><span>Administrators</span><strong>'+adminCount+'</strong></div>';
+    const pageCount=Math.max(1,Math.ceil(filtered.length/memberPageSize));
+    memberPage=Math.min(memberPage,pageCount);
+    const rows=filtered.slice((memberPage-1)*memberPageSize,memberPage*memberPageSize);
+    if(!rows.length){memberList.innerHTML='<p>'+(memberUsers.length?'No members match this search.':'No member accounts have been created yet.')+'</p>';memberPrev.disabled=memberPage<=1;memberNext.disabled=true;return;}
     memberList.innerHTML=rows.map(u=>{
       const status=memberStatus(u),safeId=escape(u.id),safeEmail=escape(u.email||'(no email)');
       const created=u.created_at?new Date(u.created_at).toLocaleDateString():'—';
-      const last=u.last_sign_in_at?new Date(u.last_sign_in_at).toLocaleDateString():'Never';
+      const last=u.last_sign_in_at?new Date(u.last_sign_in_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'Never signed in';
       return '<article style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="overflow-wrap:anywhere">'+safeEmail+'</strong><span>'+status+' · '+(u.role==='admin'?'Administrator':'Member')+'</span></div><small>Created '+created+' · Last sign-in '+last+'</small><small style="overflow-wrap:anywhere;color:#68756f">ID: '+safeId+'</small>'+(u.role==='admin'?'<p>Protected administrator account</p>':'<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="button button-ghost" data-member-action="'+(status==='Suspended'?'unban':'ban')+'" data-member-id="'+safeId+'">'+(status==='Suspended'?'Restore access':'Suspend access')+'</button><button type="button" class="button button-ghost" data-member-action="delete" data-member-id="'+safeId+'" style="border-color:#b91c1c;color:#b91c1c">Delete account</button></div>')+'</article>';
     }).join('');
+    memberPrev.disabled=memberPage<=1;
+    memberNext.disabled=memberPage>=pageCount;
   }
-  let memberPage=1;
   let memberHasNextPage=false;
   const memberPager=document.createElement('div');
   memberPager.className='admin-actions';
@@ -897,19 +909,19 @@
   memberPrev.type='button';memberPrev.className='button button-ghost';memberPrev.textContent='Previous 100';
   const memberNext=document.createElement('button');
   memberNext.type='button';memberNext.className='button button-ghost';memberNext.textContent='Next 100';
-  memberPrev.addEventListener('click',()=>{if(memberPage>1){memberPage--;loadMembers();}});
-  memberNext.addEventListener('click',()=>{if(memberHasNextPage){memberPage++;loadMembers();}});
+  memberPrev.addEventListener('click',()=>{if(memberPage>1){memberPage--;renderMembers();}});
+  memberNext.addEventListener('click',()=>{memberPage++;renderMembers();});
   memberPager.append(memberPrev,memberNext);
   memberList.parentElement.insertBefore(memberPager,memberList);
   async function loadMembers(){
-    memberList.textContent='Loading member accounts…';memberMessage.textContent='';
-    memberPrev.disabled=memberPage<=1;memberNext.disabled=true;
+    memberList.textContent='Loading all member accounts…';memberMessage.textContent='';
+    memberPrev.disabled=true;memberNext.disabled=true;
     try{
-      const result=await memberRequest('GET',undefined,memberPage);
-      memberUsers=result.users||[];memberHasNextPage=memberUsers.length===100;
+      const allUsers=[];let page=1,batch=[];
+      do{const result=await memberRequest('GET',undefined,page);batch=Array.isArray(result.users)?result.users:[];allUsers.push(...batch);page++;}while(batch.length===100&&page<=1000);
+      memberUsers=allUsers;memberPage=1;memberHasNextPage=memberUsers.length>memberPageSize;
       renderMembers();
-      memberMessage.textContent='Loaded '+memberUsers.length+' member accounts (page '+memberPage+'; 100 per page).';
-      memberPrev.disabled=memberPage<=1;memberNext.disabled=!memberHasNextPage;
+      memberMessage.textContent='Loaded '+memberUsers.length+' total accounts. Last sign-in times are shown in local time.';
     }catch(error){
       memberList.textContent='Member accounts could not be loaded.';
       memberMessage.textContent=error.message;memberMessage.classList.add('admin-error');
