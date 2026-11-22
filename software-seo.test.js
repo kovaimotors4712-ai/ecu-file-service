@@ -1,3 +1,4 @@
+// Store artwork must remain first-party; software source and download links are never public catalogue content.
 'use strict';
 
 const assert = require('node:assert/strict');
@@ -9,6 +10,7 @@ const {
   productIdFromPath,
   renderSoftwareProductPage,
   softwareCategory,
+  softwareCoverUrl,
   softwareProductPath,
   softwareProductUrl
 } = require('./software-seo');
@@ -75,11 +77,24 @@ test('public software descriptions omit licence-status wording while retaining u
 test('software detail pages normalize public titles and split escaped paragraphs', () => {
   const titlePage = renderSoftwareProductPage({...validProduct, title: 'Winols'});
   assert.match(titlePage, /<title>EVC WinOLS V4\.7/);
-  assert.match(titlePage, /class="software-detail-cover"/);
+  assert.match(titlePage, /src="https:\/\/ecufileservice\.in\/software-cover-diagnostics\.svg"/);
   const description = 'First paragraph contains enough context about the ECU software, its purpose and the supported workflow.\\n\\nSecond paragraph explains that technicians should confirm the exact vehicle, module and interface before choosing a package.';
   const page = renderSoftwareProductPage({...validProduct, description});
   assert.match(page, /<p>First paragraph contains enough context/);
   assert.match(page, /<p>Second paragraph explains/);
   assert.doesNotMatch(page, /\\\\n/);
   assert.equal(publicProductTitle({...validProduct, title: 'Odis'}), 'ODIS Service V26');
+});
+
+test('software product pages use first-party artwork and suppress external product links', () => {
+  const html = renderSoftwareProductPage({
+    ...validProduct,
+    image_url: 'https://external.example/image.jpg',
+    product_url: 'https://external.example/details',
+    contact_url: 'https://external.example/download',
+    description: validProduct.description + '\nSource: https://external.example\nDownload link: https://external.example/file'
+  });
+  assert.equal(softwareCoverUrl(validProduct), 'https://ecufileservice.in/software-cover-diagnostics.svg');
+  assert.match(html, /software-cover-diagnostics\.svg/);
+  assert.doesNotMatch(html, /external\.example|View product details|download link/i);
 });

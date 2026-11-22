@@ -731,8 +731,8 @@ test('serves customer and admin pages', async () => {
   assert.match(workshops.payload, /href="#workshop-registration">Register your workshop/);
   assert.match(workshops.payload, /id="workshop-registration"/);
   assert.match(ecuSeo.payload,/canonical.*ecu-file-services\.html/);
-  assert.match(ecuSeo.payload,/<title>Automotive ECU Service &amp; File Support \| ECU File Service India<\/title>/);
-  assert.match(ecuSeo.payload,/name="twitter:title" content="Automotive ECU Service &amp; File Support \| ECU File Service India"/);
+  assert.match(ecuSeo.payload,/<title>Automotive ECU File Support \| ECU File Service India<\/title>/);
+  assert.match(ecuSeo.payload,/name="twitter:title" content="Automotive ECU File Support \| ECU File Service India"/);
   assert.match(ecuSeo.payload,/"areaServed": \[/);
   assert.match(ecuSeo.payload,/"name": "Remote ECU File Support for Workshops in India and Worldwide"/);
   assert.match(ecuSeo.payload,/"name": "International markets"/);
@@ -742,9 +742,9 @@ test('serves customer and admin pages', async () => {
   assert.doesNotMatch(ecuSeo.payload,/<span>DPF &amp; EGR Off<\/span>/);
   assert.match(ecuSeo.payload,/Can workshops outside India submit a request\?/);
   assert.match(airbagSeo.payload,/canonical.*airbag-crash-clear\.html/);
-  assert.match(airbagSeo.payload,/<title>Airbag SRS Module File Support \| ECU File Service India<\/title>/);
-  assert.match(airbagSeo.payload,/property="og:title" content="Airbag SRS Module File Support \| ECU File Service India"/);
-  assert.match(airbagSeo.payload,/name="twitter:title" content="Airbag SRS Module File Support \| ECU File Service India"/);
+  assert.match(airbagSeo.payload,/<title>Airbag SRS File Support \| ECU File Service India<\/title>/);
+  assert.match(airbagSeo.payload,/property="og:title" content="Airbag SRS File Support \| ECU File Service India"/);
+  assert.match(airbagSeo.payload,/name="twitter:title" content="Airbag SRS File Support \| ECU File Service India"/);
   assert.match(airbagSeo.payload,/"name": "International markets"/);
   assert.match(airbagSeo.payload,/for India &amp; worldwide workshops/);
   assert.match(airbagSeo.payload,/SRS Module File Review/);
@@ -753,8 +753,8 @@ test('serves customer and admin pages', async () => {
   assert.match(customer.payload,/name="twitter:title" content="ECU Service &amp; Diagnostics \| ECU File Service India"/);
   assert.match(customer.payload,/<title>ECU Service &amp; Diagnostics \| ECU File Service India<\/title>/);
   assert.notEqual(customer.payload.match(/<title>(.*?)<\/title>/)?.[1], ecuSeo.payload.match(/<title>(.*?)<\/title>/)?.[1], 'homepage and service page titles should target distinct search intent');
-  assert.match((await call('/car-diagnostic-help.html')).payload,/property="og:title" content="Common Car Problems &amp; Questions Answered \| ECU File Service India"/);
-  assert.match((await call('/car-electrical-diagnostics.html')).payload,/property="og:title" content="Car Electrical Diagnostics &amp; ECU Fault Help Worldwide \| ECU File Service India"/);
+  assert.match((await call('/car-diagnostic-help.html')).payload,/property="og:title" content="Common Car Problems &amp; Diagnostics \| ECU File Service India"/);
+  assert.match((await call('/car-electrical-diagnostics.html')).payload,/property="og:title" content="Car Electrical Fault Diagnosis \| ECU File Service India"/);
   assert.match(customer.response.headers.get('content-type') || '', /text\/html/);
   assert.equal(customer.response.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(customer.response.headers.get('x-frame-options'), 'DENY');
@@ -2091,9 +2091,11 @@ test('admin software catalogue loads all records and searches with stable page c
   const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
   const page = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
-  assert.match(server, /software_products\?select=\*&order=sort_order\.asc,created_at\.desc&limit=1000/);
+  assert.match(server, /software_products\?select=id,title,description,version,price_paise,price_visible,currency,image_url,sort_order,is_published,created_at,updated_at&order=sort_order\.asc,created_at\.desc&limit=1000/);
   assert.match(page, /id="software-product-search"/);
   assert.match(page, /id="software-product-pagination"/);
+  assert.doesNotMatch(page, /name="product_url"|name="contact_url"/);
+  assert.doesNotMatch(admin, /product_url:data.get|contact_url:data.get/);
   assert.match(admin, /const softwareProductPageSize=50/);
   assert.match(admin, /softwareProductItems\.filter\(item=>!query/);
   const renderStart = admin.indexOf('function renderSoftwareProducts(){');
@@ -2314,6 +2316,8 @@ test('message notification migration enables order message realtime publication'
 
 test('published software detail pages are server-rendered and included in the dynamic sitemap', async () => {
   const productPath = '/software/ecu-diagnostic-utility-' + softwareSeoFixture.id;
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  assert.ok(serverSource.includes('software_products?select=id,title,description,is_published,created_at,updated_at&is_published=eq.true&order=updated_at.desc&limit=1000'));
   const page = await call(productPath);
   assert.equal(page.response.status, 200);
   assert.match(page.payload, /<title>ECU Diagnostic Utility/);
