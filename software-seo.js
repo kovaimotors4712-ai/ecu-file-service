@@ -34,6 +34,21 @@ function softwareCategory(product) {
   return 'Automotive Software';
 }
 
+function softwareCoverUrl(product) {
+  const category = softwareCategory(product);
+  const cover = ({
+    'ADAS Software':'adas',
+    'DPF Software':'emissions',
+    'EGR Software':'emissions',
+    'Airbag and SRS':'airbag',
+    'Immobilizer and Key Tools':'immobilizer',
+    'Dashboard and Cluster':'dashboard',
+    'Diagnostics and DTC':'diagnostics',
+    'ECU and ECM Tools':'ecu',
+    'Automotive Software':'workshop'
+  })[category] || 'workshop';
+  return SITE_ORIGIN + '/software-cover-' + cover + '.svg';
+}
 function publicProductTitle(product) {
   const title = String(product?.title || '').trim();
   const normalized = {
