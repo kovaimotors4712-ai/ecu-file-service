@@ -5,7 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const root = __dirname;
-const { buildSoftwareSitemapEntries, isIndexableSoftwareProduct, publicProductDescription, publicProductTitle, productIdFromPath, renderSoftwareProductPage, softwareProductPath } = require('./software-seo');
+const { buildSoftwareSitemapEntries, isIndexableSoftwareProduct, publicProductDescription, publicProductTitle, productIdFromPath, renderSoftwareProductPage, softwareProductPath, softwareCoverUrl } = require('./software-seo');
 try {
   const envText = fs.readFileSync(path.join(root, '.env'), 'utf8');
   for (const line of envText.split(/\r?\n/)) {
@@ -58,7 +58,7 @@ function isUnsupportedElectricModel(brand, model) {
   });
 }
 
-const publicFiles = new Set(['index.html', 'manifest.json', 'sw.js', 'app-icon-192.svg', 'app-icon-512.svg', 'car-diagnostic-help.html', 'dtc-search.html', 'car-electrical-diagnostics.html', 'workshops.html', 'admin.html', 'advertising-quote.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'ecu-fault-code-diagnosis.html', 'ecu-file-identification-original-backup.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'terms.html', 'privacy.html', 'contact.html', 'about.html', 'international-ecu-file-support.html', 'googlea2bbe9d2fd8bede2.html', '9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d.txt']);
+const publicFiles = new Set(['index.html', 'manifest.json', 'sw.js', 'app-icon-192.svg', 'app-icon-512.svg', 'software-cover-ecu.svg', 'software-cover-diagnostics.svg', 'software-cover-immobilizer.svg', 'software-cover-airbag.svg', 'software-cover-emissions.svg', 'software-cover-adas.svg', 'software-cover-dashboard.svg', 'software-cover-electronics.svg', 'software-cover-workshop.svg', 'car-diagnostic-help.html', 'dtc-search.html', 'car-electrical-diagnostics.html', 'workshops.html', 'admin.html', 'advertising-quote.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'ecu-fault-code-diagnosis.html', 'ecu-file-identification-original-backup.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'terms.html', 'privacy.html', 'contact.html', 'about.html', 'international-ecu-file-support.html', 'googlea2bbe9d2fd8bede2.html', '9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d.txt']);
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
@@ -1937,7 +1937,7 @@ function softwareProductPayload(body, adminId, partial = false) {
   if (!partial || body.version !== undefined) out.version = cleanSiteText(body.version, 80);
   if (!partial || body.price_paise !== undefined) { const amount=Number(body.price_paise); if(!Number.isSafeInteger(amount)||amount<0||amount>100000000000) throw Object.assign(new Error('Enter a valid price in INR.'),{statusCode:400}); out.price_paise=amount; }
   if(!partial || body.price_visible!==undefined)out.price_visible=body.price_visible===true;
-  for(const field of ['image_url','product_url','contact_url']) if(!partial||body[field]!==undefined){const value=cleanSiteText(body[field],1000);if(!validHttpsUrl(value))throw Object.assign(new Error(field+' must use HTTPS.'),{statusCode:400});out[field]=value||null;}
+  if(!partial||body.image_url!==undefined){const value=cleanSiteText(body.image_url,1000);if(!validHttpsUrl(value))throw Object.assign(new Error('image_url must use HTTPS.'),{statusCode:400});out.image_url=value||null;}
   if(!partial||body.sort_order!==undefined){const order=Number(body.sort_order??100);if(!Number.isInteger(order)||order<0||order>100000)throw Object.assign(new Error('Enter a valid listing order.'),{statusCode:400});out.sort_order=order;}
   if(!partial||body.is_published!==undefined)out.is_published=body.is_published===true;
   if(adminId&&!partial)out.created_by=adminId;
@@ -1946,22 +1946,22 @@ function softwareProductPayload(body, adminId, partial = false) {
 async function handlePublicSoftwareProducts(request,response){
   if(request.method!=='GET'){jsonResponse(response,405,{error:'Method Not Allowed'});return true;}
   if(!supabaseServiceRoleKey){jsonResponse(response,200,{items:[]});return true;}
-  const result=await supabaseRequest(serviceToken(),'rest/v1/software_products?select=id,title,description,version,price_paise,price_visible,currency,image_url,product_url,contact_url,sort_order,created_at&is_published=eq.true&order=sort_order.asc,created_at.desc&limit=1000',{timeoutMs:12000});
+  const result=await supabaseRequest(serviceToken(),'rest/v1/software_products?select=id,title,description,version,price_paise,price_visible,currency,image_url,sort_order,created_at&is_published=eq.true&order=sort_order.asc,created_at.desc&limit=1000',{timeoutMs:12000});
   if(!result.ok){console.warn('[software-products] Public query failed',{status:result.status});jsonResponse(response,502,{error:'Software listings could not be loaded.'});return true;}
-  jsonResponse(response,200,{items:(await result.json()).map(item=>({...item,title:publicProductTitle(item),description:publicProductDescription(item),price_paise:item.price_visible?item.price_paise:null}))});return true;
+  jsonResponse(response,200,{items:(await result.json()).map(item=>({...item,title:publicProductTitle(item),description:publicProductDescription(item),image_url:softwareCoverUrl(item),price_paise:item.price_visible?item.price_paise:null}))});return true;
 }
 async function handleAdminSoftwareProducts(request,response){
   const admin=await requireAdmin(request);if(!admin){jsonResponse(response,403,{error:'Administrator role is required.'});return true;}
   if(!supabaseServiceRoleKey){jsonResponse(response,503,{error:'Software catalogue is unavailable.'});return true;}
   const token=serviceToken();
-  if(request.method==='GET'){const result=await supabaseRequest(token,'rest/v1/software_products?select=*&order=sort_order.asc,created_at.desc&limit=1000',{timeoutMs:12000});if(!result.ok){jsonResponse(response,502,{error:'Software listings could not be loaded.'});return true;}jsonResponse(response,200,{items:await result.json()});return true;}
+  if(request.method==='GET'){const result=await supabaseRequest(token,'rest/v1/software_products?select=id,title,description,version,price_paise,price_visible,currency,image_url,sort_order,is_published,created_at,updated_at&order=sort_order.asc,created_at.desc&limit=1000',{timeoutMs:12000});if(!result.ok){jsonResponse(response,502,{error:'Software listings could not be loaded.'});return true;}jsonResponse(response,200,{items:(await result.json()).map(item=>({...item,image_url:softwareCoverUrl(item)}))});return true;}
   if(request.method==='DELETE'){try{const body=await readJson(request,12000),id=String(body.id||'');if(!/^[0-9a-f-]{36}$/i.test(id)){jsonResponse(response,400,{error:'Invalid software listing reference.'});return true;}
     const removed=await supabaseRequest(token,'rest/v1/software_products?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=representation',timeoutMs:12000});if(!removed.ok){const detail=await removed.text().catch(()=> '');const linked= /foreign key|constraint|referenced/i.test(detail);jsonResponse(response,linked?409:502,{error:linked?'This software has customer request history and cannot be permanently deleted. Use Hide to remove it from the public store while preserving customer records.':'Software listing could not be deleted. Please retry.'});return true;}const rows=await removed.json().catch(()=>[]);if(!rows?.length){jsonResponse(response,404,{error:'Software listing not found.'});return true;}jsonResponse(response,200,{deleted:true});return true;
   }catch(error){jsonResponse(response,error.statusCode||400,{error:error.message||'Software listing could not be deleted.'});return true;}}
   if(request.method==='POST'||request.method==='PATCH'){try{const body=await readJson(request,12000),partial=request.method==='PATCH';let id='';if(partial){id=String(body.id||'');if(!/^[0-9a-f-]{36}$/i.test(id)){jsonResponse(response,400,{error:'Invalid software listing reference.'});return true;}}
-    const payload=softwareProductPayload(body,admin.id,partial),endpoint=partial?'rest/v1/software_products?id=eq.'+encodeURIComponent(id)+'&select=*':'rest/v1/software_products?select=*';
+    const payload=softwareProductPayload(body,admin.id,partial),fields='id,title,description,version,price_paise,price_visible,currency,image_url,sort_order,is_published,created_at,updated_at',endpoint=partial?'rest/v1/software_products?id=eq.'+encodeURIComponent(id)+'&select='+fields:'rest/v1/software_products?select='+fields;
     const result=await supabaseRequest(token,endpoint,{method:partial?'PATCH':'POST',prefer:'return=representation',body:payload,timeoutMs:12000});if(!result.ok){jsonResponse(response,502,{error:'Software listing could not be saved.'});return true;}
-    const rows=await result.json();if(partial&&!rows?.length){jsonResponse(response,404,{error:'Software listing not found.'});return true;}jsonResponse(response,partial?200:201,{item:rows?.[0]||null});return true;
+    const rows=await result.json();if(partial&&!rows?.length){jsonResponse(response,404,{error:'Software listing not found.'});return true;}jsonResponse(response,partial?200:201,{item:rows?.[0]?{...rows[0],image_url:softwareCoverUrl(rows[0])}:null});return true;
   }catch(error){jsonResponse(response,error.statusCode||400,{error:error.message||'Invalid software listing.'});return true;}}
   jsonResponse(response,405,{error:'Method Not Allowed'});return true;
 }
