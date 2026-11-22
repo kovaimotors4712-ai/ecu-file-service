@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-labelledby="t d">
+<title id="t">ECU File Service India — EMISSIONS SYSTEMS</title>
+<desc id="d">Original automotive software category artwork designed for ECU File Service India.</desc>
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#081321"/><stop offset=".55" stop-color="#13283d"/><stop offset="1" stop-color="#091523"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#17638a" stop-opacity=".55"/><stop offset="1" stop-color="#17638a" stop-opacity="0"/></radialGradient>
+ <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="#6aa5c8" stroke-opacity=".10" stroke-width="1"/></pattern>
+</defs>
+<rect width="640" height="420" fill="url(#bg)"/><rect width="640" height="420" fill="url(#grid)"/>
+<circle cx="430" cy="190" r="245" fill="url(#glow)"/>
+<path d="M0 365H640" stroke="#3f708e" stroke-opacity=".45"/>
+<text x="42" y="48" fill="#b8d8eb" font-family="Arial,sans-serif" font-size="12" font-weight="700" letter-spacing="3">ECU FILE SERVICE INDIA</text>
+<text x="42" y="382" fill="#f1f7fb" font-family="Arial,sans-serif" font-size="17" font-weight="700" letter-spacing="1.4">EMISSIONS SYSTEMS</text>
+<text x="42" y="402" fill="#78b8d7" font-family="Arial,sans-serif" font-size="9" letter-spacing="2">SOFTWARE STORE  /  WORKSHOP TOOLS</text>
+<g opacity=".98"><g stroke="#6ddfff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M190 158h55v-34h150v34h55v104h-55v34H245v-34h-55z" fill="#142b40"/><rect x="252" y="151" width="136" height="118" rx="12" fill="#0a1727" stroke="#ffc15b"/><path d="M270 170l22 22-22 22 22 22-22 18m38-84 22 22-22 22 22 22-22 18m38-84 22 22-22 22 22 22-22 18" stroke="#56d9ff" stroke-width="4"/><path d="M158 210h32m290 0h32" stroke="#ffc15b"/></g></g>
+<path d="M42 70h86" stroke="#ffc15b" stroke-width="3" stroke-linecap="round"/>
+</svg>
