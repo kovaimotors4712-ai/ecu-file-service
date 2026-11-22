@@ -1,3 +1,4 @@
+// Store artwork must remain first-party; software source and download links are never public catalogue content.
 'use strict';
 
 const assert = require('node:assert/strict');
