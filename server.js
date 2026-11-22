@@ -2173,7 +2173,7 @@ async function handlePublicSoftwareSeoRequest(request, response, pathname) {
     if (supabaseServiceRoleKey && sitemap.includes('</urlset>')) {
       try {
         const result = await supabaseRequest(serviceToken(),
-          'rest/v1/software_products?select=id,title,description,is_published,created_at,updated_at&is_published=eq.true&order=updated_at.desc&limit=200',
+          'rest/v1/software_products?select=id,title,description,is_published,created_at,updated_at&is_published=eq.true&order=updated_at.desc&limit=1000',
           { timeoutMs: 12000 });
         if (result.ok) {
           const products = await result.json();
