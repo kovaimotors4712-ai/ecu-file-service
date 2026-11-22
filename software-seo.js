@@ -47,7 +47,8 @@ function publicProductTitle(product) {
 
 function publicProductDescription(product) {
   return String(product?.description || '').replace(/\r\n?/g, '\n').replace(/\\n/g, '\n')
-    .split(/\n+/).map(line => line.replace(/[ \t]+/g, ' ').trim()).filter(Boolean)
+    .split(/\n+/).map(line => line.replace(/[ \t]+/g, ' ').trim())
+    .filter(line => line && !/(https?:\/\/|www\.|\b[a-z0-9-]+\.(?:com|in|net|org|io)\b|source\s*:|official website|publisher website|developer website|download link|external link|product details url)/i.test(line))
     .map(line => line
       .replace(/\b(?:licence|license)\s+terms?\b/gi, 'package details')
       .replace(/\b(?:licence|license)\s+entitlement\b/gi, 'available functions')
@@ -56,6 +57,7 @@ function publicProductDescription(product) {
       .replace(/\b(?:licence|license|licensing)\b/gi, 'software edition'))
     .join('\n\n');
 }
+
 function isIndexableSoftwareProduct(product) {
   const description = String(product?.description || '').replace(/\s+/g, ' ').trim();
   return Boolean(product?.id && UUID_PATTERN.test(String(product.id)) &&
@@ -86,16 +88,12 @@ function renderSoftwareProductPage(product) {
   const metaDescription = seoDescription(product);
   const paragraphs = description.split(/\n+/).map(part => part.trim()).filter(Boolean)
     .map(part => '<p>' + escapeHtml(part) + '</p>').join('\n');
-  const image = /^https:\/\//i.test(String(product.image_url || ''))
-    ? '<img class="software-detail-image" src="' + escapeHtml(product.image_url) + '" alt="' + escapeHtml(title) + '" loading="lazy" decoding="async">'
-    : '<div class="software-detail-cover" role="img" aria-label="' + escapeHtml(title) + ' software cover"><span>ECU FILE SERVICE INDIA</span><strong>' + escapeHtml(title) + '</strong><small>' + escapeHtml(category) + '</small></div>';
+  const image = '<img class="software-detail-image" src="' + escapeHtml(softwareCoverUrl(product)) + '" alt="' + escapeHtml(title) + ' — ECU File Service India software cover" loading="lazy" decoding="async">';
   const version = product.version ? '<p><strong>Version:</strong> ' + escapeHtml(product.version) + '</p>' : '';
   const price = product.price_visible && Number.isSafeInteger(Number(product.price_paise)) && Number(product.price_paise) > 0
     ? '<p><strong>Price:</strong> ₹' + (Number(product.price_paise) / 100).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</p>'
     : '<p><strong>Price:</strong> Request price</p>';
-  const detailLink = /^https:\/\//i.test(String(product.product_url || ''))
-    ? '<p><a href="' + escapeHtml(product.product_url) + '" rel="noopener noreferrer">View product details</a></p>' : '';
-  const enquiryUrl = /^https:\/\//i.test(String(product.contact_url || '')) ? product.contact_url : '/store.html';
+  const enquiryUrl = '/store.html';
   const structured = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
@@ -115,8 +113,8 @@ function renderSoftwareProductPage(product) {
     + '<link rel="stylesheet" href="/styles.css"><script type="application/ld+json">' + jsonLd + '</script>'
     + '<style>.software-detail{max-width:900px;margin:40px auto;padding:28px;background:#111b2b;border:1px solid #29384d;border-radius:18px;color:#edf3fb}.software-detail a{color:#83c5ff}.software-detail-image{display:block;max-width:100%;max-height:360px;object-fit:contain;border-radius:12px;margin:20px 0}.software-detail-cover{display:flex;flex-direction:column;justify-content:space-between;gap:24px;max-width:620px;min-height:220px;padding:28px;margin:20px 0;border:1px solid #35475f;border-radius:14px;background:radial-gradient(circle at 85% 15%,#314a68 0,transparent 42%),linear-gradient(135deg,#172638,#101b2a);color:#f2f6fb}.software-detail-cover span{font:600 10px DM Mono,monospace;letter-spacing:.16em;color:#b8d7f4}.software-detail-cover strong{font:800 clamp(22px,4vw,36px) Manrope,sans-serif;line-height:1.15;max-width:480px}.software-detail-cover small{font:11px DM Mono,monospace;color:#c1d0de;text-transform:uppercase;letter-spacing:.12em}.software-detail p{line-height:1.75}.software-detail .eyebrow{color:#9db5cf;text-transform:uppercase;letter-spacing:.08em;font-size:.78rem}.software-detail .cta{display:inline-block;margin-top:18px;padding:12px 18px;background:#2369a8;color:#fff;text-decoration:none;border-radius:9px;font-weight:700}</style>'
     + '</head><body><main class="software-detail"><p class="eyebrow"><a href="/">Home</a> / <a href="/store.html">Software Store</a> / ' + escapeHtml(category) + '</p>'
-    + '<h1>' + escapeHtml(title) + '</h1>' + image + version + price + paragraphs + detailLink
-    + '<a class="cta" href="' + escapeHtml(enquiryUrl) + '">Enquire about this software</a>'
+    + '<h1>' + escapeHtml(title) + '</h1>' + image + version + price + paragraphs
+    + '<a class="cta" href="' + escapeHtml(enquiryUrl) + '">Request price from our store</a>'
     + '<p><small>Confirm exact vehicle compatibility, software edition and package contents before purchase.</small></p></main></body></html>';
 }
 
@@ -136,7 +134,7 @@ function productIdFromPath(pathname) {
 }
 
 module.exports = {
-  MIN_DESCRIPTION_LENGTH, buildSoftwareSitemapEntries, isIndexableSoftwareProduct, publicProductDescription, publicProductTitle,
+  MIN_DESCRIPTION_LENGTH, buildSoftwareSitemapEntries, isIndexableSoftwareProduct, publicProductDescription, publicProductTitle, softwareCoverUrl,
   productIdFromPath, renderSoftwareProductPage, slugify, softwareCategory,
   softwareProductPath, softwareProductUrl
 };
