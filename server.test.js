@@ -2316,6 +2316,8 @@ test('message notification migration enables order message realtime publication'
 
 test('published software detail pages are server-rendered and included in the dynamic sitemap', async () => {
   const productPath = '/software/ecu-diagnostic-utility-' + softwareSeoFixture.id;
+  const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  assert.match(serverSource, /software_products\\?select=id,title,description,is_published,created_at,updated_at&is_published=eq\\.true&order=updated_at\\.desc&limit=1000/);
   const page = await call(productPath);
   assert.equal(page.response.status, 200);
   assert.match(page.payload, /<title>ECU Diagnostic Utility/);
