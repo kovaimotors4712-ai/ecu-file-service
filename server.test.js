@@ -742,9 +742,9 @@ test('serves customer and admin pages', async () => {
   assert.doesNotMatch(ecuSeo.payload,/<span>DPF &amp; EGR Off<\/span>/);
   assert.match(ecuSeo.payload,/Can workshops outside India submit a request\?/);
   assert.match(airbagSeo.payload,/canonical.*airbag-crash-clear\.html/);
-  assert.match(airbagSeo.payload,/<title>Airbag SRS Module File Support \| ECU File Service India<\/title>/);
-  assert.match(airbagSeo.payload,/property="og:title" content="Airbag SRS Module File Support \| ECU File Service India"/);
-  assert.match(airbagSeo.payload,/name="twitter:title" content="Airbag SRS Module File Support \| ECU File Service India"/);
+  assert.match(airbagSeo.payload,/<title>Airbag SRS File Support \| ECU File Service India<\/title>/);
+  assert.match(airbagSeo.payload,/property="og:title" content="Airbag SRS File Support \| ECU File Service India"/);
+  assert.match(airbagSeo.payload,/name="twitter:title" content="Airbag SRS File Support \| ECU File Service India"/);
   assert.match(airbagSeo.payload,/"name": "International markets"/);
   assert.match(airbagSeo.payload,/for India &amp; worldwide workshops/);
   assert.match(airbagSeo.payload,/SRS Module File Review/);
@@ -2091,9 +2091,11 @@ test('admin software catalogue loads all records and searches with stable page c
   const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
   const admin = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
   const page = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
-  assert.match(server, /software_products\?select=\*&order=sort_order\.asc,created_at\.desc&limit=1000/);
+  assert.match(server, /software_products\?select=id,title,description,version,price_paise,price_visible,currency,image_url,sort_order,is_published,created_at,updated_at&order=sort_order\.asc,created_at\.desc&limit=1000/);
   assert.match(page, /id="software-product-search"/);
   assert.match(page, /id="software-product-pagination"/);
+  assert.doesNotMatch(page, /name="product_url"|name="contact_url"/);
+  assert.doesNotMatch(admin, /product_url:data.get|contact_url:data.get/);
   assert.match(admin, /const softwareProductPageSize=50/);
   assert.match(admin, /softwareProductItems\.filter\(item=>!query/);
   const renderStart = admin.indexOf('function renderSoftwareProducts(){');
