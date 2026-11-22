@@ -753,7 +753,7 @@ test('serves customer and admin pages', async () => {
   assert.match(customer.payload,/name="twitter:title" content="ECU Service &amp; Diagnostics \| ECU File Service India"/);
   assert.match(customer.payload,/<title>ECU Service &amp; Diagnostics \| ECU File Service India<\/title>/);
   assert.notEqual(customer.payload.match(/<title>(.*?)<\/title>/)?.[1], ecuSeo.payload.match(/<title>(.*?)<\/title>/)?.[1], 'homepage and service page titles should target distinct search intent');
-  assert.match((await call('/car-diagnostic-help.html')).payload,/property="og:title" content="Common Car Problems &amp; Questions Answered \| ECU File Service India"/);
+  assert.match((await call('/car-diagnostic-help.html')).payload,/property="og:title" content="Common Car Problems &amp; Diagnostics \| ECU File Service India"/);
   assert.match((await call('/car-electrical-diagnostics.html')).payload,/property="og:title" content="Car Electrical Diagnostics &amp; ECU Fault Help Worldwide \| ECU File Service India"/);
   assert.match(customer.response.headers.get('content-type') || '', /text\/html/);
   assert.equal(customer.response.headers.get('x-content-type-options'), 'nosniff');
@@ -2317,7 +2317,7 @@ test('message notification migration enables order message realtime publication'
 test('published software detail pages are server-rendered and included in the dynamic sitemap', async () => {
   const productPath = '/software/ecu-diagnostic-utility-' + softwareSeoFixture.id;
   const serverSource = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
-  assert.match(serverSource, /software_products\\?select=id,title,description,is_published,created_at,updated_at&is_published=eq\\.true&order=updated_at\\.desc&limit=1000/);
+  assert.ok(serverSource.includes('software_products?select=id,title,description,is_published,created_at,updated_at&is_published=eq.true&order=updated_at.desc&limit=1000'));
   const page = await call(productPath);
   assert.equal(page.response.status, 200);
   assert.match(page.payload, /<title>ECU Diagnostic Utility/);
