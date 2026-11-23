@@ -2465,9 +2465,9 @@ test('ECU service landing links preselect the matching request service', () => {
 test('membership SEO metadata reflects the existing free account and sitemap entry', () => {
   const page = fs.readFileSync(path.join(__dirname, 'membership.html'), 'utf8');
   const sitemap = fs.readFileSync(path.join(__dirname, 'sitemap.xml'), 'utf8');
-  assert.match(page, /<title>Free Workshop Account \\| ECU File Service India<\\/title>/);
-  assert.match(page, /name="description" content="Create a free ECU File Service India account to join automotive workshop discussions, live chat and send private support requests\\. No payment is required for a free account\\."/);
-  assert.match(page, /property="og:description" content="Join the free automotive workshop community to take part in discussions, live chat and private support requests\\. Free account registration is open; no payment is required\\."/);
+  assert.match(page, /<title>Free Workshop Account \| ECU File Service India<\/title>/);
+  assert.match(page, /name="description" content="Create a free ECU File Service India account to join automotive workshop discussions, live chat and send private support requests\. No payment is required for a free account\."/);
+  assert.match(page, /property="og:description" content="Join the free automotive workshop community to take part in discussions, live chat and private support requests\. Free account registration is open; no payment is required\."/);
   assert.ok(sitemap.includes('<loc>https://ecufileservice.in/membership.html</loc>'));
 });
 
