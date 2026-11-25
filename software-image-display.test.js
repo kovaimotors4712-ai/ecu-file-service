@@ -31,3 +31,11 @@ test('catalogue API, detail dialog and existing request action remain connected'
   assert.match(store, /detailRequest\?\.addEventListener\('click'/);
   assert.match(store, /forum_customer_requests/);
 });
+
+test('listing cards show a compact description excerpt while detail dialog keeps the full description', () => {
+  assert.match(store, /const detailText=cleanDetails\(item\);/);
+  assert.match(store, /detailText\.length>240\?detailText\.slice\(0,240\)/);
+  assert.match(store, /summary\.className='software-details';card\.append\(summary\)/);
+  assert.match(store, /detailDescription\.textContent=cleanDetails\(item\)/);
+  assert.match(store, /-webkit-line-clamp:4/);
+});
