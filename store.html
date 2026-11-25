@@ -63,7 +63,7 @@
 .software-product{padding:9px!important;gap:6px!important;min-height:0;overflow:hidden}
 .software-product .software-cover{width:100%;aspect-ratio:1.18/1;display:grid;place-items:center;position:relative;overflow:hidden;background:linear-gradient(145deg,#132523,#273d37);border:1px solid #31483e}
 .software-product .software-cover svg{width:78%;height:78%;display:block}
-.software-product .software-cover.image-fallback{background:linear-gradient(145deg,#172a26,#34483c);color:#c9d9b0;font:9px var(--mono);letter-spacing:.08em;text-align:center;padding:8px}
+
 .software-product .software-category{font-size:8px;padding:3px 5px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .software-product .version{font-size:8px;letter-spacing:.06em}
 .software-product h3{font-size:13px!important;line-height:1.2!important;margin:0!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.4em}
@@ -96,15 +96,16 @@
 .software-product:hover,.software-product:focus-visible{transform:translateY(-3px);border-color:#829b2e!important;box-shadow:0 12px 28px rgba(16,26,25,.11);outline:none}
 .software-product .software-cover{width:100%;aspect-ratio:1.25/1;margin:0;border:0;border-radius:0;background:#f2f4f0;display:grid;place-items:center;overflow:hidden}
 .software-product .software-cover img{width:100%;height:100%;object-fit:contain;background:#f2f4f0;padding:10px}
-.software-product .image-unavailable{color:#7a857c;font:10px var(--mono);letter-spacing:.12em;text-transform:uppercase}
+
 .software-product h3{padding:14px 13px 16px!important;margin:0!important;min-height:0!important;font:650 14px/1.4 var(--display)!important;color:#17201e;display:block!important;overflow-wrap:anywhere}
 .software-product .software-details,.software-product .software-category,.software-product .version,.software-product .price,.software-product .button{display:none!important}
 .software-detail-dialog{width:min(760px,calc(100% - 28px));max-width:760px;max-height:min(88vh,900px);padding:0;border:1px solid #dfe5dd;border-radius:12px;background:#fff;color:#17201e;box-shadow:0 24px 80px rgba(0,0,0,.28);overflow:auto}
 .software-detail-dialog::backdrop{background:rgba(8,18,15,.68);backdrop-filter:blur(3px)}
 .software-detail-close{position:sticky;top:12px;float:right;z-index:2;margin:12px 12px -48px 0;width:36px;height:36px;border:1px solid #d7ded6;border-radius:50%;background:#fff;color:#17201e;font-size:24px;cursor:pointer}
 .software-detail-media{height:260px;background:#f2f4f0;display:grid;place-items:center;overflow:hidden}
+#software-detail-media[hidden]{display:none!important}
 .software-detail-media img{width:100%;height:100%;object-fit:contain;padding:18px}
-.software-detail-media .image-unavailable{color:#7a857c;font:11px var(--mono);letter-spacing:.12em}
+
 .software-detail-copy{padding:28px clamp(20px,5vw,42px) 36px}
 .software-detail-copy .kicker{margin:0 0 10px}
 .software-detail-copy h2{font:700 clamp(23px,4vw,34px)/1.2 var(--display);margin:0 42px 18px 0;color:#17201e}
@@ -129,6 +130,10 @@ let selectedItem=null;
 if(!grid)return;
 const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
 const https=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch(_){return '';}};
+// Only exact product-ID mappings verified against the individual software are allowed.
+// Existing catalogue image_url values are shared category graphics and are not trusted as product images.
+const VERIFIED_SOFTWARE_IMAGE_URLS=Object.freeze({});
+const verifiedImageUrl=item=>https(VERIFIED_SOFTWARE_IMAGE_URLS[String(item.id||'')]);
 const softwareSlug=value=>String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,90)||'software';
 const canHaveSearchPage=item=>/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id||''))&&String(item.description||'').replace(/\s+/g,' ').trim().length>=120;
 const categoryOf=item=>{
@@ -156,9 +161,9 @@ const openDetails=item=>{
 selectedItem=item;detailTitle.textContent=item.title||'Software';
 detailDescription.textContent=cleanDetails(item)||'No additional details are available for this software yet.';
 detailMedia.replaceChildren();
-const src=https(item.image_url);
-if(src){const image=el('img');image.src=src;image.alt=String(item.title||'Software image');image.referrerPolicy='no-referrer';detailMedia.append(image);}
-else{const empty=el('span','IMAGE NOT AVAILABLE');empty.className='image-unavailable';detailMedia.append(empty);}
+const src=verifiedImageUrl(item);
+detailMedia.hidden=!src;
+if(src){const image=el('img');image.src=src;image.alt=String(item.title||'Software image');image.referrerPolicy='no-referrer';image.onerror=()=>{detailMedia.replaceChildren();detailMedia.hidden=true;};detailMedia.append(image);}
 detailRequest.textContent=item.price_visible?'Request payment link':'Request price';
 detailDialog?.showModal();
 };
@@ -184,11 +189,8 @@ const items=Array.isArray(data.items)?data.items:[];count.textContent=items.leng
 if(!items.length){grid.replaceChildren(el('p','No software listings have been published yet. Please check back later.'));return;}
 cards=items.map(item=>{
 const card=el('article');card.className='software-product';card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label','View details for '+String(item.title||'software'));
-const group=categoryOf(item),cover=el('div');cover.className='software-cover';
-const imgUrl=https(item.image_url);
-if(imgUrl){const img=el('img');img.src=imgUrl;img.alt=String(item.title||'Software image');img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.onerror=()=>{cover.replaceChildren();const unavailable=el('span','IMAGE NOT AVAILABLE');unavailable.className='image-unavailable';cover.append(unavailable);};cover.append(img);}
-else{const unavailable=el('span','IMAGE NOT AVAILABLE');unavailable.className='image-unavailable';cover.append(unavailable);}
-card.append(cover);
+const group=categoryOf(item),imgUrl=verifiedImageUrl(item);
+if(imgUrl){const cover=el('div');cover.className='software-cover';const img=el('img');img.src=imgUrl;img.alt=String(item.title||'Software image');img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.onerror=()=>cover.remove();cover.append(img);card.append(cover);}
 card.append(el('h3',item.title||'Software'));
 return {item,group,card};
 });

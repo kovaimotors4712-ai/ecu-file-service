@@ -7,7 +7,7 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node --test server.test.js software-seo.test.js",
+    "test": "node --test server.test.js software-seo.test.js software-image-display.test.js",
     "checkout:test": "node dev-checkout.js"
   }
 }
