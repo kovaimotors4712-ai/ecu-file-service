@@ -1561,6 +1561,40 @@ async function handleCustomerSoftwareDownload(request, response) {
   return true;
 }
 
+async function handleCustomerFreeRepairBundleDownload(request, response) {
+  if (request.method !== 'GET') { jsonResponse(response, 405, { error:'Method Not Allowed' }); return true; }
+  try {
+    const customer = await requireCustomer(request);
+    if (!customer) { jsonResponse(response, 401, { error:'Please sign in to download the free ECU Repair Bundle.' }); return true; }
+    if (!supabaseServiceRoleKey) { jsonResponse(response, 503, { error:'The free bundle is temporarily unavailable.' }); return true; }
+    const objectPath = 'free-gifts/ecu-repair-bundle.zip';
+    const upstream = await requestHttps(
+      supabaseUrl+'/storage/v1/object/private-ecu-files/'+objectPath.split('/').map(encodeURIComponent).join('/'),
+      { headers:{ apikey:supabaseAnonKey, Authorization:'Bearer '+serviceToken() }, timeoutMs:30000, streamResponse:true }
+    );
+    if (!upstream.ok) {
+      upstream.destroy?.();
+      jsonResponse(response, upstream.status === 404 ? 404 : 502, { error:upstream.status === 404 ? 'The ECU Repair Bundle has not been uploaded yet.' : 'The private bundle could not be downloaded. Please retry.' });
+      return true;
+    }
+    response.writeHead(200, {
+      'Content-Type':'application/zip',
+      'Content-Disposition':'attachment; filename="ECU-Repair-Bundle.zip"',
+      'Cache-Control':'private, no-store',
+      'X-Content-Type-Options':'nosniff'
+    });
+    upstream.on('error', error => {
+      console.warn('[free-repair-bundle] Private download stream failed', error.code || error.message);
+      if (!response.headersSent) jsonResponse(response, 502, { error:'The bundle download was interrupted. Please retry.' });
+      else response.destroy(error);
+    });
+    upstream.pipe(response);
+  } catch (error) {
+    jsonResponse(response, error.statusCode || 502, { error:error.message || 'The free bundle could not be downloaded.' });
+  }
+  return true;
+}
+
 async function handleAdminSiteContent(request, response) {
   const admin = await requireAdmin(request);
   if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
@@ -2119,6 +2153,7 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/admin/software-requests/payment-link') return handleAdminCreateSoftwarePaymentLink(request, response);
   if (url.pathname === '/api/admin/software-requests/verify-payment') return handleAdminVerifySoftwarePayment(request, response);
   if (url.pathname === '/api/customer/software-download') return handleCustomerSoftwareDownload(request, response);
+  if (url.pathname === '/api/customer/free-repair-bundle-download') return handleCustomerFreeRepairBundleDownload(request, response);
   if (url.pathname === '/api/admin/site-content') return handleAdminSiteContent(request, response);
   if (url.pathname === '/api/admin/advertising/inquiries') return handleAdminAdvertisingInquiries(request, response);
   if (url.pathname === '/api/pricing') return handlePricing(request, response);
