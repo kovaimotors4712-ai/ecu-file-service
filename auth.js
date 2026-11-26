@@ -187,6 +187,7 @@
     if (accountTitle && !signedIn && !resetForm?.hidden && authEvent === 'PASSWORD_RECOVERY') accountTitle.textContent = 'Set a new password';
     if (!signedIn && accountTitle && !authEvent) accountTitle.textContent = 'Sign in to your account';
     if (!signedIn && accountIntro && !authEvent) accountIntro.textContent = 'Sign in to view your orders, payment status and messages. New here? Create an account.';
+    const repairBundlePanel=document.querySelector('#customer-free-repair-bundle');if(repairBundlePanel)repairBundlePanel.hidden=!signedIn;
     const ordersPanel = document.querySelector('#customer-orders');
     const pendingPanel = document.querySelector('#pending-checkouts');
     const notificationPanel = document.querySelector('#customer-notifications');
@@ -411,6 +412,25 @@
   function showPasswordReset(text = '') { authTabs.hidden = true; form.hidden = true; resetForm.hidden = false; document.querySelector('.auth-reset').hidden = true; accountTitle.textContent = 'Set a new password'; accountIntro.textContent = 'Choose a new password for your customer account.'; message.textContent = text; if (!dialog.open) dialog.showModal(); document.querySelector('#auth-new-password').focus(); }
 
   document.querySelector('#account-trigger').addEventListener('click', () => { dialog.showModal(); if (session?.user?.id) { loadCustomerOrders(); loadPendingCheckouts(); loadCustomerNotifications(); subscribeToOrders(); } });
+  document.querySelector('#free-repair-bundle-open-account')?.addEventListener('click',()=>document.querySelector('#account-trigger')?.click());
+  document.querySelector('#customer-free-repair-bundle-download')?.addEventListener('click',async event=>{
+    const button=event.currentTarget;
+    const message=document.querySelector('#customer-free-repair-bundle-message');
+    if(!session?.user?.id){message.textContent='Please sign in to download the free bundle.';return;}
+    button.disabled=true;message.classList.remove('admin-error');message.textContent='Preparing your private download…';
+    try{
+      const token=await accessToken();
+      if(!token)throw new Error('Your sign-in session needs to be refreshed. Please sign in again.');
+      const response=await fetch('/api/customer/free-repair-bundle-download',{method:'GET',headers:{Authorization:'Bearer '+token},cache:'no-store'});
+      if(!response.ok){const failure=await response.json().catch(()=>({}));throw new Error(failure.error||'The bundle could not be downloaded ('+response.status+').');}
+      const blob=await response.blob();
+      if(!blob.size)throw new Error('The uploaded bundle is empty. Please contact the site team.');
+      const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='ECU-Repair-Bundle.zip';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+      message.textContent='Your ECU REPAIR BUNDLE download has started.';
+    }catch(error){message.textContent=error.message||'Download failed. Please retry.';message.classList.add('admin-error');}
+    finally{button.disabled=false;}
+  });
+
   function openCustomerMessagesFromHash() {
     if (!['#account-messages','#check-your-messages'].includes(window.location.hash)) return;
     if (!dialog.open) dialog.showModal();
