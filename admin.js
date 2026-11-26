@@ -472,6 +472,35 @@
   };
 
 
+  const freeRepairBundleForm=document.querySelector('#free-repair-bundle-form');
+  const freeRepairBundleMessage=document.querySelector('#free-repair-bundle-message');
+  freeRepairBundleForm?.addEventListener('submit',async event=>{
+    event.preventDefault();
+    const button=freeRepairBundleForm.querySelector('button[type="submit"]');
+    const input=document.querySelector('#free-repair-bundle-file');
+    const file=input?.files?.[0];
+    if(!file){freeRepairBundleMessage.textContent='Choose the ECU Repair Bundle ZIP file first.';freeRepairBundleMessage.classList.add('admin-error');return;}
+    if(file.size<4||file.size>25*1024*1024||!file.name.toLowerCase().endsWith('.zip')){
+      freeRepairBundleMessage.textContent='Choose a valid ZIP file between 4 bytes and 25 MB.';freeRepairBundleMessage.classList.add('admin-error');return;
+    }
+    try{
+      const signature=new Uint8Array(await file.slice(0,4).arrayBuffer());
+      if(!(signature[0]===0x50&&signature[1]===0x4b&&[[0x03,0x04],[0x05,0x06],[0x07,0x08]].some(pair=>signature[2]===pair[0]&&signature[3]===pair[1]))){
+        throw new Error('The selected file does not appear to be a valid ZIP archive.');
+      }
+      const token=await backend.getAccessToken();
+      if(!token)throw new Error('Your admin session is unavailable. Please sign in again.');
+      button.disabled=true;freeRepairBundleMessage.classList.remove('admin-error');freeRepairBundleMessage.textContent='Uploading privately…';
+      const url=String(window.SUPABASE_URL||'').replace(/\/$/,'')+'/storage/v1/object/private-ecu-files/free-gifts/ecu-repair-bundle.zip';
+      const response=await fetch(url,{method:'POST',headers:{apikey:window.SUPABASE_ANON_KEY,Authorization:'Bearer '+token,'Content-Type':'application/zip','x-upsert':'true'},body:file});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(result.message||result.error||'The private bundle upload failed ('+response.status+').');
+      freeRepairBundleMessage.textContent='ECU REPAIR BUNDLE uploaded successfully. Signed-in members can now download it from My Account.';
+      input.value='';
+    }catch(error){freeRepairBundleMessage.textContent=error.message||'The bundle could not be uploaded.';freeRepairBundleMessage.classList.add('admin-error');}
+    finally{button.disabled=false;}
+  });
+
   const siteContentForm = document.querySelector('#site-content-form');
   const siteContentMessage = document.querySelector('#site-content-message');
   async function adminApi(path, options = {}) {
