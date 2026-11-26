@@ -102,6 +102,15 @@
         <div style="margin-top:24px"><h3>Advertiser enquiries</h3><p>Review incoming advertising requests and update their status. Publishing an ad remains a separate approval step.</p><div id="advertising-inquiry-list" class="admin-order-list">Loading advertiser enquiries…</div><p id="advertising-inquiry-message" class="admin-message" role="status"></p></div>
       </section>
 
+
+      <section class="pricing-settings" aria-labelledby="free-repair-bundle-title" style="margin-top:28px;display:block">
+        <div><span class="form-kicker">FREE MEMBER GIFT</span><h2 id="free-repair-bundle-title">ECU REPAIR BUNDLE</h2><p class="admin-section-help">Upload or replace the private ZIP bundle available to signed-in members. The file is stored in the existing private storage bucket and is never published as a public link. Maximum file size: 25 MB.</p></div>
+        <form id="free-repair-bundle-form" class="pricing-form" style="margin-top:18px;display:grid;grid-template-columns:1fr;gap:12px">
+          <label>ECU Repair Bundle (ZIP only)<input id="free-repair-bundle-file" type="file" accept=".zip,application/zip" required></label>
+          <div><button class="button button-dark" type="submit">Upload / Replace ECU Repair Bundle →</button><p id="free-repair-bundle-message" class="admin-message" role="status"></p></div>
+        </form>
+      </section>
+
 <section class="pricing-settings" aria-labelledby="software-products-title" style="margin-top:28px;display:block">
 <div class="admin-software-heading"><span class="form-kicker">SOFTWARE STORE</span><h2 id="software-products-title">Software Store</h2><p>Add, edit and manage software listings.</p></div>
 <details class="admin-software-form-details"><summary>＋ Add / edit software</summary>
