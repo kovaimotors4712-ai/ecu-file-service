@@ -66,6 +66,26 @@
         </div>
       </section>
 
+      <section class="pricing-settings" aria-labelledby="central-moderation-title" style="margin-top:28px;display:block">
+        <div><span class="form-kicker">SAFETY & COMMUNITY CONTROL</span><h2 id="central-moderation-title">Central Content Moderation</h2><p>Review public community content from one place. Hide content immediately, restore it when appropriate, review reports, and inspect the administrator activity log. Permanent deletion requires confirmation.</p></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0">
+          <label for="central-moderation-filter">Content type</label>
+          <select id="central-moderation-filter">
+            <option value="all">All moderation content</option>
+            <option value="forum_topics">Forum topics</option>
+            <option value="forum_replies">Forum replies</option>
+            <option value="forum_chat_messages">Live Chat messages</option>
+            <option value="workshop_reviews">Workshop reviews</option>
+            <option value="forum_reports">Forum reports</option>
+            <option value="workshop_reports">Workshop reports</option>
+          </select>
+          <button id="central-moderation-refresh" class="button button-ghost" type="button">↻ Refresh</button>
+        </div>
+        <p id="central-moderation-message" class="admin-message" role="status">Loading moderation records…</p>
+        <div id="central-moderation-list" class="admin-order-list">Moderation records will appear here.</div>
+        <div style="margin-top:24px"><h3>Admin Activity Log</h3><p class="admin-section-help">Recent recorded moderation actions. This log is read-only in the dashboard.</p><div id="central-admin-audit-list" class="admin-order-list">Loading activity log…</div></div>
+      </section>
+
       <section class="pricing-settings" aria-labelledby="pricing-settings-title">
         <div><span class="form-kicker">SERVICE PRICING</span><h2 id="pricing-settings-title">File Verification</h2><p>Set the optional customer fee. Changes apply to new requests; submitted orders keep their price snapshot.</p></div>
         <form id="pricing-form" class="pricing-form">
