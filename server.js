@@ -2056,6 +2056,7 @@ async function handleAdminCentralModeration(request, response, url) {
         payload={title,body:text};
       } else { jsonResponse(response,400,{error:'This action is not available for reviews.'}); return true; }
     } else {
+      if (action === 'investigate' && type !== 'workshop_reports') { jsonResponse(response,400,{error:'Forum reports do not support an investigating status.'}); return true; }
       if (action === 'resolve' || action === 'dismiss' || action === 'investigate') {
         payload={status:action==='resolve'?'resolved':action==='dismiss'?'dismissed':'investigating',resolved_by:action==='investigate'?null:admin.id,resolved_at:action==='investigate'?null:new Date().toISOString()};
         if (type === 'workshop_reports' && body.admin_note !== undefined) payload.admin_note=cleanSiteText(body.admin_note,2000);
