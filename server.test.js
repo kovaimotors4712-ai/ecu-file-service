@@ -2708,3 +2708,12 @@ test('public software catalogue API loads up to 1000 published products in admin
   for (const item of items) assert.doesNotMatch(String(item.description || ''), /licen[cs]e|licensing/i);
 });
 
+
+
+test('moderator moderation page hides permanent-delete controls while admins retain them', () => {
+  const moderation = fs.readFileSync(path.join(__dirname, 'moderation.js'), 'utf8');
+  const page = fs.readFileSync(path.join(__dirname, 'moderation.html'), 'utf8');
+  assert.match(moderation, /currentRole==='admin'&&!\['workshops','forum_categories'\]\.includes\(type\)/);
+  assert.match(moderation, /currentRole=role/);
+  assert.match(page, /moderation\.js\?v=20261127-3/);
+});
