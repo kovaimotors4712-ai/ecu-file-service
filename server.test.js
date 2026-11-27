@@ -28,10 +28,12 @@ const { createHttpServer, flushNotificationOutbox, cleanupExpiredCheckoutIntents
 const customerId = '10000000-0000-4000-8000-000000000001';
 const adminId = '20000000-0000-4000-8000-000000000001';
 const otherCustomerId = '30000000-0000-4000-8000-000000000001';
+const moderatorId = '40000000-0000-4000-8000-000000000001';
 const tokens = {
   customer: 'test-customer-token',
   admin: 'test-admin-token',
-  other: 'test-other-customer-token'
+  other: 'test-other-customer-token',
+  moderator: 'test-moderator-token'
 };
 const centralModerationTables = {
   forum_categories:new Map(), forum_topics:new Map(), forum_replies:new Map(), forum_chat_messages:new Map(),
@@ -138,6 +140,7 @@ function identity(options) {
   if (token === tokens.customer) return { id: customerId, role: 'customer' };
   if (token === tokens.admin) return { id: adminId, role: 'admin' };
   if (token === tokens.other) return { id: otherCustomerId, role: 'customer' };
+  if (token === tokens.moderator) return { id: moderatorId, role: 'moderator' };
   if (token === 'service_test_key') return { id: 'service-role', role: 'service' };
   return null;
 }
@@ -185,7 +188,7 @@ const upstream = async (urlValue, options = {}) => {
   const method = options.method || 'GET';
   if (url.pathname === '/auth/v1/user') {
     const user = identity(options);
-    return user ? response(200, { id: user.id, email: user.role === 'admin' ? 'admin@example.invalid' : 'customer@example.invalid', app_metadata: user.role === 'admin' ? { role: 'admin' } : {} }) : response(401, { message: 'Invalid test session.' });
+    return user ? response(200, { id: user.id, email: user.role === 'admin' ? 'admin@example.invalid' : 'customer@example.invalid', app_metadata: ['admin','moderator'].includes(user.role) ? { role: user.role } : {} }) : response(401, { message: 'Invalid test session.' });
   }
 
   if (url.hostname === 'api.razorpay.com') {
@@ -603,6 +606,17 @@ test('central moderation API is admin-only, supports reversible chat hiding and 
   assert.equal(restored.response.status,200);
   assert.equal(centralModerationTables.forum_chat_messages.get(id).is_hidden,false);
   assert.equal(centralModerationTables.community_admin_audit.size,2);
+});
+
+test('central moderation accepts an authorized moderator but does not grant admin account-management access', async () => {
+  const id='123e4567-e89b-42d3-a456-426614174116';
+  centralModerationTables.forum_chat_messages.set(id,{id,author_id:customerId,body:'Moderation test',is_hidden:false});
+  const loaded=await call('/api/admin/moderation?type=forum_chat_messages',{token:tokens.moderator});
+  assert.equal(loaded.response.status,200);
+  const hidden=await call('/api/admin/moderation',{method:'POST',token:tokens.moderator,body:{type:'forum_chat_messages',id,action:'hide'}});
+  assert.equal(hidden.response.status,200);
+  const members=await call('/api/admin/members',{token:tokens.moderator});
+  assert.equal(members.response.status,403);
 });
 
 test('central moderation preserves forum report status constraints and chat migration visibility rules', async () => {
