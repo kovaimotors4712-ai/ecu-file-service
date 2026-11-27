@@ -168,7 +168,6 @@
     if (index === 1) {
       const year = values.vehicleYear;
       if (!values.vehicleBrand || !values.vehicleType || !values.vehicleModel) { setError(index, 'Brand, vehicle type and model are required.'); return false; }
-      if (values.vehicleType === 'Two-wheeler' && !premiumTwoWheelerBrands.has(values.vehicleBrand)) { setError(index, 'Two-wheeler requests are limited to selected imported/premium motorcycle brands.'); return false; }
       if (isUnsupportedElectricModel(values.vehicleBrand, values.vehicleModel)) { setError(index, 'Electric vehicles are not supported. Select a supported petrol, diesel, CNG or other non-EV variant.'); return false; }
       if (values.category === 'AIRBAG' && !year) { setError(index, 'Year is required for Airbag Crash Clear requests.'); return false; }
       if (year && (!/^\d{4}$/.test(year) || Number(year)<1950 || Number(year)>2100)) { setError(index, 'Enter a valid vehicle year.'); return false; }
@@ -262,8 +261,11 @@
   function renderBrands(query='') {
     const needle = query.trim().toLowerCase();
     const matches = brandsForCurrentVehicleType().filter(brand => !needle || brand.toLowerCase().includes(needle)).slice(0,30);
-    brandResults.innerHTML = matches.map((brand,index)=>`<button type="button" class="brand-option" role="option" data-brand="${escapeHtml(brand)}" aria-selected="false">${escapeHtml(brand)}</button>`).join('');
-    brandResults.classList.toggle('open', matches.length>0 && document.activeElement===brandInput);
+    const customBrand = query.trim() && !brands.includes(query.trim())
+      ? `<button type="button" class="brand-option brand-option-custom" role="option" data-brand="${escapeHtml(query.trim())}" aria-selected="false">Use custom brand: ${escapeHtml(query.trim())}</button>`
+      : '';
+    brandResults.innerHTML = customBrand + matches.map(brand=>`<button type="button" class="brand-option" role="option" data-brand="${escapeHtml(brand)}" aria-selected="false">${escapeHtml(brand)}</button>`).join('');
+    brandResults.classList.toggle('open', Boolean(customBrand || matches.length) && document.activeElement===brandInput);
     activeBrandOption = -1;
   }
   function closeBrandResults(){ brandResults.classList.remove('open'); brandInput.setAttribute('aria-expanded','false'); }
@@ -272,7 +274,7 @@
   brandInput.addEventListener('keydown',event=>{const options=[...brandResults.querySelectorAll('.brand-option')]; if (!options.length) return; if (event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();activeBrandOption=(activeBrandOption+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;options.forEach((o,i)=>o.classList.toggle('keyboard-active',i===activeBrandOption));options[activeBrandOption]?.scrollIntoView({block:'nearest'});} else if(event.key==='Enter'&&activeBrandOption>=0){event.preventDefault();options[activeBrandOption].click();} else if(event.key==='Escape') closeBrandResults();});
   brandResults.addEventListener('click',event=>{const button=event.target.closest('.brand-option');if(!button)return;pendingCheckoutAttemptId=null;brandInput.value=button.dataset.brand;closeBrandResults();renderModelSuggestions();updateSummary();});
   document.addEventListener('click',event=>{if(!event.target.closest('.brand-search-wrap'))closeBrandResults();});
-  vehicleTypeSelect?.addEventListener('change',()=>{pendingCheckoutAttemptId=null;const allowed=brandsForCurrentVehicleType();if(brandInput.value && !allowed.includes(brandInput.value)){brandInput.value='';if(vehicleModelInput)vehicleModelInput.value='';}renderBrands(brandInput.value);renderModelSuggestions();updateSummary();});
+  vehicleTypeSelect?.addEventListener('change',()=>{pendingCheckoutAttemptId=null;const allowed=brandsForCurrentVehicleType();if(brandInput.value && brands.includes(brandInput.value) && !allowed.includes(brandInput.value)){brandInput.value='';if(vehicleModelInput)vehicleModelInput.value='';}renderBrands(brandInput.value);renderModelSuggestions();updateSummary();});
   brandInput.addEventListener('change',()=>{pendingCheckoutAttemptId=null;renderModelSuggestions();});
   document.querySelectorAll('input[name="category"]').forEach(radio=>radio.addEventListener('change',()=>{document.querySelectorAll('.choice-card').forEach(card=>card.classList.toggle('selected',card.querySelector('input')?.checked));fileStagedInStorage=false;activeIntent=null;pendingCheckoutAttemptId=null;originalFileSha256='';updateSummary();}));
   document.querySelectorAll('input[name="service"],#vehicle-type,#vehicle-model,#vehicle-year,#ecu-maker,#ecu-model,#reading-tool,#customer-name,#customer-phone,#customer-email,#request-notes,#airbag-module-details').forEach(el=>el.addEventListener('input',()=>{pendingCheckoutAttemptId=null;updateSummary();}));
