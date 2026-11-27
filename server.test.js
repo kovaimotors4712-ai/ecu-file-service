@@ -2359,7 +2359,7 @@ test('customer session refresh preserves stored login on temporary HTTP failures
 test('isolated moderation page loads with noindex and its own moderation script', () => {
   const moderationHtml=fs.readFileSync(path.join(__dirname,'moderation.html'),'utf8');
   assert.match(moderationHtml, /noindex, nofollow, noarchive/);
-  assert.match(moderationHtml, /moderation\.js\?v=20261127-1/);
+  assert.match(moderationHtml, /moderation\\.js\\?v=20261127-2/);
   assert.match(moderationHtml, /authorized moderator account/i);
 });
 
