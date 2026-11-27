@@ -13,6 +13,7 @@
   const search=document.querySelector('#moderation-search');
   const signout=document.querySelector('#moderator-signout');
   let items=[];
+  let currentRole='';
   function esc(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   async function request(method='GET',body=null){
     const token=await backend.getAccessToken();
@@ -26,8 +27,9 @@
   function enterDenied(text){login.hidden=true;dashboard.hidden=true;denied.hidden=false;document.querySelector('#moderator-denied-message').textContent=text;signout.hidden=false;}
   async function enter(){
     const session=backend.getSession();
-    if(!session?.user){login.hidden=false;dashboard.hidden=true;denied.hidden=true;signout.hidden=true;return;}
+    if(!session?.user){currentRole='';login.hidden=false;dashboard.hidden=true;denied.hidden=true;signout.hidden=true;return;}
     const role=session.user.app_metadata?.role;
+    currentRole=role;
     if(!['admin','moderator'].includes(role)){enterDenied('Your account does not have an authorized moderation role.');return;}
     login.hidden=true;denied.hidden=true;dashboard.hidden=false;signout.hidden=false;
     await load();
@@ -54,7 +56,7 @@
       if(type==='forum_reports'||type==='workshop_reports'){
         if(!resolved){if(type==='workshop_reports')buttons+='<button type="button" class="button button-ghost" data-action="investigate" data-type="'+esc(type)+'" data-id="'+id+'">Investigate</button>';buttons+='<button type="button" class="button button-ghost" data-action="resolve" data-type="'+esc(type)+'" data-id="'+id+'">Resolve</button><button type="button" class="button button-ghost" data-action="dismiss" data-type="'+esc(type)+'" data-id="'+id+'">Dismiss</button>';}
       }
-      if(!['workshops','forum_categories'].includes(type))buttons+='<button type="button" class="button button-ghost" style="border-color:#b91c1c;color:#b91c1c" data-action="delete" data-type="'+esc(type)+'" data-id="'+id+'">Delete</button>';
+      if(currentRole==='admin'&&!['workshops','forum_categories'].includes(type))buttons+='<button type="button" class="button button-ghost" style="border-color:#b91c1c;color:#b91c1c" data-action="delete" data-type="'+esc(type)+'" data-id="'+id+'">Delete</button>';
       return '<article data-id="'+id+'" data-title="'+esc(item.title||'')+'" data-body="'+esc(item.body||item.description||'')+'" style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap"><strong>'+label+'</strong><span>'+esc(state)+'</span></div><p style="margin:0;white-space:pre-wrap;overflow-wrap:anywhere">'+esc(preview(item))+'</p><small>'+esc(item.created_at?new Date(item.created_at).toLocaleString():'')+' · ID: '+id+'</small><div style="display:flex;gap:8px;flex-wrap:wrap">'+buttons+'</div></article>';
     }).join('');
   }
