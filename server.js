@@ -2096,7 +2096,7 @@ function renderForumTopicPage(topic, categoryTitle, replies) {
 }
 async function handlePublicForumTopicRequest(request, response, pathname) {
   if (request.method !== 'GET' && request.method !== 'HEAD') { response.writeHead(405, { Allow: 'GET, HEAD' }).end(); return true; }
-  const match = pathname.match(/^\/forum\/topic\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\\/([a-z0-9-]{1,80}))?\\/?$/i);
+  const match = pathname.match(/^\/forum\/topic\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/([a-z0-9-]{1,80}))?\/?$/i);
   if (!match) { response.writeHead(404).end('Not found'); return true; }
   if (!hasSafeSupabaseConfig) { response.writeHead(503, { 'Cache-Control': 'no-store' }).end('Forum topic is temporarily unavailable.'); return true; }
   const topicId = match[1].toLowerCase();
