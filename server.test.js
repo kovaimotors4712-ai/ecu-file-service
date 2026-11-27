@@ -34,7 +34,7 @@ const tokens = {
   other: 'test-other-customer-token'
 };
 const centralModerationTables = {
-  forum_topics:new Map(), forum_replies:new Map(), forum_chat_messages:new Map(),
+  forum_categories:new Map(), forum_topics:new Map(), forum_replies:new Map(), forum_chat_messages:new Map(),
   workshop_reviews:new Map(), workshops:new Map(), forum_reports:new Map(), workshop_reports:new Map(),
   community_admin_audit:new Map()
 };
@@ -258,7 +258,7 @@ const upstream = async (urlValue, options = {}) => {
   }
 
 
-  const moderationTableMatch=url.pathname.match(/^\/rest\/v1\/(forum_topics|forum_replies|forum_chat_messages|workshop_reviews|workshops|forum_reports|workshop_reports|community_admin_audit)$/);
+  const moderationTableMatch=url.pathname.match(/^\/rest\/v1\/(forum_categories|forum_topics|forum_replies|forum_chat_messages|workshop_reviews|workshops|forum_reports|workshop_reports|community_admin_audit)$/);
   if(moderationTableMatch){
     const table=moderationTableMatch[1],rows=centralModerationTables[table],idFilter=url.searchParams.get('id');
     let selected=[...rows.values()].filter(row=>!idFilter||idFilter==='eq.'+row.id);
@@ -615,6 +615,22 @@ test('central moderation preserves forum report status constraints and chat migr
   assert.match(migration,/drop policy if exists forum_chat_read_public/i);
   assert.match(migration,/is_hidden = false/);
   assert.match(migration,/grant update on public\.forum_chat_messages to authenticated/i);
+});
+
+test('central moderation can edit and deactivate forum categories but cannot delete linked categories', async () => {
+  const id='123e4567-e89b-42d3-a456-426614174115';
+  centralModerationTables.forum_categories.set(id,{id,slug:'diagnostics',title:'Diagnostics',description:'Vehicle diagnostic discussions',sort_order:1,is_active:true});
+  const loaded=await call('/api/admin/moderation?type=forum_categories',{token:tokens.admin});
+  assert.equal(loaded.response.status,200);
+  const edited=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_categories',id,action:'edit',title:'ECU Diagnostics',body:'ECU diagnostic discussions and repair guidance'}});
+  assert.equal(edited.response.status,200);
+  assert.equal(centralModerationTables.forum_categories.get(id).title,'ECU Diagnostics');
+  const hidden=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_categories',id,action:'hide'}});
+  assert.equal(hidden.response.status,200);
+  assert.equal(centralModerationTables.forum_categories.get(id).is_active,false);
+  const removed=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_categories',id,action:'delete',confirmPermanentDelete:true}});
+  assert.equal(removed.response.status,409);
+  assert.ok(centralModerationTables.forum_categories.has(id));
 });
 
 test('central moderation can suspend and restore workshop listings without exposing contact fields or deleting linked records', async () => {
