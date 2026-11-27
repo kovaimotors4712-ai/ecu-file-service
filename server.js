@@ -2048,6 +2048,7 @@ async function handleAdminCentralModeration(request, response, url) {
     const endpoint = 'rest/v1/'+resource.table+'?id=eq.'+encodeURIComponent(id);
     let method = 'PATCH', payload = {};
     if (action === 'delete') {
+      if (admin.user?.app_metadata?.role !== 'admin') { jsonResponse(response,403,{error:'Only an administrator can permanently delete content.'}); return true; }
       if (type === 'workshops') { jsonResponse(response,409,{error:'Workshop records are retained to preserve reviews and reports. Suspend the listing to remove it from public view.'}); return true; }
       if (type === 'forum_categories') { jsonResponse(response,409,{error:'Forum categories are retained to protect existing discussions. Deactivate the category instead.'}); return true; }
       if (body.confirmPermanentDelete !== true) { jsonResponse(response,400,{error:'Permanent deletion requires explicit confirmation.'}); return true; }
