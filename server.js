@@ -1976,17 +1976,22 @@ const CENTRAL_MODERATION_RESOURCES = {
 const CENTRAL_MODERATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function writeCentralAdminAudit(admin, action, targetType, targetId, details = {}) {
-  const result = await supabaseRequest(serviceToken(), 'rest/v1/community_admin_audit', {
-    method:'POST', prefer:'return=minimal',
-    body:{ actor_id:admin.id, action, target_type:targetType, target_id:targetId || null, details },
-    timeoutMs:12000
-  });
-  if (!result.ok) {
-    const detail = await result.text().catch(()=>'');
-    console.warn('[admin-audit] Activity could not be recorded.', { action, targetType, status:result.status, detail:detail.slice(0,300) });
+  try {
+    const result = await supabaseRequest(serviceToken(), 'rest/v1/community_admin_audit', {
+      method:'POST', prefer:'return=minimal',
+      body:{ actor_id:admin.id, action, target_type:targetType, target_id:targetId || null, details },
+      timeoutMs:12000
+    });
+    if (!result.ok) {
+      const detail = await result.text().catch(()=>'');
+      console.warn('[admin-audit] Activity could not be recorded.', { action, targetType, status:result.status, detail:detail.slice(0,300) });
+      return false;
+    }
+    return true;
+  } catch(error) {
+    console.warn('[admin-audit] Activity request failed.', { action, targetType, message:error.message });
     return false;
   }
-  return true;
 }
 
 async function handleAdminCentralModeration(request, response, url) {
