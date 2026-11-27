@@ -615,7 +615,7 @@ test('central moderation accepts an authorized moderator but does not grant admi
   assert.equal(loaded.response.status,200);
   const hidden=await call('/api/admin/moderation',{method:'POST',token:tokens.moderator,body:{type:'forum_chat_messages',id,action:'hide'}});
   assert.equal(hidden.response.status,200);
-  const members=await call('/api/admin/members',{token:tokens.moderator});
+  const members=await call('/api/admin/users',{token:tokens.moderator});
   assert.equal(members.response.status,403);
 });
 
