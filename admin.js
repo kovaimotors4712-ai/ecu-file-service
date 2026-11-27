@@ -1027,7 +1027,7 @@
     const itemType=type;
     let body={type:itemType,id,action};
     if(action==='delete') {
-      if(!confirm('Permanently delete this content? This cannot be undone. For forum topics, related replies may also be removed.'))return;
+      if(!confirm('Permanently delete this content? This cannot be undone. Related replies or reports may also be removed.'))return;
       body.confirmPermanentDelete=true;
     }
     if(action==='hide'&&!confirm('Hide this content from public visitors? You can restore it later.'))return;
