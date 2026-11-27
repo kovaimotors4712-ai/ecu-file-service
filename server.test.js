@@ -2356,6 +2356,13 @@ test('customer session refresh preserves stored login on temporary HTTP failures
   assert.doesNotMatch(auth, /if \(!response\.ok\) \{ saveSession\(null\); return null; \}/);
 });
 
+test('isolated moderation page loads with noindex and its own moderation script', () => {
+  const moderationHtml=fs.readFileSync(path.join(__dirname,'moderation.html'),'utf8');
+  assert.match(moderationHtml, /noindex, nofollow, noarchive/);
+  assert.match(moderationHtml, /moderation\.js\?v=20261127-1/);
+  assert.match(moderationHtml, /authorized moderator account/i);
+});
+
 test('admin controls enforce readable contrast and cache-busted current assets', () => {
   const adminCss = fs.readFileSync(path.join(__dirname, 'admin.css'), 'utf8');
   const adminHtml = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
@@ -2364,7 +2371,7 @@ test('admin controls enforce readable contrast and cache-busted current assets',
   assert.match(adminCss, /#site-content-list \.button-ghost[\s\S]*?opacity:1 !important/);
   assert.match(adminCss, /button:disabled[\s\S]*?opacity:1 !important/);
   assert.match(adminHtml, /admin\.css\?v=20261118-sticky-folders/);
-  assert.match(adminHtml, /admin\.js\?v=20261119-forum-post-manager/);
+  assert.match(adminHtml, /admin\.js\?v=20261127-central-moderation-categories3/);
   assert.match(adminJs, /<details class=\"admin-order-detail\">/);
   assert.match(adminJs, /admin-order-summary-meta/);
   assert.match(adminCss, /\.admin-order-detail>summary/);
