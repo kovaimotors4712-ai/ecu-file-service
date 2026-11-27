@@ -2727,3 +2727,17 @@ test('authorized moderation page and script are included in the public static al
   assert.equal(script.response.status, 200);
   assert.match(script.payload, /currentRole==='admin'/);
 });
+
+
+test('admin activity log records advertising review and order replies without copying private content', () => {
+  const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  assert.match(server, /delete_advertising_inquiry'[\s\S]*?previous_status:inquiry\.status/);
+  assert.match(server, /update_advertising_inquiry_status'[\s\S]*?from:inquiryStatusBefore, to:body\.status/);
+  assert.match(server, /create_advertising_quote'[\s\S]*?inquiry_id:inquiryId, quote_version:version/);
+  assert.match(server, /issue_advertising_quote'[\s\S]*?quote_version:quote\.quote_version/);
+  assert.match(server, /decline_advertising_quote/);
+  assert.match(server, /send_order_message'[\s\S]*?message_length:cleanMessage\.length/);
+  const replyHandler = server.slice(server.indexOf('async function handleAdminReply('), server.indexOf('\nasync function ', server.indexOf('async function handleAdminReply(') + 1));
+  assert.doesNotMatch(replyHandler, /writeCentralAdminAudit\([^;]*cleanMessage\s*[,}]/);
+  assert.doesNotMatch(replyHandler, /writeCentralAdminAudit\([^;]*contact(?:Name|Phone|Email)/i);
+});
