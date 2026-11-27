@@ -46,8 +46,8 @@
       const state=type==='forum_categories'?(item.is_active===false?'Inactive':'Active'):item.is_hidden?'Hidden':esc(item.status||'Visible');
       const canHide=['forum_categories','forum_topics','forum_replies','forum_chat_messages','workshop_reviews','workshops'].includes(type);
       const canEdit=['forum_categories','forum_topics','forum_replies','workshop_reviews'].includes(type);
-      const action=type==='workshops'?(hidden?'restore':'hide'):type==='workshop_reviews'&&item.status==='pending'?'publish':hidden?'restore':'hide';
-      const actionLabel=action==='restore'?'Restore':action==='publish'?'Publish':type==='workshops'?'Suspend':'Hide';
+      const action=type==='workshops'?(item.status==='approved'?'hide':hidden?'restore':'publish'):type==='workshop_reviews'&&item.status==='pending'?'publish':hidden?'restore':'hide';
+      const actionLabel=action==='restore'?'Restore':action==='publish'?(type==='workshops'?'Approve':'Publish'):type==='workshops'?'Suspend':'Hide';
       let buttons='';
       if(canHide)buttons+='<button type="button" class="button button-ghost" data-action="'+action+'" data-type="'+esc(type)+'" data-id="'+id+'">'+actionLabel+'</button>';
       if(canEdit)buttons+='<button type="button" class="button button-ghost" data-action="edit" data-type="'+esc(type)+'" data-id="'+id+'">Edit</button>';
