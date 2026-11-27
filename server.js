@@ -1162,6 +1162,7 @@ async function handleAdminReply(request, response) {
       return true;
     }
     const inserted = await insertRes.json();
+    await writeCentralAdminAudit(admin, 'send_order_message', 'order', orderId, { message_length:cleanMessage.length });
     jsonResponse(response, 201, { message: inserted?.[0] || null });
   } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Failed to send reply.' }); }
   return true;
@@ -1668,15 +1669,21 @@ async function handleAdminAdvertisingInquiries(request, response) {
     const removed = await supabaseRequest(token, 'rest/v1/advertising_inquiries?id=eq.'+encodeURIComponent(id)+'&select=id', { method:'DELETE', prefer:'return=representation', timeoutMs:12000 });
     if (!removed.ok) { jsonResponse(response, 502, { error:'Enquiry could not be deleted.' }); return true; }
     if (!(await removed.json())?.length) { jsonResponse(response, 404, { error:'Enquiry not found.' }); return true; }
+    await writeCentralAdminAudit(admin, 'delete_advertising_inquiry', 'advertising_inquiry', id, { previous_status:inquiry.status || null });
     jsonResponse(response, 200, { deleted:true }); return true;
   }
   if (request.method === 'PATCH') {
     const body = await readJson(request, 4096);
     if (!/^[0-9a-f-]{36}$/i.test(String(body.id || '')) || !['new','contacted','approved','declined','closed'].includes(body.status)) { jsonResponse(response, 400, { error:'Invalid enquiry reference or status.' }); return true; }
+    const beforeResult = await supabaseRequest(token, 'rest/v1/advertising_inquiries?id=eq.'+encodeURIComponent(body.id)+'&select=id,status&limit=1', { timeoutMs:12000 });
+    if (!beforeResult.ok) { jsonResponse(response, 502, { error:'Enquiry could not be checked before updating.' }); return true; }
+    const inquiryStatusBefore = (await beforeResult.json())?.[0]?.status || null;
+    if (inquiryStatusBefore === null) { jsonResponse(response, 404, { error:'Enquiry not found.' }); return true; }
     const result = await supabaseRequest(token, 'rest/v1/advertising_inquiries?id=eq.'+encodeURIComponent(body.id)+'&select=id,status', { method:'PATCH', prefer:'return=representation', body:{ status:body.status, updated_at:new Date().toISOString() }, timeoutMs:12000 });
     if (!result.ok) { jsonResponse(response, 502, { error:'Enquiry status could not be updated.' }); return true; }
     const rows = await result.json();
     if (!rows?.length) { jsonResponse(response, 404, { error:'Enquiry not found.' }); return true; }
+    await writeCentralAdminAudit(admin, 'update_advertising_inquiry_status', 'advertising_inquiry', body.id, { from:inquiryStatusBefore, to:body.status });
     jsonResponse(response, 200, { item:rows[0] }); return true;
   }
   jsonResponse(response, 405, { error:'Method Not Allowed' }); return true;
@@ -1738,6 +1745,7 @@ async function handleAdminAdvertisingQuotes(request, response) {
       if (!result.ok) { jsonResponse(response, result.status === 409 ? 409 : 502, { error:'Quote could not be saved. Refresh and retry; the enquiry may have changed.' }); return true; }
       const quote = (await result.json())?.[0];
       await writeAdvertisingAudit('quote_created', quote?.id, null, admin.id, { inquiry_id:inquiryId, quote_version:version });
+      await writeCentralAdminAudit(admin, 'create_advertising_quote', 'advertising_quote', quote?.id || null, { inquiry_id:inquiryId, quote_version:version });
       jsonResponse(response, 201, { item:quote, advertiser:{ businessName:inquiry.business_name, email:inquiry.email } }); return true;
     } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Invalid advertising quote.' }); return true; }
   }
@@ -1776,6 +1784,7 @@ async function handleAdminAdvertisingQuotes(request, response) {
           jsonResponse(response, 502, { error:'Quote email could not be delivered. The quote was returned to draft.' }); return true;
         }
         await writeAdvertisingAudit('quote_issued', id, null, admin.id, { quote_version:quote.quote_version });
+        await writeCentralAdminAudit(admin, 'issue_advertising_quote', 'advertising_quote', id, { quote_version:quote.quote_version });
         jsonResponse(response, 200, { ok:true, status:'issued' }); return true;
       }
       if (body.action === 'decline' && ['draft','issued'].includes(current.status)) {
@@ -1783,6 +1792,7 @@ async function handleAdminAdvertisingQuotes(request, response) {
         const rows = await result.json().catch(()=>[]);
         if (!result.ok || !rows?.length) { jsonResponse(response, 409, { error:'Quote could not be declined.' }); return true; }
         await writeAdvertisingAudit('quote_declined', id, null, admin.id);
+        await writeCentralAdminAudit(admin, 'decline_advertising_quote', 'advertising_quote', id);
         jsonResponse(response, 200, { item:rows[0] }); return true;
       }
       jsonResponse(response, 400, { error:'Unsupported quote action.' }); return true;
