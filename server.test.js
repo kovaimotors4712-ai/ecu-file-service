@@ -673,8 +673,8 @@ test('central moderation can suspend and restore workshop listings without expos
 
 test('central moderation edit cards retain the current title and body for safe prefilled editing', () => {
   const adminSource=fs.readFileSync(path.join(__dirname,'admin.js'),'utf8');
-  assert.ok(adminSource.includes("data-current-title=\"'+escape(item.title||'')+'\""));
-  assert.ok(adminSource.includes("data-current-body=\"'+escape(item.body||'')+'\""));
+  assert.ok(adminSource.includes("data-current-title=\"'+escape(item.title||item.name||'')+'\""));
+  assert.ok(adminSource.includes("data-current-body=\"'+escape(item.body||item.description||'')+'\""));
   assert.match(adminSource,/card\?\.dataset\.currentBody/);
   assert.match(adminSource,/card\?\.dataset\.currentTitle/);
 });
