@@ -619,8 +619,8 @@ test('central moderation preserves forum report status constraints and chat migr
 
 test('central moderation edit cards retain the current title and body for safe prefilled editing', () => {
   const adminSource=fs.readFileSync(path.join(__dirname,'admin.js'),'utf8');
-  assert.match(adminSource,/data-current-title="\+'\+escape\(item\.title\|\|'\'\)\+'"/);
-  assert.match(adminSource,/data-current-body="\+'\+escape\(item\.body\|\|'\'\)\+'"/);
+  assert.ok(adminSource.includes("data-current-title=\"'+escape(item.title||'')+'\""));
+  assert.ok(adminSource.includes("data-current-body=\"'+escape(item.body||'')+'\""));
   assert.match(adminSource,/card\?\.dataset\.currentBody/);
   assert.match(adminSource,/card\?\.dataset\.currentTitle/);
 });
