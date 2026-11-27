@@ -1977,6 +1977,7 @@ const CENTRAL_MODERATION_RESOURCES = {
   forum_replies: { table:'forum_replies', fields:'id,topic_id,body,author_display_name,created_at,is_hidden', order:'created_at.desc' },
   forum_chat_messages: { table:'forum_chat_messages', fields:'id,author_id,body,created_at,is_hidden,hidden_at', order:'created_at.desc' },
   workshop_reviews: { table:'workshop_reviews', fields:'id,workshop_id,reviewer_id,rating,title,body,status,created_at,updated_at', order:'created_at.desc' },
+  workshops: { table:'workshops', fields:'id,name,description,services,address,city,state,pincode,opening_hours,status,is_verified,created_at,updated_at', order:'created_at.desc' },
   forum_reports: { table:'forum_reports', fields:'id,reporter_id,topic_id,reply_id,reason,status,created_at,resolved_by,resolved_at', order:'created_at.desc' },
   workshop_reports: { table:'workshop_reports', fields:'id,reporter_id,workshop_id,review_id,reason,status,admin_note,created_at,resolved_by,resolved_at', order:'created_at.desc' }
 };
@@ -2040,6 +2041,7 @@ async function handleAdminCentralModeration(request, response, url) {
     const endpoint = 'rest/v1/'+resource.table+'?id=eq.'+encodeURIComponent(id);
     let method = 'PATCH', payload = {};
     if (action === 'delete') {
+      if (type === 'workshops') { jsonResponse(response,409,{error:'Workshop records are retained to preserve reviews and reports. Suspend the listing to remove it from public view.'}); return true; }
       if (body.confirmPermanentDelete !== true) { jsonResponse(response,400,{error:'Permanent deletion requires explicit confirmation.'}); return true; }
       method = 'DELETE';
     } else if (type === 'forum_topics' || type === 'forum_replies') {
@@ -2060,6 +2062,10 @@ async function handleAdminCentralModeration(request, response, url) {
       if (action === 'hide') payload={is_hidden:true,hidden_at:new Date().toISOString(),hidden_by:admin.id};
       else if (action === 'restore') payload={is_hidden:false,hidden_at:null,hidden_by:null};
       else { jsonResponse(response,400,{error:'Chat messages can only be hidden, restored or permanently deleted.'}); return true; }
+    } else if (type === 'workshops') {
+      if (action === 'hide') payload={status:'suspended'};
+      else if (action === 'restore' || action === 'publish') payload={status:'approved'};
+      else { jsonResponse(response,400,{error:'Workshop listings can only be suspended or restored here.'}); return true; }
     } else if (type === 'workshop_reviews') {
       if (action === 'hide') payload={status:'hidden'};
       else if (action === 'restore' || action === 'publish') payload={status:'published'};
