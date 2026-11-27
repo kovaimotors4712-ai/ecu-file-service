@@ -57,7 +57,7 @@ function isUnsupportedElectricModel(brand, model) {
   });
 }
 
-const publicFiles = new Set(['index.html', 'manifest.json', 'sw.js', 'app-icon-192.svg', 'app-icon-512.svg', 'software-cover-ecu.svg', 'software-cover-diagnostics.svg', 'software-cover-immobilizer.svg', 'software-cover-airbag.svg', 'software-cover-emissions.svg', 'software-cover-adas.svg', 'software-cover-dashboard.svg', 'software-cover-electronics.svg', 'software-cover-workshop.svg', 'car-diagnostic-help.html', 'dtc-search.html', 'car-electrical-diagnostics.html', 'workshops.html', 'admin.html', 'advertising-quote.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'ecu-fault-code-diagnosis.html', 'ecu-file-identification-original-backup.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'terms.html', 'privacy.html', 'contact.html', 'about.html', 'international-ecu-file-support.html', 'googlea2bbe9d2fd8bede2.html', '9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d.txt']);
+const publicFiles = new Set(['index.html', 'manifest.json', 'sw.js', 'app-icon-192.svg', 'app-icon-512.svg', 'software-cover-ecu.svg', 'software-cover-diagnostics.svg', 'software-cover-immobilizer.svg', 'software-cover-airbag.svg', 'software-cover-emissions.svg', 'software-cover-adas.svg', 'software-cover-dashboard.svg', 'software-cover-electronics.svg', 'software-cover-workshop.svg', 'car-diagnostic-help.html', 'dtc-search.html', 'car-electrical-diagnostics.html', 'workshops.html', 'admin.html', 'advertising-quote.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'ecu-fault-code-diagnosis.html', 'ecu-file-identification-original-backup.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'terms.html', 'privacy.html', 'contact.html', 'about.html', 'international-ecu-file-support.html', 'vehicle-ecu-wiring-diagnostic-guide.html', 'googlea2bbe9d2fd8bede2.html', '9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d.txt']);
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
@@ -266,7 +266,7 @@ async function supabaseRequest(token, route, { method = 'GET', body, prefer, hea
 function serviceToken() { return supabaseServiceRoleKey || supabaseAnonKey; }
 
 function sanitizeFileName(value) {
-  return String(value || 'original.bin').normalize('NFKD').replace(/[^\w.-]+/g, '_').slice(-180) || 'original.bin';
+  return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
 }
 function orderHash(order) { return crypto.createHash('sha256').update(JSON.stringify(order)).digest('hex'); }
 function paymentProof(customerId, intentId, provider, providerOrderId, providerPaymentId, amount, requestSha256) {
@@ -2064,6 +2064,71 @@ function renderDtcSeoPage(item, code) {
     (related.length ? '<h2>Related DTC codes</h2><ul>' + related.map(value => '<li><a href="/dtc/'+encodeURIComponent(String(value).toUpperCase())+'">'+esc(String(value).toUpperCase())+'</a></li>').join('') + '</ul>' : '') +
     '<p><a class="search" href="/dtc-search.html?q='+encodeURIComponent(code)+'">Search this code in DTC Search</a></p><p><small>Generic OBD-II reference only. Manufacturer-specific definitions, test values and repair procedures can vary by vehicle. Verify with vehicle-specific service information.</small></p></article></main></body></html>';
 }
+
+function forumTopicSlug(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'discussion';
+}
+function forumTopicPath(topic) {
+  return '/forum/topic/' + String(topic.id) + '/' + forumTopicSlug(topic.title);
+}
+function renderForumTopicPage(topic, categoryTitle, replies) {
+  const esc = escapeDtcHtml;
+  const canonical = 'https://ecufileservice.in' + forumTopicPath(topic);
+  const author = String(topic.author_display_name || 'Community member');
+  const title = String(topic.title || 'Workshop discussion');
+  const body = String(topic.body || '');
+  const published = topic.created_at && !Number.isNaN(Date.parse(topic.created_at)) ? new Date(topic.created_at).toISOString() : '';
+  const replyMarkup = replies.length
+    ? replies.map(reply => '<article class="reply"><div class="meta"><strong>' + esc(reply.author_display_name || 'Community member') + '</strong><time datetime="' + esc(reply.created_at || '') + '">' + esc(reply.created_at ? new Date(reply.created_at).toISOString().slice(0, 10) : '') + '</time></div><p>' + esc(reply.body || '') + '</p></article>').join('')
+    : '<p class="muted">No public replies yet. Join the free community to add a useful reply.</p>';
+  const schema = {'@context':'https://schema.org','@type':'DiscussionForumPosting','headline':title,'text':body,'datePublished':published || undefined,'mainEntityOfPage':canonical,'author':{'@type':'Person','name':author},'publisher':{'@type':'Organization','name':'ECU File Service India','url':'https://ecufileservice.in/'}};
+  return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta name="robots" content="index,follow"><meta name="description" content="' + esc((body || title).slice(0, 260)) + '">' +
+    '<link rel="canonical" href="' + canonical + '"><meta property="og:type" content="article"><meta property="og:title" content="' + esc(title + ' | ECU File Service India Forum') + '">' +
+    '<meta property="og:description" content="' + esc(body.slice(0, 220)) + '"><meta property="og:url" content="' + canonical + '">' +
+    '<title>' + esc(title + ' | ECU File Service India Forum') + '</title><script type="application/ld+json">' + JSON.stringify(schema).replace(/</g, '\\u003c') + '</script>' +
+    '<style>*{box-sizing:border-box}body{margin:0;background:#f4f6f1;color:#19231e;font:16px/1.75 Arial,sans-serif}.wrap{max-width:900px;margin:32px auto;padding:24px}.panel{background:#fff;border:1px solid #e2e7de;padding:clamp(20px,4vw,38px)}nav{font-size:13px;margin-bottom:22px}a{color:#4e6827}h1{font-size:clamp(28px,5vw,42px);line-height:1.18;margin:8px 0 12px}.meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#687469;font-size:12px}.category{display:inline-block;background:#f1f6e4;color:#647832;padding:4px 9px;font-size:11px;text-transform:uppercase}.body{white-space:pre-wrap;overflow-wrap:anywhere;margin:26px 0;color:#344439}.reply{border-top:1px solid #e6ebe2;padding:18px 0}.reply p{white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0}.muted{color:#657268}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}.button{display:inline-block;padding:11px 16px;background:#d4ed72;color:#172119;text-decoration:none;font-weight:700;font-size:13px}.button.alt{background:#19231e;color:#fff}.footer{margin-top:22px;font-size:12px;color:#657268}@media(max-width:600px){.wrap{padding:12px;margin:12px auto}.panel{padding:18px}}</style></head><body><main class="wrap"><article class="panel"><nav><a href="/">Home</a> / <a href="/forum.html">Workshop Forum</a> / ' + esc(categoryTitle || 'Discussion') + '</nav>' +
+    '<span class="category">' + esc(categoryTitle || 'Workshop discussion') + '</span><h1>' + esc(title) + '</h1><div class="meta"><strong>By ' + esc(author) + '</strong><time datetime="' + esc(published) + '">' + esc(published ? published.slice(0, 10) : '') + '</time></div>' +
+    '<div class="body">' + esc(body) + '</div><h2>Community replies</h2>' + replyMarkup +
+    '<div class="actions"><a class="button" href="/forum.html?topic=' + encodeURIComponent(topic.id) + '">Open this discussion ↗</a><a class="button alt" href="/forum.html#forum-account-panel">Create a free account</a></div>' +
+    '<p class="footer">Public workshop discussion. Do not share VINs, registration details, customer information, passwords or private files. Confirm vehicle-specific procedures with reliable service information.</p></article></main></body></html>';
+}
+async function handlePublicForumTopicRequest(request, response, pathname) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') { response.writeHead(405, { Allow: 'GET, HEAD' }).end(); return true; }
+  const match = pathname.match(/^\/forum\/topic\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/([a-z0-9-]{1,80}))?\/?$/i);
+  if (!match) { response.writeHead(404).end('Not found'); return true; }
+  if (!hasSafeSupabaseConfig) { response.writeHead(503, { 'Cache-Control': 'no-store' }).end('Forum topic is temporarily unavailable.'); return true; }
+  const topicId = match[1].toLowerCase();
+  try {
+    const topicResult = await supabaseRequest(supabaseAnonKey,
+      'rest/v1/forum_topics?select=id,category_id,title,body,author_display_name,created_at,is_hidden&id=eq.' + encodeURIComponent(topicId) + '&is_hidden=eq.false&limit=1',
+      { timeoutMs: 12000 });
+    if (!topicResult.ok) { response.writeHead(503, { 'Cache-Control': 'no-store' }).end('Forum topic is temporarily unavailable.'); return true; }
+    const rows = await topicResult.json();
+    const topic = Array.isArray(rows) ? rows[0] : null;
+    if (!topic || topic.is_hidden) { response.writeHead(404).end('Public topic not found.'); return true; }
+    const canonicalPath = forumTopicPath(topic);
+    if (pathname !== canonicalPath) { response.writeHead(301, { Location: canonicalPath, 'Cache-Control': 'public, max-age=86400' }).end(); return true; }
+    const categoryQuery = topic.category_id
+      ? supabaseRequest(supabaseAnonKey, 'rest/v1/forum_categories?select=id,title&id=eq.' + encodeURIComponent(topic.category_id) + '&is_active=eq.true&limit=1', { timeoutMs: 12000 })
+      : Promise.resolve(null);
+    const repliesQuery = supabaseRequest(supabaseAnonKey,
+      'rest/v1/forum_replies?select=id,body,author_display_name,created_at&topic_id=eq.' + encodeURIComponent(topicId) + '&is_hidden=eq.false&order=created_at.asc&limit=200',
+      { timeoutMs: 12000 });
+    const [categoryResult, repliesResult] = await Promise.all([categoryQuery, repliesQuery]);
+    if (repliesResult && !repliesResult.ok) { response.writeHead(503, { 'Cache-Control': 'no-store' }).end('Forum replies are temporarily unavailable.'); return true; }
+    const categoryRows = categoryResult && categoryResult.ok ? await categoryResult.json() : [];
+    const replies = repliesResult ? await repliesResult.json() : [];
+    const html = renderForumTopicPage(topic, Array.isArray(categoryRows) && categoryRows[0] ? categoryRows[0].title : 'Workshop discussion', Array.isArray(replies) ? replies : []);
+    response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300, stale-while-revalidate=1800', 'X-Content-Type-Options': 'nosniff' });
+    response.end(request.method === 'HEAD' ? undefined : html);
+  } catch (error) {
+    console.warn('[forum-seo] Public topic render failed.', { message: error.message });
+    response.writeHead(503, { 'Cache-Control': 'no-store' }).end('Forum topic is temporarily unavailable.');
+  }
+  return true;
+}
+
 async function handleDtcSeoRequest(request, response, pathname) {
   if (request.method !== 'GET' && request.method !== 'HEAD') { response.writeHead(405, { Allow: 'GET, HEAD' }).end(); return true; }
   const match = pathname.match(/^\/dtc\/([PBCU][0-3][0-9A-F]{3})\/?$/i);
@@ -2184,6 +2249,28 @@ async function handlePublicSoftwareSeoRequest(request, response, pathname) {
         console.warn('[software-seo] Dynamic sitemap unavailable; serving static sitemap.', { message: error.message });
       }
     }
+    if (hasSafeSupabaseConfig && sitemap.includes('</urlset>')) {
+      try {
+        const forumResult = await supabaseRequest(supabaseAnonKey,
+          'rest/v1/forum_topics?select=id,title,updated_at,created_at&is_hidden=eq.false&order=updated_at.desc&limit=1000',
+          { timeoutMs: 12000 });
+        if (forumResult.ok) {
+          const forumTopics = await forumResult.json();
+          const entries = (Array.isArray(forumTopics) ? forumTopics : [])
+            .filter(topic => topic && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(topic.id || '')))
+            .map(topic => {
+              const lastmod = topic.updated_at || topic.created_at;
+              const date = lastmod && !Number.isNaN(Date.parse(lastmod)) ? '<lastmod>' + new Date(lastmod).toISOString().slice(0, 10) + '</lastmod>' : '';
+              return '<url><loc>https://ecufileservice.in' + forumTopicPath(topic) + '</loc>' + date + '<changefreq>weekly</changefreq><priority>0.7</priority></url>';
+            }).join('');
+          if (entries) sitemap = sitemap.replace('</urlset>', entries + '</urlset>');
+        } else {
+          console.warn('[forum-seo] Public topic sitemap query failed; serving the base sitemap.', { status: forumResult.status });
+        }
+      } catch (error) {
+        console.warn('[forum-seo] Public topic sitemap unavailable; serving the base sitemap.', { message: error.message });
+      }
+    }
     response.writeHead(200, {
       'Content-Type': 'application/xml; charset=utf-8',
       'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
@@ -2253,6 +2340,13 @@ function createHttpServer() {
     }
     let pathname;
     try { pathname = decodeURIComponent(requestUrl.pathname); } catch { response.writeHead(400).end('Bad request'); return; }
+    if (pathname.startsWith('/forum/topic/')) {
+      handlePublicForumTopicRequest(request, response, pathname).catch(error => {
+        if (!response.writableEnded) response.writeHead(500).end('Request failed');
+        console.warn('[forum-seo] Public topic route failed.', { message: error.message });
+      });
+      return;
+    }
     if (pathname === '/sitemap.xml' || pathname.startsWith('/software/')) {
       handlePublicSoftwareSeoRequest(request, response, pathname).catch(error => {
         if (!response.writableEnded) response.writeHead(500).end('Request failed');
