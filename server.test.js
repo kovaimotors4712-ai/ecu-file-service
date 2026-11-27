@@ -629,6 +629,7 @@ test('central moderation can suspend and restore workshop listings without expos
   const restored=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'workshops',id,action:'restore'}});
   assert.equal(restored.response.status,200);
   assert.equal(centralModerationTables.workshops.get(id).status,'approved');
+  assert.equal(centralModerationTables.community_admin_audit.size,2);
   const removed=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'workshops',id,action:'delete',confirmPermanentDelete:true}});
   assert.equal(removed.response.status,409);
   assert.ok(centralModerationTables.workshops.has(id));
