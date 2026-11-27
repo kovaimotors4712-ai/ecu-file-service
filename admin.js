@@ -990,8 +990,8 @@
       const canHide=['forum_topics','forum_replies','forum_chat_messages','workshop_reviews','workshops'].includes(type);
       const canEdit=['forum_topics','forum_replies','workshop_reviews'].includes(type);
       const reportActions=isReport&&!isResolved?((type==='workshop_reports'?'<button type="button" class="button button-ghost" data-central-action="investigate" data-central-type="'+type+'" data-central-id="'+id+'">Investigate</button>':'')+'<button type="button" class="button button-ghost" data-central-action="resolve" data-central-type="'+type+'" data-central-id="'+id+'">Resolve</button><button type="button" class="button button-ghost" data-central-action="dismiss" data-central-type="'+type+'" data-central-id="'+id+'">Dismiss</button>'):'';
-      const visibilityAction=type==='workshop_reviews'?(item.status==='pending'?'publish':hidden?'restore':'hide'):(hidden?'restore':'hide');
-      const visibilityLabel=visibilityAction==='publish'?'Publish':visibilityAction==='restore'?'Restore':'Hide';
+      const visibilityAction=type==='workshop_reviews'?(item.status==='pending'?'publish':hidden?'restore':'hide'):type==='workshops'?(item.status==='approved'?'hide':hidden?'restore':'publish'):(hidden?'restore':'hide');
+      const visibilityLabel=type==='workshops'&&visibilityAction==='publish'?'Approve':visibilityAction==='publish'?'Publish':visibilityAction==='restore'?'Restore':'Hide';
       const visibilityActions=canHide?'<button type="button" class="button button-ghost" data-central-action="'+visibilityAction+'" data-central-type="'+type+'" data-central-id="'+id+'">'+visibilityLabel+'</button>':'';
       const editAction=canEdit?'<button type="button" class="button button-ghost" data-central-action="edit" data-central-type="'+type+'" data-central-id="'+id+'">Edit</button>':'';
       const removeAction=type==='workshops'?'':'<button type="button" class="button button-ghost" style="border-color:#b91c1c;color:#b91c1c" data-central-action="delete" data-central-type="'+type+'" data-central-id="'+id+'">Delete</button>';
