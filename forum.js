@@ -100,7 +100,7 @@
         (topic.is_locked ? "<span class='topic-locked'>LOCKED</span>" : '') +
         (topic.accepted_reply_id ? "<span class='topic-tag'>SOLVED</span>" : '') +
         (Number(topic.reply_count || 0) === 0 ? "<span class='topic-tag'>UNANSWERED</span>" : "<span class='topic-tag'>" + Number(topic.reply_count || 0) + (Number(topic.reply_count || 0) === 1 ? ' REPLY' : ' REPLIES') + "</span>") + "</div>" +
-        "<h3><button type='button' class='topic-open' data-topic-id='" + escapeHtml(topic.id) + "'>" + escapeHtml(topic.title) + "</button></h3>" +
+        "<h3><a class='topic-open topic-index-link' href='/forum/topic/" + encodeURIComponent(topic.id) + "/" + String(topic.title || 'discussion').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) + "'>" + escapeHtml(topic.title) + "</a></h3>" +
         "<p class='topic-preview'>" + escapeHtml(preview) + "</p>" +
         "<div class='topic-meta'><span>By <strong>" + escapeHtml(displayNameFor(topic.author_id, profiles, topic)) + "</strong>" + authorLabelMarkup(topic) + "</span><span>" + escapeHtml(formatDate(topic.created_at)) + "</span></div>" +
         "</article>";
