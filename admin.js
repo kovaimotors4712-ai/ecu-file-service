@@ -897,7 +897,7 @@
       const status=memberStatus(u),safeId=escape(u.id),safeEmail=escape(u.email||'(no email)');
       const created=u.created_at?new Date(u.created_at).toLocaleDateString():'—';
       const last=u.last_sign_in_at?new Date(u.last_sign_in_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'Never signed in';
-      return '<article style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="overflow-wrap:anywhere">'+safeEmail+'</strong><span>'+status+' · '+(u.role==='admin'?'Administrator':'Member')+'</span></div><small>Created '+created+' · Last sign-in '+last+'</small><small style="overflow-wrap:anywhere;color:#68756f">ID: '+safeId+'</small>'+(u.role==='admin'?'<p>Protected administrator account</p>':'<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="button button-ghost" data-member-action="'+(status==='Suspended'?'unban':'ban')+'" data-member-id="'+safeId+'">'+(status==='Suspended'?'Restore access':'Suspend access')+'</button><button type="button" class="button button-ghost" data-member-action="delete" data-member-id="'+safeId+'" style="border-color:#b91c1c;color:#b91c1c">Delete account</button></div>')+'</article>';
+      return '<article data-central-id="'+id+'" data-current-title="'+escape(item.title||'')+'" style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="overflow-wrap:anywhere">'+safeEmail+'</strong><span>'+status+' · '+(u.role==='admin'?'Administrator':'Member')+'</span></div><small>Created '+created+' · Last sign-in '+last+'</small><small style="overflow-wrap:anywhere;color:#68756f">ID: '+safeId+'</small>'+(u.role==='admin'?'<p>Protected administrator account</p>':'<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="button button-ghost" data-member-action="'+(status==='Suspended'?'unban':'ban')+'" data-member-id="'+safeId+'">'+(status==='Suspended'?'Restore access':'Suspend access')+'</button><button type="button" class="button button-ghost" data-member-action="delete" data-member-id="'+safeId+'" style="border-color:#b91c1c;color:#b91c1c">Delete account</button></div>')+'</article>';
     }).join('');
     memberPrev.disabled=memberPage<=1;
     memberNext.disabled=memberPage>=pageCount;
@@ -952,6 +952,8 @@
   const moderationMessage = document.querySelector('#central-moderation-message');
   const moderationFilter = document.querySelector('#central-moderation-filter');
   const auditList = document.querySelector('#central-admin-audit-list');
+  const moderationSearch = document.querySelector('#central-moderation-search');
+  let centralModerationItems = [];
 
   async function centralModerationRequest(method='GET', body=null) {
     const session=backend.getSession();
@@ -964,7 +966,7 @@
     return result;
   }
   function moderationPreview(item) {
-    return String(item.title||item.body||item.reason||item.admin_note||'').slice(0,360);
+    return [item.title,item.body,item.reason,item.admin_note].filter(Boolean).join(' — ').slice(0,520);
   }
   function moderationStatus(item) {
     if(item.is_hidden===true)return 'Hidden';
@@ -972,8 +974,10 @@
   }
   function renderCentralModeration(items) {
     if(!moderationList)return;
-    if(!items.length){moderationList.textContent='No moderation records found for this filter.';return;}
-    moderationList.innerHTML=items.map(item=>{
+    const query=(moderationSearch?.value||'').trim().toLowerCase();
+    const filtered=items.filter(item=>!query||[item.title,item.body,item.reason,item.admin_note,item.author_display_name,item.id].some(value=>String(value||'').toLowerCase().includes(query)));
+    if(!filtered.length){moderationList.textContent='No matching moderation records found.';return;}
+    moderationList.innerHTML=filtered.map(item=>{
       const type=escape(item.content_type||'');
       const id=escape(item.id||'');
       const preview=escape(moderationPreview(item));
@@ -1007,7 +1011,8 @@
     moderationMessage.classList.remove('admin-error');
     try {
       const result=await centralModerationRequest('GET');
-      renderCentralModeration(Array.isArray(result.items)?result.items:[]);
+      centralModerationItems=Array.isArray(result.items)?result.items:[];
+      renderCentralModeration(centralModerationItems);
       renderCentralAudit(result.audit||[]);
       moderationMessage.textContent='Loaded '+(result.items?.length||0)+' records. Hidden content remains stored and can be restored.';
     } catch(error) {
@@ -1031,7 +1036,7 @@
       const next=prompt('Edit the content:',current);
       if(next===null)return;
       if(itemType==='forum_topics'||itemType==='workshop_reviews') {
-        const currentTitle=card?.querySelector('strong')?.textContent||'';
+        const currentTitle=card?.dataset.currentTitle||'';
         const title=prompt('Edit the title:',currentTitle);
         if(title===null)return;
         body.title=title;body.body=next;
@@ -1059,6 +1064,7 @@
   });
   document.querySelector('#central-moderation-refresh')?.addEventListener('click',loadCentralModeration);
   moderationFilter?.addEventListener('change',loadCentralModeration);
+  moderationSearch?.addEventListener('input',()=>renderCentralModeration(centralModerationItems));
 
   const adminForumForm = document.querySelector('#admin-forum-post-form');
   const adminForumCategory = document.querySelector('#admin-forum-category');
