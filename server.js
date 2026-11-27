@@ -22,7 +22,6 @@ const maxOriginalFileBytes = 50 * 1024 * 1024;
 const maxAirbagPhotoBytes = 10 * 1024 * 1024;
 const allowedAirbagPhotoMimes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const allowedCorsOrigins = new Set(['https://ecufileservice.in', 'https://www.ecufileservice.in']);
-const premiumTwoWheelerBrands = new Set(['Aprilia','BMW Motorrad','Benelli','Ducati','Harley-Davidson','Kawasaki','KTM','Moto Guzzi','MV Agusta','Triumph']);
 const electricOnlyModels = {
   'Tata Motors':['Nexon EV','Tiago EV','Tigor EV','Punch EV','Curvv EV','Harrier EV','Sierra EV'],
   'Tata Motors Commercial Vehicles':['Ace EV'],
@@ -293,7 +292,6 @@ function normalizePaymentRequest(value) {
     throw new Error('Complete the required vehicle, contact and valid email details.');
   }
   if (isUnsupportedElectricModel(clean(value?.vehicleBrand), clean(value?.vehicleModel))) throw new Error('Electric vehicles are not currently supported. Select a non-EV vehicle variant.');
-  if (clean(value?.vehicleType) === 'Two-wheeler' && !premiumTwoWheelerBrands.has(clean(value?.vehicleBrand))) throw new Error('Two-wheeler requests are limited to selected imported/premium motorcycle brands.');
   if (clean(value?.vehicleType) !== 'Two-wheeler' && twoWheelerOnlyBrands.has(clean(value?.vehicleBrand))) throw new Error('Select the imported/premium two-wheeler vehicle type for this motorcycle brand.');
   if (year !== null && (!Number.isInteger(year) || year < 1950 || year > 2100)) throw new Error('Enter a valid vehicle year.');
   if (category === 'AIRBAG' && year === null) throw new Error('Year is required for Airbag Crash Clear requests.');
