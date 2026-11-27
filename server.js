@@ -1973,6 +1973,7 @@ async function handleAdminSoftwareProducts(request,response){
 
 
 const CENTRAL_MODERATION_RESOURCES = {
+  forum_categories: { table:'forum_categories', fields:'id,slug,title,description,sort_order,is_active,created_at', order:'sort_order.asc' },
   forum_topics: { table:'forum_topics', fields:'id,title,body,author_display_name,created_at,is_hidden,is_locked', order:'created_at.desc' },
   forum_replies: { table:'forum_replies', fields:'id,topic_id,body,author_display_name,created_at,is_hidden', order:'created_at.desc' },
   forum_chat_messages: { table:'forum_chat_messages', fields:'id,author_id,body,created_at,is_hidden,hidden_at', order:'created_at.desc' },
@@ -2042,6 +2043,7 @@ async function handleAdminCentralModeration(request, response, url) {
     let method = 'PATCH', payload = {};
     if (action === 'delete') {
       if (type === 'workshops') { jsonResponse(response,409,{error:'Workshop records are retained to preserve reviews and reports. Suspend the listing to remove it from public view.'}); return true; }
+      if (type === 'forum_categories') { jsonResponse(response,409,{error:'Forum categories are retained to protect existing discussions. Deactivate the category instead.'}); return true; }
       if (body.confirmPermanentDelete !== true) { jsonResponse(response,400,{error:'Permanent deletion requires explicit confirmation.'}); return true; }
       method = 'DELETE';
     } else if (type === 'forum_topics' || type === 'forum_replies') {
@@ -2058,6 +2060,14 @@ async function handleAdminCentralModeration(request, response, url) {
           payload={body:text};
         }
       } else { jsonResponse(response,400,{error:'This action is not available for this content type.'}); return true; }
+    } else if (type === 'forum_categories') {
+      if (action === 'hide') payload={is_active:false};
+      else if (action === 'restore' || action === 'publish') payload={is_active:true};
+      else if (action === 'edit') {
+        const title=cleanSiteText(body.title,100), description=cleanSiteText(body.body,500);
+        if (title.length<3 || !description) { jsonResponse(response,400,{error:'Enter a category title and description.'}); return true; }
+        payload={title,description};
+      } else { jsonResponse(response,400,{error:'Forum categories can only be edited, deactivated or restored here.'}); return true; }
     } else if (type === 'forum_chat_messages') {
       if (action === 'hide') payload={is_hidden:true,hidden_at:new Date().toISOString(),hidden_by:admin.id};
       else if (action === 'restore') payload={is_hidden:false,hidden_at:null,hidden_by:null};
