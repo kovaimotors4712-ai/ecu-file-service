@@ -266,7 +266,7 @@ async function supabaseRequest(token, route, { method = 'GET', body, prefer, hea
 function serviceToken() { return supabaseServiceRoleKey || supabaseAnonKey; }
 
 function sanitizeFileName(value) {
-  return String(value || 'original.bin').normalize('NFKD').replace(/[^\w.-]+/g, '_').slice(-180) || 'original.bin';
+  return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
 }
 function orderHash(order) { return crypto.createHash('sha256').update(JSON.stringify(order)).digest('hex'); }
 function paymentProof(customerId, intentId, provider, providerOrderId, providerPaymentId, amount, requestSha256) {
