@@ -595,6 +595,43 @@ test('dynamic DTC landing pages render known generic codes and return 404 for un
 
 
 
+test('public forum topic pages render only visible topics and visible replies as crawlable HTML', async () => {
+  const topicId = '123e4567-e89b-42d3-a456-426614174000';
+  const publicTopic = {
+    id: topicId, category_id: '223e4567-e89b-42d3-a456-426614174000',
+    title: 'Public DTC diagnostic discussion', body: 'A public workshop question about an intermittent sensor circuit.',
+    author_display_name: 'Workshop Member', created_at: '2026-11-27T08:00:00.000Z', is_hidden: false
+  };
+  const visibleReply = {
+    id: '323e4567-e89b-42d3-a456-426614174000', body: 'Check the connector and compare live data with the service procedure.',
+    author_display_name: 'Another Member', created_at: '2026-11-27T09:00:00.000Z'
+  };
+  setTestUpstreamRequest(async (urlValue, options = {}) => {
+    const url = String(urlValue);
+    if (url.includes('/rest/v1/forum_topics?')) return response(200, [publicTopic]);
+    if (url.includes('/rest/v1/forum_categories?')) return response(200, [{ id: publicTopic.category_id, title: 'Diagnostics', is_active: true }]);
+    if (url.includes('/rest/v1/forum_replies?')) return response(200, [visibleReply]);
+    return upstream(urlValue, options);
+  });
+  try {
+    const page = await call('/forum/topic/' + topicId + '/public-dtc-diagnostic-discussion');
+    assert.equal(page.response.status, 200);
+    assert.match(page.response.headers.get('content-type') || '', /text\/html/);
+    assert.match(page.payload, /<meta name="robots" content="index,follow">/);
+    assert.match(page.payload, /rel="canonical" href="https:\/\/ecufileservice\.in\/forum\/topic\//);
+    assert.match(page.payload, /Public DTC diagnostic discussion/);
+    assert.match(page.payload, /Check the connector and compare live data/);
+    assert.match(page.payload, /DiscussionForumPosting/);
+    const missing = await call('/forum/topic/423e4567-e89b-42d3-a456-426614174000/hidden-topic');
+    assert.equal(missing.response.status, 200);
+  } finally {
+    setTestUpstreamRequest(upstream);
+  }
+});
+
+
+
+
 test('admin forum editorial publishing is labelled and guarded by a single invoker transaction', () => {
   const adminHtml = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
   const adminJs = fs.readFileSync(path.join(__dirname, 'admin.js'), 'utf8');
