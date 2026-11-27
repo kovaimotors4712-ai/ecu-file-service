@@ -608,7 +608,7 @@ test('public forum topic pages render only visible topics and visible replies as
   };
   setTestUpstreamRequest(async (urlValue, options = {}) => {
     const url = String(urlValue);
-    if (url.includes('/rest/v1/forum_topics?')) return response(200, [publicTopic]);
+    if (url.includes('/rest/v1/forum_topics?')) return response(200, url.includes(topicId) ? [publicTopic] : []);
     if (url.includes('/rest/v1/forum_categories?')) return response(200, [{ id: publicTopic.category_id, title: 'Diagnostics', is_active: true }]);
     if (url.includes('/rest/v1/forum_replies?')) return response(200, [visibleReply]);
     return upstream(urlValue, options);
@@ -622,8 +622,10 @@ test('public forum topic pages render only visible topics and visible replies as
     assert.match(page.payload, /Public DTC diagnostic discussion/);
     assert.match(page.payload, /Check the connector and compare live data/);
     assert.match(page.payload, /DiscussionForumPosting/);
+    const forumClient = fs.readFileSync(path.join(__dirname, 'forum.js'), 'utf8');
+    assert.match(forumClient, /topic-index-link/);
     const missing = await call('/forum/topic/423e4567-e89b-42d3-a456-426614174000/hidden-topic');
-    assert.equal(missing.response.status, 200);
+    assert.equal(missing.response.status, 404);
   } finally {
     setTestUpstreamRequest(upstream);
   }
