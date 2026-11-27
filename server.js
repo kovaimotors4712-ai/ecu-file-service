@@ -2102,7 +2102,7 @@ async function handlePublicForumTopicRequest(request, response, pathname) {
   const topicId = match[1].toLowerCase();
   try {
     const topicResult = await supabaseRequest(supabaseAnonKey,
-      'rest/v1/forum_topics?select=id,category_id,title,body,author_display_name,created_at,is_hidden& id=eq.' .replace(' & ', '&') + encodeURIComponent(topicId) + '&is_hidden=eq.false&limit=1',
+      'rest/v1/forum_topics?select=id,category_id,title,body,author_display_name,created_at,is_hidden&id=eq.' + encodeURIComponent(topicId) + '&is_hidden=eq.false&limit=1',
       { timeoutMs: 12000 });
     if (!topicResult.ok) { response.writeHead(503, { 'Cache-Control': 'no-store' }).end('Forum topic is temporarily unavailable.'); return true; }
     const rows = await topicResult.json();
