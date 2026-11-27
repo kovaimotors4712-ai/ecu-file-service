@@ -1965,6 +1965,121 @@ async function handleAdminSoftwareProducts(request,response){
 }
 
 
+const CENTRAL_MODERATION_RESOURCES = {
+  forum_topics: { table:'forum_topics', fields:'id,title,body,author_display_name,created_at,is_hidden,is_locked', order:'created_at.desc' },
+  forum_replies: { table:'forum_replies', fields:'id,topic_id,body,author_display_name,created_at,is_hidden', order:'created_at.desc' },
+  forum_chat_messages: { table:'forum_chat_messages', fields:'id,author_id,body,created_at,is_hidden,hidden_at', order:'created_at.desc' },
+  workshop_reviews: { table:'workshop_reviews', fields:'id,workshop_id,reviewer_id,rating,title,body,status,created_at,updated_at', order:'created_at.desc' },
+  forum_reports: { table:'forum_reports', fields:'id,reporter_id,topic_id,reply_id,reason,status,created_at,resolved_by,resolved_at', order:'created_at.desc' },
+  workshop_reports: { table:'workshop_reports', fields:'id,reporter_id,workshop_id,review_id,reason,status,admin_note,created_at,resolved_by,resolved_at', order:'created_at.desc' }
+};
+const CENTRAL_MODERATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function writeCentralAdminAudit(admin, action, targetType, targetId, details = {}) {
+  const result = await supabaseRequest(serviceToken(), 'rest/v1/community_admin_audit', {
+    method:'POST', prefer:'return=minimal',
+    body:{ actor_id:admin.id, action, target_type:targetType, target_id:targetId || null, details },
+    timeoutMs:12000
+  });
+  if (!result.ok) {
+    const detail = await result.text().catch(()=>'');
+    console.warn('[admin-audit] Activity could not be recorded.', { action, targetType, status:result.status, detail:detail.slice(0,300) });
+    throw new Error('The change could not be safely logged. No further action was taken.');
+  }
+}
+
+async function handleAdminCentralModeration(request, response, url) {
+  const admin = await requireAdmin(request);
+  if (!admin) { jsonResponse(response,403,{error:'Administrator role is required.'}); return true; }
+  if (!supabaseServiceRoleKey) { jsonResponse(response,503,{error:'Central moderation is not configured.'}); return true; }
+  const token = serviceToken();
+  if (request.method === 'GET') {
+    const type = String(url.searchParams.get('type') || 'all');
+    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 50)));
+    const selected = type === 'all' ? Object.keys(CENTRAL_MODERATION_RESOURCES) : [type];
+    if (selected.some(key => !CENTRAL_MODERATION_RESOURCES[key])) { jsonResponse(response,400,{error:'Unknown moderation content type.'}); return true; }
+    const items = [];
+    for (const key of selected) {
+      const resource = CENTRAL_MODERATION_RESOURCES[key];
+      const result = await supabaseRequest(token,'rest/v1/'+resource.table+'?select='+resource.fields+'&order='+resource.order+'&limit='+limit,{timeoutMs:15000});
+      if (!result.ok) { jsonResponse(response,502,{error:'Could not load '+key.replaceAll('_',' ')+'.'}); return true; }
+      const rows = await result.json();
+      for (const item of rows) items.push({ ...item, content_type:key });
+    }
+    items.sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+    const auditResult = await supabaseRequest(token,'rest/v1/community_admin_audit?select=id,actor_id,action,target_type,target_id,details,created_at&order=created_at.desc&limit=50',{timeoutMs:12000});
+    if (!auditResult.ok) { jsonResponse(response,502,{error:'Admin activity log could not be loaded.'}); return true; }
+    jsonResponse(response,200,{items,audit:await auditResult.json(),limit});
+    return true;
+  }
+  if (request.method !== 'POST') { jsonResponse(response,405,{error:'Method Not Allowed'}); return true; }
+  try {
+    const body = await readJson(request,16000);
+    const type = String(body.type || '');
+    const action = String(body.action || '');
+    const id = String(body.id || '');
+    const resource = CENTRAL_MODERATION_RESOURCES[type];
+    if (!resource || !CENTRAL_MODERATION_ID.test(id)) { jsonResponse(response,400,{error:'Choose valid content and a valid item.'}); return true; }
+    const supported = ['hide','restore','delete','edit','resolve','dismiss','investigate','publish'];
+    if (!supported.includes(action)) { jsonResponse(response,400,{error:'Unsupported moderation action.'}); return true; }
+
+    const endpoint = 'rest/v1/'+resource.table+'?id=eq.'+encodeURIComponent(id);
+    let method = 'PATCH', payload = {};
+    if (action === 'delete') {
+      if (body.confirmPermanentDelete !== true) { jsonResponse(response,400,{error:'Permanent deletion requires explicit confirmation.'}); return true; }
+      method = 'DELETE';
+    } else if (type === 'forum_topics' || type === 'forum_replies') {
+      if (action === 'hide') payload = { is_hidden:true };
+      else if (action === 'restore') payload = { is_hidden:false };
+      else if (action === 'edit') {
+        if (type === 'forum_topics') {
+          const title=cleanSiteText(body.title,160), text=cleanSiteText(body.body,12000);
+          if (title.length<8 || !text) { jsonResponse(response,400,{error:'Enter a valid topic title and content.'}); return true; }
+          payload={title,body:text};
+        } else {
+          const text=cleanSiteText(body.body,8000);
+          if (!text) { jsonResponse(response,400,{error:'Reply content cannot be empty.'}); return true; }
+          payload={body:text};
+        }
+      } else { jsonResponse(response,400,{error:'This action is not available for this content type.'}); return true; }
+    } else if (type === 'forum_chat_messages') {
+      if (action === 'hide') payload={is_hidden:true,hidden_at:new Date().toISOString(),hidden_by:admin.id};
+      else if (action === 'restore') payload={is_hidden:false,hidden_at:null,hidden_by:null};
+      else { jsonResponse(response,400,{error:'Chat messages can only be hidden, restored or permanently deleted.'}); return true; }
+    } else if (type === 'workshop_reviews') {
+      if (action === 'hide') payload={status:'hidden'};
+      else if (action === 'restore' || action === 'publish') payload={status:'published'};
+      else if (action === 'edit') {
+        const title=cleanSiteText(body.title,120), text=cleanSiteText(body.body,2000);
+        if (title.length<3 || text.length<10) { jsonResponse(response,400,{error:'Enter a valid review title and content.'}); return true; }
+        payload={title,body:text};
+      } else { jsonResponse(response,400,{error:'This action is not available for reviews.'}); return true; }
+    } else {
+      if (action === 'resolve' || action === 'dismiss' || action === 'investigate') {
+        payload={status:action==='resolve'?'resolved':action==='dismiss'?'dismissed':'investigating',resolved_by:action==='investigate'?null:admin.id,resolved_at:action==='investigate'?null:new Date().toISOString()};
+        if (type === 'workshop_reports' && body.admin_note !== undefined) payload.admin_note=cleanSiteText(body.admin_note,2000);
+      } else { jsonResponse(response,400,{error:'Reports can only be reviewed, resolved, dismissed or deleted.'}); return true; }
+    }
+
+    const result = await supabaseRequest(token,endpoint,{method,body:method==='PATCH'?payload:undefined,prefer:'return=representation',timeoutMs:15000});
+    if (!result.ok) {
+      const detail=await result.text().catch(()=>'');
+      jsonResponse(response,result.status===404?404:502,{error:result.status===404?'Content not found.':'Moderation action failed. Check the database policy and retry.'});
+      console.warn('[central-moderation] Update failed',{type,action,status:result.status,detail:detail.slice(0,300)});
+      return true;
+    }
+    const rows=method==='DELETE'?await result.json().catch(()=>[]):await result.json().catch(()=>[]);
+    if (!rows?.length) { jsonResponse(response,404,{error:'Content not found or no change was applied.'}); return true; }
+    await writeCentralAdminAudit(admin,action,type,id,{content_type:type,action});
+    jsonResponse(response,200,{success:true,action,type,id,item:rows[0]||null});
+    return true;
+  } catch(error) {
+    jsonResponse(response,error.statusCode||502,{error:error.message||'Moderation action could not be completed.'});
+    return true;
+  }
+}
+
+
 async function handleAdminUsers(request,response){
   const admin=await requireAdmin(request);
   if(!admin){jsonResponse(response,403,{error:'Administrator role is required.'});return true;}
@@ -2171,6 +2286,7 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/software-products') return handlePublicSoftwareProducts(request, response);
   if (url.pathname === '/api/admin/software-products') return handleAdminSoftwareProducts(request, response);
   if (url.pathname === '/api/admin/users') return handleAdminUsers(request, response);
+  if (url.pathname === '/api/admin/moderation') return handleAdminCentralModeration(request, response, url);
   if (url.pathname === '/api/admin/advertising/quotes') return handleAdminAdvertisingQuotes(request, response);
   if (url.pathname === '/api/advertising/quote') return handlePublicAdvertisingQuote(request, response);
   if (url.pathname === '/api/advertising/payment/create-order') return handleCreateAdvertisingPayment(request, response);
