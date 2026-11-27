@@ -2066,8 +2066,7 @@ function renderDtcSeoPage(item, code) {
 }
 
 function forumTopicSlug(value) {
-  return String(value || '').normalize('NFKD').replace(/[\\u0300-\\u036f]/g, '')
-    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'discussion';
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'discussion';
 }
 function forumTopicPath(topic) {
   return '/forum/topic/' + String(topic.id) + '/' + forumTopicSlug(topic.title);
@@ -2341,6 +2340,13 @@ function createHttpServer() {
     }
     let pathname;
     try { pathname = decodeURIComponent(requestUrl.pathname); } catch { response.writeHead(400).end('Bad request'); return; }
+    if (pathname.startsWith('/forum/topic/')) {
+      handlePublicForumTopicRequest(request, response, pathname).catch(error => {
+        if (!response.writableEnded) response.writeHead(500).end('Request failed');
+        console.warn('[forum-seo] Public topic route failed.', { message: error.message });
+      });
+      return;
+    }
     if (pathname === '/sitemap.xml' || pathname.startsWith('/software/')) {
       handlePublicSoftwareSeoRequest(request, response, pathname).catch(error => {
         if (!response.writableEnded) response.writeHead(500).end('Request failed');
