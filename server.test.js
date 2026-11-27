@@ -994,7 +994,7 @@ test('accepts custom two-wheeler brands for individual compatibility review', as
     request.vehicleType = 'Two-wheeler';
     request.vehicleBrand = brand;
     request.vehicleModel = model;
-    const result = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request } });
+    const result = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request, clientAttemptId:crypto.randomUUID() } });
     assert.equal(result.response.status,200,brand);
   }
 });
