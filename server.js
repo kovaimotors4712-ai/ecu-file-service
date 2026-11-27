@@ -1984,8 +1984,9 @@ async function writeCentralAdminAudit(admin, action, targetType, targetId, detai
   if (!result.ok) {
     const detail = await result.text().catch(()=>'');
     console.warn('[admin-audit] Activity could not be recorded.', { action, targetType, status:result.status, detail:detail.slice(0,300) });
-    throw new Error('The change could not be safely logged. No further action was taken.');
+    return false;
   }
+  return true;
 }
 
 async function handleAdminCentralModeration(request, response, url) {
@@ -2070,8 +2071,8 @@ async function handleAdminCentralModeration(request, response, url) {
     }
     const rows=method==='DELETE'?await result.json().catch(()=>[]):await result.json().catch(()=>[]);
     if (!rows?.length) { jsonResponse(response,404,{error:'Content not found or no change was applied.'}); return true; }
-    await writeCentralAdminAudit(admin,action,type,id,{content_type:type,action});
-    jsonResponse(response,200,{success:true,action,type,id,item:rows[0]||null});
+    const auditLogged = await writeCentralAdminAudit(admin,action,type,id,{content_type:type,action});
+    jsonResponse(response,200,{success:true,auditLogged,action,type,id,item:rows[0]||null});
     return true;
   } catch(error) {
     jsonResponse(response,error.statusCode||502,{error:error.message||'Moderation action could not be completed.'});
