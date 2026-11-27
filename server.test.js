@@ -1003,7 +1003,7 @@ test('accepts an unlisted two-wheeler brand for individual compatibility review'
   request.vehicleBrand = 'Royal Enfield';
   request.vehicleModel = 'Classic 350';
   const result = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request } });
-  assert.equal(result.response.status,200);
+  assert.equal(result.response.status,200,JSON.stringify(result.payload));
   assert.ok(result.payload.intentId);
 });
 
