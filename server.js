@@ -293,7 +293,7 @@ function normalizePaymentRequest(value) {
     throw new Error('Complete the required vehicle, contact and valid email details.');
   }
   if (isUnsupportedElectricModel(clean(value?.vehicleBrand), clean(value?.vehicleModel))) throw new Error('Electric vehicles are not currently supported. Select a non-EV vehicle variant.');
-  if (clean(value?.vehicleType) === 'Two-wheeler' && !premiumTwoWheelerBrands.has(clean(value?.vehicleBrand))) throw new Error('Two-wheeler requests are limited to selected imported/premium motorcycle brands.');
+  if (clean(value?.vehicleType) === 'Two-wheeler' && !premiumTwoWheelerBrands.has(clean(value?.vehicleBrand)) && twoWheelerOnlyBrands.has(clean(value?.vehicleBrand))) throw new Error('This listed motorcycle brand is not currently enabled for direct requests. Unlisted makes may be submitted for individual compatibility review.');
   if (clean(value?.vehicleType) !== 'Two-wheeler' && twoWheelerOnlyBrands.has(clean(value?.vehicleBrand))) throw new Error('Select the imported/premium two-wheeler vehicle type for this motorcycle brand.');
   if (year !== null && (!Number.isInteger(year) || year < 1950 || year > 2100)) throw new Error('Enter a valid vehicle year.');
   if (category === 'AIRBAG' && year === null) throw new Error('Year is required for Airbag Crash Clear requests.');
