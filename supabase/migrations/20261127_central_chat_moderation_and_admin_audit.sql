@@ -31,6 +31,10 @@ using (
   or public.forum_is_moderator()
 );
 
+-- Table privilege enables the operation; the RLS policy below restricts it
+-- to trusted admins/moderators only.
+grant update on public.forum_chat_messages to authenticated;
+
 -- Only trusted admins/moderators can hide or restore chat messages.
 drop policy if exists forum_chat_moderator_update on public.forum_chat_messages;
 create policy forum_chat_moderator_update
