@@ -570,3 +570,5 @@ body.forum-page .forum-header-actions #forum-auth-message{font-size:10px;margin-
  body.forum-page .forum-header-actions .auth-actions{grid-column:auto;display:grid;grid-template-columns:1fr 1fr}
  body.forum-page .forum-header-actions .auth-actions .button{width:100%;min-height:36px}
 }
+
+.topic-index-link{display:inline-block;text-decoration:none}.topic-index-link:hover{text-decoration:underline}
