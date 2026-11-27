@@ -168,7 +168,7 @@
     if (index === 1) {
       const year = values.vehicleYear;
       if (!values.vehicleBrand || !values.vehicleType || !values.vehicleModel) { setError(index, 'Brand, vehicle type and model are required.'); return false; }
-      if (values.vehicleType === 'Two-wheeler' && !premiumTwoWheelerBrands.has(values.vehicleBrand)) { setError(index, 'Two-wheeler requests are limited to selected imported/premium motorcycle brands.'); return false; }
+      if (values.vehicleType === 'Two-wheeler' && !premiumTwoWheelerBrands.has(values.vehicleBrand) && twoWheelerOnlyBrands.has(values.vehicleBrand)) { setError(index, 'This listed motorcycle brand is not currently enabled for direct requests. Use Type Your Own Brand only for a genuinely unlisted make; compatibility will be reviewed individually.'); return false; }
       if (isUnsupportedElectricModel(values.vehicleBrand, values.vehicleModel)) { setError(index, 'Electric vehicles are not supported. Select a supported petrol, diesel, CNG or other non-EV variant.'); return false; }
       if (values.category === 'AIRBAG' && !year) { setError(index, 'Year is required for Airbag Crash Clear requests.'); return false; }
       if (year && (!/^\d{4}$/.test(year) || Number(year)<1950 || Number(year)>2100)) { setError(index, 'Enter a valid vehicle year.'); return false; }
@@ -262,7 +262,8 @@
   function renderBrands(query='') {
     const needle = query.trim().toLowerCase();
     const matches = brandsForCurrentVehicleType().filter(brand => !needle || brand.toLowerCase().includes(needle)).slice(0,30);
-    brandResults.innerHTML = matches.map((brand,index)=>`<button type="button" class="brand-option" role="option" data-brand="${escapeHtml(brand)}" aria-selected="false">${escapeHtml(brand)}</button>`).join('');
+    const customBrandOption = '<button type="button" class="brand-option brand-option-custom" role="option" data-action="custom-brand" aria-selected="false">＋ Type Your Own Brand</button>';
+    brandResults.innerHTML = customBrandOption + matches.map((brand,index)=>`<button type="button" class="brand-option" role="option" data-brand="${escapeHtml(brand)}" aria-selected="false">${escapeHtml(brand)}</button>`).join('');
     brandResults.classList.toggle('open', matches.length>0 && document.activeElement===brandInput);
     activeBrandOption = -1;
   }
@@ -270,7 +271,7 @@
   brandInput.addEventListener('input',()=>{renderBrands(brandInput.value);brandInput.setAttribute('aria-expanded','true');});
   brandInput.addEventListener('focus',()=>{renderBrands(brandInput.value);brandInput.setAttribute('aria-expanded','true');});
   brandInput.addEventListener('keydown',event=>{const options=[...brandResults.querySelectorAll('.brand-option')]; if (!options.length) return; if (event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();activeBrandOption=(activeBrandOption+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;options.forEach((o,i)=>o.classList.toggle('keyboard-active',i===activeBrandOption));options[activeBrandOption]?.scrollIntoView({block:'nearest'});} else if(event.key==='Enter'&&activeBrandOption>=0){event.preventDefault();options[activeBrandOption].click();} else if(event.key==='Escape') closeBrandResults();});
-  brandResults.addEventListener('click',event=>{const button=event.target.closest('.brand-option');if(!button)return;pendingCheckoutAttemptId=null;brandInput.value=button.dataset.brand;closeBrandResults();renderModelSuggestions();updateSummary();});
+  brandResults.addEventListener('click',event=>{const button=event.target.closest('.brand-option');if(!button)return;pendingCheckoutAttemptId=null;if(button.dataset.action==='custom-brand'){brandInput.value='';brandInput.placeholder='Type your own vehicle brand…';closeBrandResults();renderModelSuggestions();updateSummary();brandInput.focus();return;}brandInput.value=button.dataset.brand;brandInput.placeholder='Search vehicle brands…';closeBrandResults();renderModelSuggestions();updateSummary();});
   document.addEventListener('click',event=>{if(!event.target.closest('.brand-search-wrap'))closeBrandResults();});
   vehicleTypeSelect?.addEventListener('change',()=>{pendingCheckoutAttemptId=null;const allowed=brandsForCurrentVehicleType();if(brandInput.value && !allowed.includes(brandInput.value)){brandInput.value='';if(vehicleModelInput)vehicleModelInput.value='';}renderBrands(brandInput.value);renderModelSuggestions();updateSummary();});
   brandInput.addEventListener('change',()=>{pendingCheckoutAttemptId=null;renderModelSuggestions();});
