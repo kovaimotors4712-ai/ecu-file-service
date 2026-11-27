@@ -33,6 +33,11 @@ const tokens = {
   admin: 'test-admin-token',
   other: 'test-other-customer-token'
 };
+const centralModerationTables = {
+  forum_topics:new Map(), forum_replies:new Map(), forum_chat_messages:new Map(),
+  workshop_reviews:new Map(), forum_reports:new Map(), workshop_reports:new Map(),
+  community_admin_audit:new Map()
+};
 const softwareSeoFixture = {
   id: '123e4567-e89b-42d3-a456-426614174000',
   title: 'ECU Diagnostic Utility',
@@ -104,6 +109,7 @@ function resetState() {
   state.razorOrderNotes = null;
   state.paypalOrderStatus = 'CREATED';
   state.resendShouldFail = false;
+  for(const table of Object.values(centralModerationTables))table.clear();
 }
 
 function uuidFor(prefix, n) {
@@ -249,6 +255,17 @@ const upstream = async (urlValue, options = {}) => {
     state.resendRequests.push(state.lastResendRequest);
     if (state.resendShouldFail) return response(500, { message: 'synthetic Resend outage' });
     return response(200, { id: 'email-local-1' });
+  }
+
+
+  const moderationTableMatch=url.pathname.match(/^\/rest\/v1\/(forum_topics|forum_replies|forum_chat_messages|workshop_reviews|forum_reports|workshop_reports|community_admin_audit)$/);
+  if(moderationTableMatch){
+    const table=moderationTableMatch[1],rows=centralModerationTables[table],idFilter=url.searchParams.get('id');
+    let selected=[...rows.values()].filter(row=>!idFilter||idFilter==='eq.'+row.id);
+    if(method==='GET')return response(200,selected);
+    if(method==='PATCH'){const body=JSON.parse(options.body||'{}');for(const row of selected)Object.assign(row,body);return response(200,selected.map(row=>({...row})));}
+    if(method==='DELETE'){for(const row of selected)rows.delete(row.id);return response(200,selected.map(row=>({...row})));}
+    if(method==='POST'){const body=JSON.parse(options.body||'{}'),id=crypto.randomUUID(),row={id,created_at:new Date().toISOString(),...body};rows.set(id,row);return response(201,[{...row}]);}
   }
 
   if (url.pathname === '/rest/v1/software_products' && method === 'GET') return response(200, [softwareSeoFixture]);
@@ -568,6 +585,34 @@ async function call(pathname, { method = 'GET', body, token } = {}) {
   try { payload = text ? JSON.parse(text) : null; } catch { payload = text; }
   return { response, payload };
 }
+
+
+test('central moderation API is admin-only, supports reversible chat hiding and records activity', async () => {
+  const id='123e4567-e89b-42d3-a456-426614174111';
+  centralModerationTables.forum_chat_messages.set(id,{id,author_id:customerId,body:'Unsafe test message',created_at:new Date().toISOString(),is_hidden:false});
+  const denied=await call('/api/admin/moderation?type=all',{token:tokens.customer});
+  assert.equal(denied.response.status,403);
+  const loaded=await call('/api/admin/moderation?type=forum_chat_messages',{token:tokens.admin});
+  assert.equal(loaded.response.status,200);
+  assert.equal(loaded.payload.items.length,1);
+  const hidden=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_chat_messages',id,action:'hide'}});
+  assert.equal(hidden.response.status,200);
+  assert.equal(centralModerationTables.forum_chat_messages.get(id).is_hidden,true);
+  assert.equal(centralModerationTables.community_admin_audit.size,1);
+  const restored=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_chat_messages',id,action:'restore'}});
+  assert.equal(restored.response.status,200);
+  assert.equal(centralModerationTables.forum_chat_messages.get(id).is_hidden,false);
+  assert.equal(centralModerationTables.community_admin_audit.size,2);
+});
+
+test('central moderation refuses permanent deletion without explicit confirmation', async () => {
+  const id='123e4567-e89b-42d3-a456-426614174112';
+  centralModerationTables.forum_topics.set(id,{id,title:'Test topic',body:'Test content',is_hidden:false});
+  const result=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_topics',id,action:'delete'}});
+  assert.equal(result.response.status,400);
+  assert.ok(centralModerationTables.forum_topics.has(id));
+});
+
 
 test('dynamic DTC landing pages render known generic codes and return 404 for unknown codes', async () => {
   const fixture = [
