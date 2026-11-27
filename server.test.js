@@ -35,7 +35,7 @@ const tokens = {
 };
 const centralModerationTables = {
   forum_topics:new Map(), forum_replies:new Map(), forum_chat_messages:new Map(),
-  workshop_reviews:new Map(), forum_reports:new Map(), workshop_reports:new Map(),
+  workshop_reviews:new Map(), workshops:new Map(), forum_reports:new Map(), workshop_reports:new Map(),
   community_admin_audit:new Map()
 };
 const softwareSeoFixture = {
@@ -258,7 +258,7 @@ const upstream = async (urlValue, options = {}) => {
   }
 
 
-  const moderationTableMatch=url.pathname.match(/^\/rest\/v1\/(forum_topics|forum_replies|forum_chat_messages|workshop_reviews|forum_reports|workshop_reports|community_admin_audit)$/);
+  const moderationTableMatch=url.pathname.match(/^\/rest\/v1\/(forum_topics|forum_replies|forum_chat_messages|workshop_reviews|workshops|forum_reports|workshop_reports|community_admin_audit)$/);
   if(moderationTableMatch){
     const table=moderationTableMatch[1],rows=centralModerationTables[table],idFilter=url.searchParams.get('id');
     let selected=[...rows.values()].filter(row=>!idFilter||idFilter==='eq.'+row.id);
@@ -615,6 +615,26 @@ test('central moderation preserves forum report status constraints and chat migr
   assert.match(migration,/drop policy if exists forum_chat_read_public/i);
   assert.match(migration,/is_hidden = false/);
   assert.match(migration,/grant update on public\.forum_chat_messages to authenticated/i);
+});
+
+test('central moderation can suspend and restore workshop listings without exposing contact fields or deleting linked records', async () => {
+  const id='123e4567-e89b-42d3-a456-426614174114';
+  centralModerationTables.workshops.set(id,{id,name:'Test Workshop',description:'Workshop listing',status:'approved',is_verified:false});
+  const loaded=await call('/api/admin/moderation?type=workshops',{token:tokens.admin});
+  assert.equal(loaded.response.status,200);
+  assert.equal(loaded.payload.items[0].name,'Test Workshop');
+  const hidden=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'workshops',id,action:'hide'}});
+  assert.equal(hidden.response.status,200);
+  assert.equal(centralModerationTables.workshops.get(id).status,'suspended');
+  const restored=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'workshops',id,action:'restore'}});
+  assert.equal(restored.response.status,200);
+  assert.equal(centralModerationTables.workshops.get(id).status,'approved');
+  const removed=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'workshops',id,action:'delete',confirmPermanentDelete:true}});
+  assert.equal(removed.response.status,409);
+  assert.ok(centralModerationTables.workshops.has(id));
+  const serverSource=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
+  assert.match(serverSource,/fields:'id,name,description,services,address,city,state,pincode,opening_hours,status,is_verified,created_at,updated_at'/);
+  assert.doesNotMatch(serverSource,/workshops: \{[^}]*phone,whatsapp/);
 });
 
 test('central moderation edit cards retain the current title and body for safe prefilled editing', () => {
