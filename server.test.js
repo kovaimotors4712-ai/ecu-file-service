@@ -2367,7 +2367,9 @@ test('key diagnostic and service pages provide valid breadcrumb structured data'
     'car-diagnostic-help.html',
     'car-electrical-diagnostics.html',
     'ecu-fault-code-diagnosis.html',
-    'ecu-file-identification-original-backup.html'
+    'ecu-file-identification-original-backup.html',
+    'membership.html',
+    'vehicle-ecu-wiring-diagnostic-guide.html'
   ];
   for (const file of files) {
     const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
