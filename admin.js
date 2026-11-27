@@ -989,7 +989,7 @@
       const isResolved=['resolved','dismissed'].includes(item.status);
       const canHide=['forum_topics','forum_replies','forum_chat_messages','workshop_reviews'].includes(type);
       const canEdit=['forum_topics','forum_replies','workshop_reviews'].includes(type);
-      const reportActions=isReport?'<button type="button" class="button button-ghost" data-central-action="investigate" data-central-type="'+type+'" data-central-id="'+id+'">Investigate</button><button type="button" class="button button-ghost" data-central-action="resolve" data-central-type="'+type+'" data-central-id="'+id+'">Resolve</button><button type="button" class="button button-ghost" data-central-action="dismiss" data-central-type="'+type+'" data-central-id="'+id+'">Dismiss</button>':'';
+      const reportActions=isReport?((type==='workshop_reports'?'<button type="button" class="button button-ghost" data-central-action="investigate" data-central-type="'+type+'" data-central-id="'+id+'">Investigate</button>':'')+'<button type="button" class="button button-ghost" data-central-action="resolve" data-central-type="'+type+'" data-central-id="'+id+'">Resolve</button><button type="button" class="button button-ghost" data-central-action="dismiss" data-central-type="'+type+'" data-central-id="'+id+'">Dismiss</button>'):'';
       const visibilityActions=canHide?'<button type="button" class="button button-ghost" data-central-action="'+(hidden?'restore':'hide')+'" data-central-type="'+type+'" data-central-id="'+id+'">'+(hidden?'Restore':'Hide')+'</button>':'';
       const editAction=canEdit?'<button type="button" class="button button-ghost" data-central-action="edit" data-central-type="'+type+'" data-central-id="'+id+'">Edit</button>':'';
       const removeAction='<button type="button" class="button button-ghost" style="border-color:#b91c1c;color:#b91c1c" data-central-action="delete" data-central-type="'+type+'" data-central-id="'+id+'">Delete</button>';
@@ -1042,7 +1042,7 @@
         body.title=title;body.body=next;
       } else body.body=next;
     }
-    if(action==='resolve'||action==='dismiss'||action==='investigate') {
+    if(type==='workshop_reports'&&(action==='resolve'||action==='dismiss'||action==='investigate')) {
       const note=prompt('Optional moderation note (leave blank if not needed):','');
       if(note===null)return;
       body.admin_note=note;
