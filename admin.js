@@ -897,7 +897,7 @@
       const status=memberStatus(u),safeId=escape(u.id),safeEmail=escape(u.email||'(no email)');
       const created=u.created_at?new Date(u.created_at).toLocaleDateString():'—';
       const last=u.last_sign_in_at?new Date(u.last_sign_in_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'Never signed in';
-      return '<article data-central-id="'+id+'" data-current-title="'+escape(item.title||'')+'" style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="overflow-wrap:anywhere">'+safeEmail+'</strong><span>'+status+' · '+(u.role==='admin'?'Administrator':'Member')+'</span></div><small>Created '+created+' · Last sign-in '+last+'</small><small style="overflow-wrap:anywhere;color:#68756f">ID: '+safeId+'</small>'+(u.role==='admin'?'<p>Protected administrator account</p>':'<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="button button-ghost" data-member-action="'+(status==='Suspended'?'unban':'ban')+'" data-member-id="'+safeId+'">'+(status==='Suspended'?'Restore access':'Suspend access')+'</button><button type="button" class="button button-ghost" data-member-action="delete" data-member-id="'+safeId+'" style="border-color:#b91c1c;color:#b91c1c">Delete account</button></div>')+'</article>';
+      return '<article data-central-id="'+id+'" data-current-title="'+escape(item.title||'')+'" data-current-body="'+escape(item.body||'')+'" style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="overflow-wrap:anywhere">'+safeEmail+'</strong><span>'+status+' · '+(u.role==='admin'?'Administrator':'Member')+'</span></div><small>Created '+created+' · Last sign-in '+last+'</small><small style="overflow-wrap:anywhere;color:#68756f">ID: '+safeId+'</small>'+(u.role==='admin'?'<p>Protected administrator account</p>':'<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="button button-ghost" data-member-action="'+(status==='Suspended'?'unban':'ban')+'" data-member-id="'+safeId+'">'+(status==='Suspended'?'Restore access':'Suspend access')+'</button><button type="button" class="button button-ghost" data-member-action="delete" data-member-id="'+safeId+'" style="border-color:#b91c1c;color:#b91c1c">Delete account</button></div>')+'</article>';
     }).join('');
     memberPrev.disabled=memberPage<=1;
     memberNext.disabled=memberPage>=pageCount;
@@ -989,8 +989,10 @@
       const isResolved=['resolved','dismissed'].includes(item.status);
       const canHide=['forum_topics','forum_replies','forum_chat_messages','workshop_reviews'].includes(type);
       const canEdit=['forum_topics','forum_replies','workshop_reviews'].includes(type);
-      const reportActions=isReport?((type==='workshop_reports'?'<button type="button" class="button button-ghost" data-central-action="investigate" data-central-type="'+type+'" data-central-id="'+id+'">Investigate</button>':'')+'<button type="button" class="button button-ghost" data-central-action="resolve" data-central-type="'+type+'" data-central-id="'+id+'">Resolve</button><button type="button" class="button button-ghost" data-central-action="dismiss" data-central-type="'+type+'" data-central-id="'+id+'">Dismiss</button>'):'';
-      const visibilityActions=canHide?'<button type="button" class="button button-ghost" data-central-action="'+(hidden?'restore':'hide')+'" data-central-type="'+type+'" data-central-id="'+id+'">'+(hidden?'Restore':'Hide')+'</button>':'';
+      const reportActions=isReport&&!isResolved?((type==='workshop_reports'?'<button type="button" class="button button-ghost" data-central-action="investigate" data-central-type="'+type+'" data-central-id="'+id+'">Investigate</button>':'')+'<button type="button" class="button button-ghost" data-central-action="resolve" data-central-type="'+type+'" data-central-id="'+id+'">Resolve</button><button type="button" class="button button-ghost" data-central-action="dismiss" data-central-type="'+type+'" data-central-id="'+id+'">Dismiss</button>'):'';
+      const visibilityAction=type==='workshop_reviews'?(item.status==='pending'?'publish':hidden?'restore':'hide'):(hidden?'restore':'hide');
+      const visibilityLabel=visibilityAction==='publish'?'Publish':visibilityAction==='restore'?'Restore':'Hide';
+      const visibilityActions=canHide?'<button type="button" class="button button-ghost" data-central-action="'+visibilityAction+'" data-central-type="'+type+'" data-central-id="'+id+'">'+visibilityLabel+'</button>':'';
       const editAction=canEdit?'<button type="button" class="button button-ghost" data-central-action="edit" data-central-type="'+type+'" data-central-id="'+id+'">Edit</button>':'';
       const removeAction='<button type="button" class="button button-ghost" style="border-color:#b91c1c;color:#b91c1c" data-central-action="delete" data-central-type="'+type+'" data-central-id="'+id+'">Delete</button>';
       return '<article style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap"><strong>'+label+'</strong><span>'+status+'</span></div><p style="margin:0;white-space:pre-wrap;overflow-wrap:anywhere">'+preview+'</p><small>'+escape(date)+' · ID: '+id+'</small><div style="display:flex;gap:8px;flex-wrap:wrap">'+visibilityActions+editAction+reportActions+(!isResolved&&!isReport?'': '')+removeAction+'</div></article>';
@@ -1032,7 +1034,7 @@
     if(action==='restore'&&!confirm('Restore this content to public view?'))return;
     if(action==='edit') {
       const card=moderationList.querySelector('[data-central-id="'+CSS.escape(id)+'"]')?.closest('article');
-      const current=card?.querySelector('p')?.textContent||'';
+      const current=card?.dataset.currentBody||'';
       const next=prompt('Edit the content:',current);
       if(next===null)return;
       if(itemType==='forum_topics'||itemType==='workshop_reviews') {
