@@ -1958,12 +1958,12 @@ async function handleAdminSoftwareProducts(request,response){
   const token=serviceToken();
   if(request.method==='GET'){const result=await supabaseRequest(token,'rest/v1/software_products?select=id,title,description,version,price_paise,price_visible,currency,image_url,sort_order,is_published,created_at,updated_at&order=sort_order.asc,created_at.desc&limit=1000',{timeoutMs:12000});if(!result.ok){jsonResponse(response,502,{error:'Software listings could not be loaded.'});return true;}jsonResponse(response,200,{items:(await result.json()).map(item=>({...item,image_url:softwareCoverUrl(item)}))});return true;}
   if(request.method==='DELETE'){try{const body=await readJson(request,12000),id=String(body.id||'');if(!/^[0-9a-f-]{36}$/i.test(id)){jsonResponse(response,400,{error:'Invalid software listing reference.'});return true;}
-    const removed=await supabaseRequest(token,'rest/v1/software_products?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=representation',timeoutMs:12000});if(!removed.ok){const detail=await removed.text().catch(()=> '');const linked= /foreign key|constraint|referenced/i.test(detail);jsonResponse(response,linked?409:502,{error:linked?'This software has customer request history and cannot be permanently deleted. Use Hide to remove it from the public store while preserving customer records.':'Software listing could not be deleted. Please retry.'});return true;}const rows=await removed.json().catch(()=>[]);if(!rows?.length){jsonResponse(response,404,{error:'Software listing not found.'});return true;}jsonResponse(response,200,{deleted:true});return true;
+    const removed=await supabaseRequest(token,'rest/v1/software_products?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=representation',timeoutMs:12000});if(!removed.ok){const detail=await removed.text().catch(()=> '');const linked= /foreign key|constraint|referenced/i.test(detail);jsonResponse(response,linked?409:502,{error:linked?'This software has customer request history and cannot be permanently deleted. Use Hide to remove it from the public store while preserving customer records.':'Software listing could not be deleted. Please retry.'});return true;}const rows=await removed.json().catch(()=>[]);if(!rows?.length){jsonResponse(response,404,{error:'Software listing not found.'});return true;}await writeCentralAdminAudit(admin,'delete','software_product',id);jsonResponse(response,200,{deleted:true});return true;
   }catch(error){jsonResponse(response,error.statusCode||400,{error:error.message||'Software listing could not be deleted.'});return true;}}
   if(request.method==='POST'||request.method==='PATCH'){try{const body=await readJson(request,12000),partial=request.method==='PATCH';let id='';if(partial){id=String(body.id||'');if(!/^[0-9a-f-]{36}$/i.test(id)){jsonResponse(response,400,{error:'Invalid software listing reference.'});return true;}}
     const payload=softwareProductPayload(body,admin.id,partial),fields='id,title,description,version,price_paise,price_visible,currency,image_url,sort_order,is_published,created_at,updated_at',endpoint=partial?'rest/v1/software_products?id=eq.'+encodeURIComponent(id)+'&select='+fields:'rest/v1/software_products?select='+fields;
     const result=await supabaseRequest(token,endpoint,{method:partial?'PATCH':'POST',prefer:'return=representation',body:payload,timeoutMs:12000});if(!result.ok){jsonResponse(response,502,{error:'Software listing could not be saved.'});return true;}
-    const rows=await result.json();if(partial&&!rows?.length){jsonResponse(response,404,{error:'Software listing not found.'});return true;}jsonResponse(response,partial?200:201,{item:rows?.[0]?{...rows[0],image_url:softwareCoverUrl(rows[0])}:null});return true;
+    const rows=await result.json();if(partial&&!rows?.length){jsonResponse(response,404,{error:'Software listing not found.'});return true;}const savedItem=rows?.[0]||null;await writeCentralAdminAudit(admin,partial?'update':'create','software_product',savedItem?.id||id,{is_published:savedItem?.is_published===true});jsonResponse(response,partial?200:201,{item:savedItem?{...savedItem,image_url:softwareCoverUrl(savedItem)}:null});return true;
   }catch(error){jsonResponse(response,error.statusCode||400,{error:error.message||'Invalid software listing.'});return true;}}
   jsonResponse(response,405,{error:'Method Not Allowed'});return true;
 }
@@ -2115,6 +2115,7 @@ async function handleAdminUsers(request,response){
       const invited=await supabaseRequest(token,'auth/v1/invite',{method:'POST',body:{email,data:{}} ,timeoutMs:20000});
       if(!invited.ok){const detail=await invited.json().catch(()=>({}));jsonResponse(response,invited.status===422?409:502,{error:detail.msg||detail.message||detail.error_description||'Invitation could not be sent. Check whether the account already exists.'});return true;}
       const user=await invited.json().catch(()=>({}));
+      await writeCentralAdminAudit(admin,'invite_member','member_account',user.id||null);
       jsonResponse(response,201,{invited:true,user:{id:user.id,email:user.email||email,created_at:user.created_at||null,banned_until:user.banned_until||null,role:'member'}});
       return true;
     }
@@ -2130,12 +2131,14 @@ async function handleAdminUsers(request,response){
       const update=await supabaseRequest(token,'auth/v1/admin/users/'+encodeURIComponent(id),{method:'PUT',body:{ban_duration:action==='ban'?'876000h':'none'},timeoutMs:15000});
       if(!update.ok){jsonResponse(response,502,{error:'Member access could not be updated.'});return true;}
       const updated=await update.json().catch(()=>({}));
+      await writeCentralAdminAudit(admin,action==='ban'?'suspend_member':'restore_member','member_account',id);
       jsonResponse(response,200,{updated:true,user:{id:updated.id||id,email:updated.email||targetUser.email,banned_until:updated.banned_until||null}});
       return true;
     }
     if(request.method==='DELETE'){
       const removed=await supabaseRequest(token,'auth/v1/admin/users/'+encodeURIComponent(id),{method:'DELETE',timeoutMs:15000});
       if(!removed.ok){jsonResponse(response,502,{error:'Member account could not be deleted. Related customer records may need to be retained.'});return true;}
+      await writeCentralAdminAudit(admin,'delete_member','member_account',id);
       jsonResponse(response,200,{deleted:true,id});
       return true;
     }
