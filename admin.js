@@ -995,7 +995,7 @@
       const visibilityActions=canHide?'<button type="button" class="button button-ghost" data-central-action="'+visibilityAction+'" data-central-type="'+type+'" data-central-id="'+id+'">'+visibilityLabel+'</button>':'';
       const editAction=canEdit?'<button type="button" class="button button-ghost" data-central-action="edit" data-central-type="'+type+'" data-central-id="'+id+'">Edit</button>':'';
       const removeAction='<button type="button" class="button button-ghost" style="border-color:#b91c1c;color:#b91c1c" data-central-action="delete" data-central-type="'+type+'" data-central-id="'+id+'">Delete</button>';
-      return '<article style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap"><strong>'+label+'</strong><span>'+status+'</span></div><p style="margin:0;white-space:pre-wrap;overflow-wrap:anywhere">'+preview+'</p><small>'+escape(date)+' · ID: '+id+'</small><div style="display:flex;gap:8px;flex-wrap:wrap">'+visibilityActions+editAction+reportActions+(!isResolved&&!isReport?'': '')+removeAction+'</div></article>';
+      return '<article style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap"><strong>'+label+'</strong><span>'+status+'</span></div><p style="margin:0;white-space:pre-wrap;overflow-wrap:anywhere">'+preview+'</p><small>'+escape(date)+' · ID: '+id+'</small><div style="display:flex;gap:8px;flex-wrap:wrap">'+visibilityActions+editAction+reportActions+removeAction+'</div></article>';
     }).join('');
   }
   function renderCentralAudit(items) {
