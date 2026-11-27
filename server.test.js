@@ -617,6 +617,14 @@ test('central moderation preserves forum report status constraints and chat migr
   assert.match(migration,/grant update on public\.forum_chat_messages to authenticated/i);
 });
 
+test('central moderation edit cards retain the current title and body for safe prefilled editing', () => {
+  const adminSource=fs.readFileSync(path.join(__dirname,'admin.js'),'utf8');
+  assert.match(adminSource,/data-current-title="\+'\+escape\(item\.title\|\|'\'\)\+'"/);
+  assert.match(adminSource,/data-current-body="\+'\+escape\(item\.body\|\|'\'\)\+'"/);
+  assert.match(adminSource,/card\?\.dataset\.currentBody/);
+  assert.match(adminSource,/card\?\.dataset\.currentTitle/);
+});
+
 test('central moderation refuses permanent deletion without explicit confirmation', async () => {
   const id='123e4567-e89b-42d3-a456-426614174112';
   centralModerationTables.forum_topics.set(id,{id,title:'Test topic',body:'Test content',is_hidden:false});
@@ -1231,6 +1239,11 @@ test('admin can explicitly set Possible status', async () => {
   const result = await call('/api/admin/orders/status', { method:'POST', token:tokens.admin, body:{ orderId, status:'Possible' } });
   assert.equal(result.response.status,200);
   assert.equal(result.payload.order.status,'Possible');
+  assert.equal(centralModerationTables.community_admin_audit.size,1);
+  const audit=[...centralModerationTables.community_admin_audit.values()][0];
+  assert.equal(audit.action,'update_order_status');
+  assert.equal(audit.target_type,'order');
+  assert.deepEqual(audit.details,{from:'New',to:'Possible'});
 });
 
 test('admin cannot mark an order Completed before a processed file exists', async () => {
