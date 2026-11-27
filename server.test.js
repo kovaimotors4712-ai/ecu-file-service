@@ -605,6 +605,18 @@ test('central moderation API is admin-only, supports reversible chat hiding and 
   assert.equal(centralModerationTables.community_admin_audit.size,2);
 });
 
+test('central moderation preserves forum report status constraints and chat migration visibility rules', async () => {
+  const id='123e4567-e89b-42d3-a456-426614174113';
+  centralModerationTables.forum_reports.set(id,{id,reporter_id:customerId,reason:'Test report reason',status:'open'});
+  const invalid=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_reports',id,action:'investigate'}});
+  assert.equal(invalid.response.status,400);
+  assert.equal(centralModerationTables.forum_reports.get(id).status,'open');
+  const migration=fs.readFileSync(path.join(__dirname,'supabase/migrations/20261127_central_chat_moderation_and_admin_audit.sql'),'utf8');
+  assert.match(migration,/drop policy if exists forum_chat_read_public/i);
+  assert.match(migration,/is_hidden = false/);
+  assert.match(migration,/grant update on public\.forum_chat_messages to authenticated/i);
+});
+
 test('central moderation refuses permanent deletion without explicit confirmation', async () => {
   const id='123e4567-e89b-42d3-a456-426614174112';
   centralModerationTables.forum_topics.set(id,{id,title:'Test topic',body:'Test content',is_hidden:false});
