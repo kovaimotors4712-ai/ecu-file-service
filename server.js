@@ -247,6 +247,12 @@ async function requireAdmin(request) {
   if (customer.user?.app_metadata?.role !== 'admin') return null;
   return customer;
 }
+async function requireCommunityModerator(request) {
+  const customer = await requireCustomer(request);
+  if (!customer) return null;
+  if (!['admin','moderator'].includes(customer.user?.app_metadata?.role)) return null;
+  return customer;
+}
 
 async function supabaseRequest(token, route, { method = 'GET', body, prefer, headers = {}, timeoutMs = 30000 } = {}) {
   const apikey = (token && supabaseServiceRoleKey && token === supabaseServiceRoleKey) ? supabaseServiceRoleKey : supabaseAnonKey;
@@ -2004,8 +2010,8 @@ async function writeCentralAdminAudit(admin, action, targetType, targetId, detai
 }
 
 async function handleAdminCentralModeration(request, response, url) {
-  const admin = await requireAdmin(request);
-  if (!admin) { jsonResponse(response,403,{error:'Administrator role is required.'}); return true; }
+  const admin = await requireCommunityModerator(request);
+  if (!admin) { jsonResponse(response,403,{error:'Administrator or authorized moderator role is required.'}); return true; }
   if (!supabaseServiceRoleKey) { jsonResponse(response,503,{error:'Central moderation is not configured.'}); return true; }
   const token = serviceToken();
   if (request.method === 'GET') {
