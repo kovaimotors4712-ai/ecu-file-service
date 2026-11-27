@@ -784,7 +784,9 @@ async function handleAdminStatus(request, response) {
       const err = await updated.json().catch(() => null);
       jsonResponse(response, updated.status >= 500 ? 502 : 409, { error: err?.message || 'The order status could not be saved.' }); return true;
     }
-    jsonResponse(response, 200, { order: (await updated.json())?.[0] || null });
+    const updatedOrder = (await updated.json())?.[0] || null;
+    await writeCentralAdminAudit(admin, 'update_order_status', 'order', orderId, { from:current.status, to:body.status });
+    jsonResponse(response, 200, { order: updatedOrder });
   } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Admin status update failed.' }); }
   return true;
 }
@@ -2006,7 +2008,8 @@ async function handleAdminCentralModeration(request, response, url) {
   const token = serviceToken();
   if (request.method === 'GET') {
     const type = String(url.searchParams.get('type') || 'all');
-    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 50)));
+    const requestedLimit = Number(url.searchParams.get('limit') || 50);
+    const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, Math.floor(requestedLimit))) : 50;
     const selected = type === 'all' ? Object.keys(CENTRAL_MODERATION_RESOURCES) : [type];
     if (selected.some(key => !CENTRAL_MODERATION_RESOURCES[key])) { jsonResponse(response,400,{error:'Unknown moderation content type.'}); return true; }
     const items = [];
