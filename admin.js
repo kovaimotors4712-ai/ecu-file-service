@@ -975,7 +975,7 @@
   function renderCentralModeration(items) {
     if(!moderationList)return;
     const query=(moderationSearch?.value||'').trim().toLowerCase();
-    const filtered=items.filter(item=>!query||[item.title,item.body,item.reason,item.admin_note,item.author_display_name,item.id].some(value=>String(value||'').toLowerCase().includes(query)));
+    const filtered=items.filter(item=>!query||[item.title,item.name,item.body,item.description,item.reason,item.admin_note,item.author_display_name,item.city,item.state,item.id].some(value=>String(value||'').toLowerCase().includes(query)));
     if(!filtered.length){moderationList.textContent='No matching moderation records found.';return;}
     moderationList.innerHTML=filtered.map(item=>{
       const type=escape(item.content_type||'');
