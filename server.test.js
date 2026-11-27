@@ -988,13 +988,15 @@ test('rejects motorcycle-only brands when submitted as passenger cars', async ()
   assert.equal(result.response.status,400);
 });
 
-test('rejects non-premium two-wheelers before creating a checkout', async () => {
-  const { request } = customerRequest();
-  request.vehicleType = 'Two-wheeler';
-  request.vehicleBrand = 'Bajaj';
-  request.vehicleModel = 'Pulsar 220';
-  const result = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request } });
-  assert.equal(result.response.status,400);
+test('accepts custom two-wheeler brands for individual compatibility review', async () => {
+  for (const [brand, model] of [['Bajaj', 'Pulsar 220'], ['Hero MotoCorp', 'Splendor Plus']]) {
+    const { request } = customerRequest();
+    request.vehicleType = 'Two-wheeler';
+    request.vehicleBrand = brand;
+    request.vehicleModel = model;
+    const result = await call('/api/checkout/intents', { method:'POST', token:tokens.customer, body:{ request } });
+    assert.equal(result.response.status,200,brand);
+  }
 });
 
 test('creates a durable checkout intent with a unique private storage path', async () => {
