@@ -1575,7 +1575,9 @@ async function handleAdminSiteContent(request, response) {
       const payload = announcementPayload(body, admin.id);
       const result = await supabaseRequest(token, 'rest/v1/site_announcements?select=*', { method:'POST', prefer:'return=representation', body:payload, timeoutMs:12000 });
       if (!result.ok) { jsonResponse(response, 502, { error:'Announcement could not be saved.' }); return true; }
-      jsonResponse(response, 201, { item:(await result.json())?.[0] || null }); return true;
+      const item=(await result.json())?.[0] || null;
+      await writeCentralAdminAudit(admin,'create','site_announcement',item?.id,{kind:item?.kind||null,placement:item?.placement||null});
+      jsonResponse(response, 201, { item }); return true;
     } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Invalid content.' }); return true; }
   }
   if (request.method === 'DELETE') {
@@ -1587,6 +1589,7 @@ async function handleAdminSiteContent(request, response) {
       if (!result.ok) { jsonResponse(response, 502, { error:'Announcement could not be deleted.' }); return true; }
       const rows = await result.json();
       if (!rows || !rows.length) { jsonResponse(response, 404, { error:'Announcement not found.' }); return true; }
+      await writeCentralAdminAudit(admin,'delete','site_announcement',id);
       jsonResponse(response, 200, { deleted:true }); return true;
     } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Announcement could not be deleted.' }); return true; }
   }
@@ -1600,6 +1603,7 @@ async function handleAdminSiteContent(request, response) {
       if (!result.ok) { jsonResponse(response, 502, { error:'Announcement could not be updated.' }); return true; }
       const rows = await result.json();
       if (!rows?.length) { jsonResponse(response, 404, { error:'Announcement not found.' }); return true; }
+      await writeCentralAdminAudit(admin,'update','site_announcement',id,{kind:rows[0]?.kind||null,placement:rows[0]?.placement||null});
       jsonResponse(response, 200, { item:rows[0] }); return true;
     } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Invalid content.' }); return true; }
   }
