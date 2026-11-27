@@ -1437,6 +1437,7 @@ async function handleAdminSiteSettings(request, response) {
       const payload={id:true,telegram_url:telegram,updated_at:new Date().toISOString(),updated_by:admin.id};
       const result=await supabaseRequest(token,'rest/v1/site_public_settings?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=representation',body:payload,timeoutMs:12000});
       if(!result.ok){jsonResponse(response,502,{error:'Telegram link could not be saved.'});return true;}
+      await writeCentralAdminAudit(admin,'update','site_public_settings',null,{setting:'telegram_url'});
       jsonResponse(response,200,{settings:{telegram_url:telegram}});return true;
     } catch(error) { jsonResponse(response,error.statusCode||400,{error:error.message||'Invalid Telegram link.'});return true; }
   }
