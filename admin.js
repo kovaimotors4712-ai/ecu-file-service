@@ -966,7 +966,7 @@
     return result;
   }
   function moderationPreview(item) {
-    return [item.title,item.body,item.reason,item.admin_note].filter(Boolean).join(' — ').slice(0,520);
+    return [item.title,item.name,item.body,item.description,item.reason,item.admin_note,item.city,item.state].filter(Boolean).join(' — ').slice(0,520);
   }
   function moderationStatus(item) {
     if(item.is_hidden===true)return 'Hidden';
@@ -985,16 +985,16 @@
       const status=escape(moderationStatus(item));
       const date=item.created_at?new Date(item.created_at).toLocaleString():'';
       const isReport=type==='forum_reports'||type==='workshop_reports';
-      const hidden=item.is_hidden===true||item.status==='hidden';
+      const hidden=item.is_hidden===true||item.status==='hidden'||(type==='workshops'&&['suspended','rejected'].includes(item.status));
       const isResolved=['resolved','dismissed'].includes(item.status);
-      const canHide=['forum_topics','forum_replies','forum_chat_messages','workshop_reviews'].includes(type);
+      const canHide=['forum_topics','forum_replies','forum_chat_messages','workshop_reviews','workshops'].includes(type);
       const canEdit=['forum_topics','forum_replies','workshop_reviews'].includes(type);
       const reportActions=isReport&&!isResolved?((type==='workshop_reports'?'<button type="button" class="button button-ghost" data-central-action="investigate" data-central-type="'+type+'" data-central-id="'+id+'">Investigate</button>':'')+'<button type="button" class="button button-ghost" data-central-action="resolve" data-central-type="'+type+'" data-central-id="'+id+'">Resolve</button><button type="button" class="button button-ghost" data-central-action="dismiss" data-central-type="'+type+'" data-central-id="'+id+'">Dismiss</button>'):'';
       const visibilityAction=type==='workshop_reviews'?(item.status==='pending'?'publish':hidden?'restore':'hide'):(hidden?'restore':'hide');
       const visibilityLabel=visibilityAction==='publish'?'Publish':visibilityAction==='restore'?'Restore':'Hide';
       const visibilityActions=canHide?'<button type="button" class="button button-ghost" data-central-action="'+visibilityAction+'" data-central-type="'+type+'" data-central-id="'+id+'">'+visibilityLabel+'</button>':'';
       const editAction=canEdit?'<button type="button" class="button button-ghost" data-central-action="edit" data-central-type="'+type+'" data-central-id="'+id+'">Edit</button>':'';
-      const removeAction='<button type="button" class="button button-ghost" style="border-color:#b91c1c;color:#b91c1c" data-central-action="delete" data-central-type="'+type+'" data-central-id="'+id+'">Delete</button>';
+      const removeAction=type==='workshops'?'':'<button type="button" class="button button-ghost" style="border-color:#b91c1c;color:#b91c1c" data-central-action="delete" data-central-type="'+type+'" data-central-id="'+id+'">Delete</button>';
       return '<article data-current-title="'+escape(item.title||'')+'" data-current-body="'+escape(item.body||'')+'" style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap"><strong>'+label+'</strong><span>'+status+'</span></div><p style="margin:0;white-space:pre-wrap;overflow-wrap:anywhere">'+preview+'</p><small>'+escape(date)+' · ID: '+id+'</small><div style="display:flex;gap:8px;flex-wrap:wrap">'+visibilityActions+editAction+reportActions+removeAction+'</div></article>';
     }).join('');
   }
