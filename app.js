@@ -261,7 +261,7 @@
   function renderBrands(query='') {
     const needle = query.trim().toLowerCase();
     const matches = brandsForCurrentVehicleType().filter(brand => !needle || brand.toLowerCase().includes(needle)).slice(0,30);
-    const customBrand = query.trim() && !brands.includes(query.trim())
+    const customBrand = query.trim() && !brandsForCurrentVehicleType().some(brand => brand.toLowerCase() === query.trim().toLowerCase())
       ? `<button type="button" class="brand-option brand-option-custom" role="option" data-brand="${escapeHtml(query.trim())}" aria-selected="false">Use custom brand: ${escapeHtml(query.trim())}</button>`
       : '';
     brandResults.innerHTML = customBrand + matches.map(brand=>`<button type="button" class="brand-option" role="option" data-brand="${escapeHtml(brand)}" aria-selected="false">${escapeHtml(brand)}</button>`).join('');
