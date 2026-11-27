@@ -2063,8 +2063,8 @@ async function handleAdminCentralModeration(request, response, url) {
       else if (action === 'restore') payload={is_hidden:false,hidden_at:null,hidden_by:null};
       else { jsonResponse(response,400,{error:'Chat messages can only be hidden, restored or permanently deleted.'}); return true; }
     } else if (type === 'workshops') {
-      if (action === 'hide') payload={status:'suspended'};
-      else if (action === 'restore' || action === 'publish') payload={status:'approved'};
+      if (action === 'hide') payload={status:'suspended',updated_at:new Date().toISOString()};
+      else if (action === 'restore' || action === 'publish') payload={status:'approved',updated_at:new Date().toISOString()};
       else { jsonResponse(response,400,{error:'Workshop listings can only be suspended or restored here.'}); return true; }
     } else if (type === 'workshop_reviews') {
       if (action === 'hide') payload={status:'hidden'};
