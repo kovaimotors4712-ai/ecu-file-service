@@ -897,7 +897,7 @@
       const status=memberStatus(u),safeId=escape(u.id),safeEmail=escape(u.email||'(no email)');
       const created=u.created_at?new Date(u.created_at).toLocaleDateString():'—';
       const last=u.last_sign_in_at?new Date(u.last_sign_in_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'Never signed in';
-      return '<article data-central-id="'+id+'" data-current-title="'+escape(item.title||'')+'" data-current-body="'+escape(item.body||'')+'" style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="overflow-wrap:anywhere">'+safeEmail+'</strong><span>'+status+' · '+(u.role==='admin'?'Administrator':'Member')+'</span></div><small>Created '+created+' · Last sign-in '+last+'</small><small style="overflow-wrap:anywhere;color:#68756f">ID: '+safeId+'</small>'+(u.role==='admin'?'<p>Protected administrator account</p>':'<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="button button-ghost" data-member-action="'+(status==='Suspended'?'unban':'ban')+'" data-member-id="'+safeId+'">'+(status==='Suspended'?'Restore access':'Suspend access')+'</button><button type="button" class="button button-ghost" data-member-action="delete" data-member-id="'+safeId+'" style="border-color:#b91c1c;color:#b91c1c">Delete account</button></div>')+'</article>';
+      return '<article data-central-id="'+id+'" data-current-title="'+escape(item.title||'')+'" data-current-body="'+escape(item.body||item.description||'')+'" style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="overflow-wrap:anywhere">'+safeEmail+'</strong><span>'+status+' · '+(u.role==='admin'?'Administrator':'Member')+'</span></div><small>Created '+created+' · Last sign-in '+last+'</small><small style="overflow-wrap:anywhere;color:#68756f">ID: '+safeId+'</small>'+(u.role==='admin'?'<p>Protected administrator account</p>':'<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="button button-ghost" data-member-action="'+(status==='Suspended'?'unban':'ban')+'" data-member-id="'+safeId+'">'+(status==='Suspended'?'Restore access':'Suspend access')+'</button><button type="button" class="button button-ghost" data-member-action="delete" data-member-id="'+safeId+'" style="border-color:#b91c1c;color:#b91c1c">Delete account</button></div>')+'</article>';
     }).join('');
     memberPrev.disabled=memberPage<=1;
     memberNext.disabled=memberPage>=pageCount;
@@ -970,6 +970,7 @@
   }
   function moderationStatus(item) {
     if(item.is_hidden===true)return 'Hidden';
+    if(item.content_type==='forum_categories')return item.is_active===false?'Inactive':'Active';
     return String(item.status||'Visible').replaceAll('_',' ');
   }
   function renderCentralModeration(items) {
@@ -985,10 +986,10 @@
       const status=escape(moderationStatus(item));
       const date=item.created_at?new Date(item.created_at).toLocaleString():'';
       const isReport=type==='forum_reports'||type==='workshop_reports';
-      const hidden=item.is_hidden===true||item.status==='hidden'||(type==='workshops'&&['suspended','rejected'].includes(item.status));
+      const hidden=item.is_hidden===true||item.status==='hidden'||(type==='forum_categories'&&item.is_active===false)||(type==='workshops'&&['suspended','rejected'].includes(item.status));
       const isResolved=['resolved','dismissed'].includes(item.status);
-      const canHide=['forum_topics','forum_replies','forum_chat_messages','workshop_reviews','workshops'].includes(type);
-      const canEdit=['forum_topics','forum_replies','workshop_reviews'].includes(type);
+      const canHide=['forum_categories','forum_topics','forum_replies','forum_chat_messages','workshop_reviews','workshops'].includes(type);
+      const canEdit=['forum_categories','forum_topics','forum_replies','workshop_reviews'].includes(type);
       const reportActions=isReport&&!isResolved?((type==='workshop_reports'?'<button type="button" class="button button-ghost" data-central-action="investigate" data-central-type="'+type+'" data-central-id="'+id+'">Investigate</button>':'')+'<button type="button" class="button button-ghost" data-central-action="resolve" data-central-type="'+type+'" data-central-id="'+id+'">Resolve</button><button type="button" class="button button-ghost" data-central-action="dismiss" data-central-type="'+type+'" data-central-id="'+id+'">Dismiss</button>'):'';
       const visibilityAction=type==='workshop_reviews'?(item.status==='pending'?'publish':hidden?'restore':'hide'):type==='workshops'?(item.status==='approved'?'hide':hidden?'restore':'publish'):(hidden?'restore':'hide');
       const visibilityLabel=type==='workshops'&&visibilityAction==='publish'?'Approve':visibilityAction==='publish'?'Publish':visibilityAction==='restore'?'Restore':'Hide';
@@ -1037,7 +1038,7 @@
       const current=card?.dataset.currentBody||'';
       const next=prompt('Edit the content:',current);
       if(next===null)return;
-      if(itemType==='forum_topics'||itemType==='workshop_reviews') {
+      if(itemType==='forum_categories'||itemType==='forum_topics'||itemType==='workshop_reviews') {
         const currentTitle=card?.dataset.currentTitle||'';
         const title=prompt('Edit the title:',currentTitle);
         if(title===null)return;
