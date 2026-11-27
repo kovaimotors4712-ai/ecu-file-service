@@ -2717,3 +2717,13 @@ test('moderator moderation page hides permanent-delete controls while admins ret
   assert.match(moderation, /currentRole=role/);
   assert.match(page, /moderation\.js\?v=20261127-3/);
 });
+
+
+test('authorized moderation page and script are included in the public static allowlist', async () => {
+  const page = await call('/moderation.html');
+  const script = await call('/moderation.js');
+  assert.equal(page.response.status, 200);
+  assert.match(page.payload, /Authorized staff access|AUTHORIZED STAFF ACCESS/i);
+  assert.equal(script.response.status, 200);
+  assert.match(script.payload, /currentRole==='admin'/);
+});
