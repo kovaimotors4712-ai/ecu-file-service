@@ -26,10 +26,12 @@ services:
         sync: false
       - key: PAYPAL_BASE_URL
         value: https://api-m.paypal.com
-      - key: RESEND_API_KEY
+      - key: BREVO_API_KEY
         sync: false
-      - key: EMAIL_FROM
+      - key: BREVO_EMAIL_FROM
         sync: false
+      - key: BREVO_SENDER_NAME
+        value: ECU File Service India
       - key: ADMIN_NOTIFICATION_EMAIL
         sync: false
       - key: PAYMENT_GATE_PROOF_SECRET
