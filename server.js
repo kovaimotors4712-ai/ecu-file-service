@@ -1998,7 +1998,7 @@ async function handleAdminUsers(request,response){
     if(!target.ok){jsonResponse(response,target.status===404?404:502,{error:'Member account could not be verified.'});return true;}
     const targetUser=await target.json();
     if(request.method==='PATCH' && String(body.action||'')==='grant_admin'){
-      const actorEmail=String(admin.email||'').trim().toLowerCase();
+      const actorEmail=String(admin.user?.email||'').trim().toLowerCase();
       const targetEmail=String(targetUser.email||'').trim().toLowerCase();
       if(actorEmail!=='thoufiqrahman4711@gmail.com'){
         jsonResponse(response,403,{error:'Only the existing primary administrator can grant this administrator access.'});return true;
