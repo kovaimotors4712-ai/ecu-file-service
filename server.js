@@ -73,8 +73,9 @@ const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || '';
 const paypalClientId = process.env.PAYPAL_CLIENT_ID || '';
 const paypalClientSecret = process.env.PAYPAL_CLIENT_SECRET || '';
 const paypalBaseUrl = (process.env.PAYPAL_BASE_URL || 'https://api-m.sandbox.paypal.com').replace(/\/$/, '');
-const resendApiKey = process.env.RESEND_API_KEY || '';
-const emailFrom = process.env.EMAIL_FROM || '';
+const brevoApiKey = process.env.BREVO_API_KEY || '';
+const brevoEmailFrom = process.env.BREVO_EMAIL_FROM || '';
+const brevoSenderName = process.env.BREVO_SENDER_NAME || 'ECU File Service India';
 const adminNotificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL || '';
 const paymentGateProofSecret = process.env.PAYMENT_GATE_PROOF_SECRET || '';
 const paymentGateSchemaReady = process.env.PAYMENT_GATE_SCHEMA_READY === 'true';
@@ -111,8 +112,15 @@ function hasPayPalConfig() {
   const hostOk = paypalBaseUrl === 'https://api-m.sandbox.paypal.com' || paypalBaseUrl === 'https://api-m.paypal.com';
   return hostOk && paypalClientId.length >= 10 && paypalClientSecret.length >= 10;
 }
-function hasResendConfig() {
-  return /^re_[A-Za-z0-9_-]{10,}$/.test(resendApiKey) && emailFrom.includes('@') && adminNotificationEmail.includes('@');
+function hasBrevoConfig() {
+  return brevoApiKey.length >= 20 && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(brevoEmailFrom) && Boolean(brevoSenderName.trim()) && adminNotificationEmail.includes('@');
+}
+function brevoIdempotencyKey(value) {
+  const digest = crypto.createHash('sha256').update(`ECU_FILE_SERVICE_BREVO:${value}`).digest();
+  digest[6] = (digest[6] & 0x0f) | 0x50;
+  digest[8] = (digest[8] & 0x3f) | 0x80;
+  const hex = digest.subarray(0, 16).toString('hex');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`;
 }
 function paymentsConfigured() { return hasSafeSupabaseConfig && Boolean(supabaseServiceRoleKey) && paymentStateReady() && hasRazorpayConfig(); }
 function paymentReadinessChecks() {
@@ -121,7 +129,7 @@ function paymentReadinessChecks() {
     supabasePublicKey: isPublicClientKey(supabaseAnonKey),
     razorpay: hasRazorpayConfig(),
     paypal: false,
-    resend: hasResendConfig(),
+    brevo: hasBrevoConfig(),
     paymentProofSecret: paymentGateProofSecret.length >= 32,
     schemaReady: paymentGateSchemaReady,
     serviceRoleAvailable: Boolean(supabaseServiceRoleKey)
@@ -141,7 +149,7 @@ function requestHttps(urlValue, { method = 'GET', headers = {}, body, timeoutMs 
   const allowed = url.protocol === 'https:' && (
     (supabaseHostname && url.hostname === supabaseHostname) ||
     url.hostname === 'api.razorpay.com' ||
-    url.hostname === 'api.resend.com' ||
+    url.hostname === 'api.brevo.com' ||
     url.hostname === 'foerbsnavi.github.io'
   );
   if (!allowed) return Promise.reject(new Error('Blocked unsupported upstream HTTPS destination.'));
@@ -1193,7 +1201,7 @@ async function handlePricing(request, response) {
 
 function escapeSqlText(value) { return String(value || '').replace(/[^a-zA-Z0-9._:@/-]+/g, '').slice(0, 256); }
 async function flushNotificationOutbox() {
-  if (notificationWorkerRunning || !supabaseServiceRoleKey || !hasResendConfig()) return;
+  if (notificationWorkerRunning || !supabaseServiceRoleKey || !hasBrevoConfig()) return;
   notificationWorkerRunning = true;
   try {
     const token = serviceToken();
@@ -1266,10 +1274,14 @@ async function flushNotificationOutbox() {
       const eventKey = String(row.event_key || `${row.order_id}:${eventType}`).replace(/[^a-zA-Z0-9._:/-]/g, '_').slice(0, 180);
       try {
         const sendEmail = async (recipient, subject, html, recipientLabel) => {
-          const emailResponse = await requestHttps('https://api.resend.com/emails', {
+          const emailResponse = await requestHttps('https://api.brevo.com/v3/smtp/email', {
             method: 'POST',
-            headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json', 'Idempotency-Key': `efsi/${eventKey}/${recipientLabel}` },
-            body: JSON.stringify({ from: emailFrom, to: [recipient], subject, html }), timeoutMs: 15000
+            headers: { 'api-key': brevoApiKey, Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sender: { name: brevoSenderName, email: brevoEmailFrom },
+              to: [{ email: recipient }], subject, htmlContent: html,
+              headers: { idempotencyKey: brevoIdempotencyKey(`${eventKey}/${recipientLabel}`) }
+            }), timeoutMs: 15000
           });
           if (!emailResponse.ok) throw new Error((await emailResponse.text()).slice(0, 300));
         };
@@ -1299,8 +1311,8 @@ function triggerCleanupWorker(delay = 2000) {
 
 function triggerNotificationWorker(delay = 500) {
   if (notificationWorkerTimer) return;
-  if (!supabaseServiceRoleKey || !hasResendConfig()) {
-    console.error('[notification-worker] Not scheduled: configuration incomplete', { serviceRoleAvailable: Boolean(supabaseServiceRoleKey), resendKeyFormatValid: /^re_[A-Za-z0-9_-]{10,}$/.test(resendApiKey), senderConfigured: emailFrom.includes('@'), adminRecipientConfigured: adminNotificationEmail.includes('@') });
+  if (!supabaseServiceRoleKey || !hasBrevoConfig()) {
+    console.error('[notification-worker] Not scheduled: configuration incomplete', { serviceRoleAvailable: Boolean(supabaseServiceRoleKey), brevoKeyConfigured: brevoApiKey.length >= 20, senderConfigured: brevoEmailFrom.includes('@'), adminRecipientConfigured: adminNotificationEmail.includes('@') });
     return;
   }
   const run = async () => {
@@ -1739,7 +1751,7 @@ async function handleAdminAdvertisingQuotes(request, response) {
       if (!current) { jsonResponse(response, 404, { error:'Quote not found.' }); return true; }
       if (body.action === 'issue') {
         if (current.status !== 'draft') { jsonResponse(response, 409, { error:'Only a draft quote can be issued.' }); return true; }
-        if (!hasResendConfig()) { jsonResponse(response, 503, { error:'Quote email delivery is not configured. The quote remains a draft.' }); return true; }
+        if (!hasBrevoConfig()) { jsonResponse(response, 503, { error:'Quote email delivery is not configured. The quote remains a draft.' }); return true; }
         const quoteResult = await supabaseRequest(token, 'rest/v1/advertising_quotes?select=*&id=eq.' + encodeURIComponent(id) + '&limit=1', { timeoutMs:12000 });
         if (!quoteResult.ok) { jsonResponse(response, 502, { error:'Quote could not be loaded for issuing.' }); return true; }
         const quote = (await quoteResult.json())?.[0];
@@ -1754,9 +1766,9 @@ async function handleAdminAdvertisingQuotes(request, response) {
         if (!update.ok || !(await update.json())?.length) { jsonResponse(response, 409, { error:'Quote changed while issuing. Refresh and retry.' }); return true; }
         const quoteUrl = 'https://ecufileservice.in/advertising-quote.html#' + rawToken;
         const htmlEscape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        const emailBody = { from:emailFrom, to:[inquiry.email], subject:'Advertising quote from ECU File Service India', html:'<p>Hello '+htmlEscape(inquiry.business_name)+',</p><p>Your advertising quote is ready for review.</p><p><strong>Amount:</strong> ₹'+(Number(quote.amount_paise)/100).toFixed(2)+' INR<br><strong>Placement:</strong> '+htmlEscape(quote.placement)+'<br><strong>Schedule:</strong> '+htmlEscape(quote.starts_at)+' to '+htmlEscape(quote.ends_at)+'<br><strong>Quote expiry:</strong> '+htmlEscape(quote.expires_at)+'</p><p><a href="'+quoteUrl+'">Review quote and accept</a></p><p>'+htmlEscape(quote.terms_snapshot)+'</p><p>Payment does not automatically publish the advertisement; creative approval is separate.</p>' };
+        const emailBody = { sender:{ name:brevoSenderName, email:brevoEmailFrom }, to:[{ email:inquiry.email }], subject:'Advertising quote from ECU File Service India', htmlContent:'<p>Hello '+htmlEscape(inquiry.business_name)+',</p><p>Your advertising quote is ready for review.</p><p><strong>Amount:</strong> ₹'+(Number(quote.amount_paise)/100).toFixed(2)+' INR<br><strong>Placement:</strong> '+htmlEscape(quote.placement)+'<br><strong>Schedule:</strong> '+htmlEscape(quote.starts_at)+' to '+htmlEscape(quote.ends_at)+'<br><strong>Quote expiry:</strong> '+htmlEscape(quote.expires_at)+'</p><p><a href="'+quoteUrl+'">Review quote and accept</a></p><p>'+htmlEscape(quote.terms_snapshot)+'</p><p>Payment does not automatically publish the advertisement; creative approval is separate.</p>', headers:{ idempotencyKey:brevoIdempotencyKey(`advertising-quote/${id}/issue`) } };
         let mail;
-        try { mail = await requestHttps('https://api.resend.com/emails', { method:'POST', headers:{ Authorization:'Bearer '+resendApiKey, 'Content-Type':'application/json' }, body:JSON.stringify(emailBody), timeoutMs:15000 }); }
+        try { mail = await requestHttps('https://api.brevo.com/v3/smtp/email', { method:'POST', headers:{ 'api-key':brevoApiKey, Accept:'application/json', 'Content-Type':'application/json' }, body:JSON.stringify(emailBody), timeoutMs:15000 }); }
         catch { mail = null; }
         if (!mail?.ok) {
           await supabaseRequest(token, 'rest/v1/advertising_quotes?id=eq.'+encodeURIComponent(id)+'&status=eq.issued', { method:'PATCH', prefer:'return=minimal', body:{ status:'draft', acceptance_token_hash:null, issued_at:null, updated_at:new Date().toISOString() }, timeoutMs:12000 }).catch(()=>{});
