@@ -410,7 +410,15 @@
     submit.innerHTML = signingUp ? 'Create account <span>→</span>' : 'Sign in <span>→</span>';
     if (clearMessage) { message.textContent = ''; message.classList.remove('account-message-warning'); }
   }
-  function showSignIn(text = '') { authTabs.hidden = false; form.hidden = false; resetForm.hidden = true; document.querySelector('.auth-reset').hidden = false; accountTitle.textContent = 'Sign in to your account'; accountIntro.textContent = 'Save requests and access your private file history.'; setMode('signin', false); message.textContent = text; }
+  function showSignIn(text = '') { authTabs.hidden = false; form.hidden = false; resetForm.hidden = true; document.querySelector('.auth-reset').hidden = false; accountTitle.textContent = 'Sign in to your account'; accountIntro.textContent = 'Save requests and access your private file history.'; setMode('signin', false); message.textContent = text; message.classList.remove('account-message-warning'); message.setAttribute('role', 'status'); }
+  function showEmailVerification(email) {
+    authTabs.hidden = true; form.hidden = true; resetForm.hidden = true; document.querySelector('.auth-reset').hidden = true;
+    accountTitle.textContent = 'Confirm your email';
+    accountIntro.textContent = 'Your account request has been received. One more step is required before you can sign in.';
+    message.classList.add('account-message-warning'); message.setAttribute('role', 'alert');
+    message.innerHTML = '<div class="email-verification-alert"><span class="email-verification-icon" aria-hidden="true">!</span><div><strong class="email-verification-title">EMAIL VERIFICATION REQUIRED</strong><p class="email-verification-copy">We sent a confirmation link to <b>' + escapeHtml(email) + '</b>.</p><p class="email-verification-copy">Open your inbox and tap the verification link to activate your account. If you do not see the email, check your Spam or Junk folder.</p><p class="email-verification-next">After confirming your email, return here and sign in.</p></div></div><button type="button" class="email-verification-back">← Back to sign in</button>';
+  }
+  message.addEventListener('click', event => { if (event.target.closest('.email-verification-back')) showSignIn(''); });
   function showPasswordReset(text = '') { authTabs.hidden = true; form.hidden = true; resetForm.hidden = false; document.querySelector('.auth-reset').hidden = true; accountTitle.textContent = 'Set a new password'; accountIntro.textContent = 'Choose a new password for your customer account.'; message.textContent = text; if (!dialog.open) dialog.showModal(); document.querySelector('#auth-new-password').focus(); }
 
   document.querySelector('#account-trigger').addEventListener('click', () => { dialog.showModal(); if (session?.user?.id) { loadCustomerOrders(); loadPendingCheckouts(); loadCustomerNotifications(); subscribeToOrders(); } });
@@ -703,7 +711,7 @@
     const values = new FormData(form); const email = String(values.get('email') || '').trim();
     if (mode === 'signup' && values.get('password') !== values.get('confirmPassword')) { message.textContent = 'The passwords do not match.'; return; }
     submit.disabled = true; message.classList.remove('account-message-warning'); message.textContent = 'Connecting securely…';
-    try { if (mode === 'signup') { const result = await api.signUp(email, values.get('password')); const confirmationPending = !result.access_token; message.textContent = confirmationPending ? 'EMAIL VERIFICATION REQUIRED: A confirmation email has been sent to your inbox. Open that email and confirm your address before signing in. If you cannot find it, check your spam folder.' : 'Account created. You are signed in.'; message.classList.toggle('account-message-warning', confirmationPending); } else { await api.signIn(email, values.get('password')); message.textContent = `Signed in as ${session.user?.email || email}.`; } passwordInput.value = ''; confirmSignupPassword.value = ''; }
+    try { if (mode === 'signup') { const result = await api.signUp(email, values.get('password')); const confirmationPending = !result.access_token; if (confirmationPending) showEmailVerification(result.user?.email || email); else { message.textContent = 'Account created. You are signed in.'; message.classList.remove('account-message-warning'); } } else { await api.signIn(email, values.get('password')); message.textContent = `Signed in as ${session.user?.email || email}.`; } passwordInput.value = ''; confirmSignupPassword.value = ''; }
     catch (error) { message.textContent = error.message; } finally { submit.disabled = false; renderAccountState(); }
   });
   document.querySelector('.auth-reset').addEventListener('click', async () => {
