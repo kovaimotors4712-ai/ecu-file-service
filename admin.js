@@ -897,7 +897,8 @@
       const status=memberStatus(u),safeId=escape(u.id),safeEmail=escape(u.email||'(no email)');
       const created=u.created_at?new Date(u.created_at).toLocaleDateString():'—';
       const last=u.last_sign_in_at?new Date(u.last_sign_in_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'Never signed in';
-      return '<article style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="overflow-wrap:anywhere">'+safeEmail+'</strong><span>'+status+' · '+(u.role==='admin'?'Administrator':'Member')+'</span></div><small>Created '+created+' · Last sign-in '+last+'</small><small style="overflow-wrap:anywhere;color:#68756f">ID: '+safeId+'</small>'+(u.role==='admin'?'<p>Protected administrator account</p>':'<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="button button-ghost" data-member-action="'+(status==='Suspended'?'unban':'ban')+'" data-member-id="'+safeId+'">'+(status==='Suspended'?'Restore access':'Suspend access')+'</button><button type="button" class="button button-ghost" data-member-action="delete" data-member-id="'+safeId+'" style="border-color:#b91c1c;color:#b91c1c">Delete account</button></div>')+'</article>';
+      const approvedAdminTarget=String(u.email||'').trim().toLowerCase()==='kovaimotors4712@gmail.com';
+      return '<article style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="overflow-wrap:anywhere">'+safeEmail+'</strong><span>'+status+' · '+(u.role==='admin'?'Administrator':'Member')+'</span></div><small>Created '+created+' · Last sign-in '+last+'</small><small style="overflow-wrap:anywhere;color:#68756f">ID: '+safeId+'</small>'+(u.role==='admin'?'<p>Protected administrator account</p>':'<div style="display:flex;gap:8px;flex-wrap:wrap">'+(approvedAdminTarget?'<button type="button" class="button button-ghost" data-member-action="grant_admin" data-member-id="'+safeId+'">Make Admin</button>':'')+'<button type="button" class="button button-ghost" data-member-action="'+(status==='Suspended'?'unban':'ban')+'" data-member-id="'+safeId+'">'+(status==='Suspended'?'Restore access':'Suspend access')+'</button><button type="button" class="button button-ghost" data-member-action="delete" data-member-id="'+safeId+'" style="border-color:#b91c1c;color:#b91c1c">Delete account</button></div>')+'</article>';
     }).join('');
     memberPrev.disabled=memberPage<=1;
     memberNext.disabled=memberPage>=pageCount;
@@ -939,9 +940,10 @@
     const button=event.target.closest('button[data-member-action]');if(!button)return;
     const id=button.dataset.memberId,action=button.dataset.memberAction;
     if(action==='delete'&&!confirm('Permanently delete this member account? This may affect their sign-in and related records.'))return;
-    if(action!=='delete'&&!confirm(action==='ban'?'Suspend this member’s sign-in access?':'Restore this member’s sign-in access?'))return;
+    if(action==='grant_admin'&&!confirm('Grant full administrator access to kovaimotors4712@gmail.com? The existing administrator account will remain unchanged.'))return;
+    if(action!=='delete'&&action!=='grant_admin'&&!confirm(action==='ban'?'Suspend this member’s sign-in access?':'Restore this member’s sign-in access?'))return;
     button.disabled=true;memberMessage.classList.remove('admin-error');
-    try{await memberRequest(action==='delete'?'DELETE':'PATCH',{id,action});memberMessage.textContent=action==='delete'?'Member account deleted.':action==='ban'?'Member access suspended.':'Member access restored.';await loadMembers();}
+    try{await memberRequest(action==='delete'?'DELETE':'PATCH',{id,action});memberMessage.textContent=action==='delete'?'Member account deleted.':action==='grant_admin'?'Administrator access granted.':'Member access '+(action==='ban'?'suspended.':'restored.');await loadMembers();}
     catch(error){memberMessage.textContent=error.message;memberMessage.classList.add('admin-error');button.disabled=false;}
   });
   if(memberSearch)memberSearch.addEventListener('input',renderMembers);
