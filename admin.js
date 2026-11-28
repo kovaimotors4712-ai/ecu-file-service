@@ -633,6 +633,65 @@
     finally { button.disabled=false; }
   });
 
+
+  const staticPageCmsForm=document.querySelector('#static-page-cms-form');
+  const staticPageCmsList=document.querySelector('#static-page-cms-list');
+  const staticPageCmsMessage=document.querySelector('#static-page-cms-message');
+  let staticPageCmsItems=[];
+  async function staticPageCmsRequest(method='GET',body=null){
+    const token=backend.getSession()?.access_token;
+    if(!token)throw new Error('Admin sign-in expired. Please sign in again.');
+    const response=await fetch('/api/admin/site-pages',{method,headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
+    const result=await parseJson(response);
+    if(!response.ok)throw new Error(result.error||'Page content request failed.');
+    return result;
+  }
+  function resetStaticPageCmsForm(){
+    staticPageCmsForm.reset();
+    staticPageCmsForm.elements.namedItem('page_title').value='';
+    staticPageCmsForm.elements.namedItem('meta_description').value='';
+    staticPageCmsForm.elements.namedItem('blocks').value='[]';
+    staticPageCmsForm.elements.namedItem('status').value='draft';
+  }
+  async function loadStaticPageCms(){
+    if(!staticPageCmsList)return;
+    staticPageCmsList.textContent='Loading page content…';
+    try{
+      const result=await staticPageCmsRequest('GET');
+      staticPageCmsItems=Array.isArray(result.items)?result.items:[];
+      const labels={about:'About',guides:'Guides',vehicle_wiring:'Vehicle ECU Wiring & Diagnostic Guide',international_support:'International ECU File Support',fault_code_diagnosis:'ECU Fault-Code Diagnosis',ecu_identification:'ECU File Identification & Original Backup',diagnostic_help:'Car Diagnostic Help'};
+      staticPageCmsList.innerHTML=Object.entries(labels).map(([key,label])=>{
+        const item=staticPageCmsItems.find(row=>row.page_key===key);
+        return '<article class="admin-order-card" style="padding:12px;margin-bottom:8px"><strong>'+escape(label)+'</strong><p>Status: '+escape(item?.status||'Not configured')+' · '+(item?.blocks?.length||0)+' blocks</p><button type="button" class="button button-ghost" data-cms-edit="'+escape(key)+'">Edit page content</button></article>';
+      }).join('');
+      staticPageCmsList.querySelectorAll('[data-cms-edit]').forEach(button=>button.addEventListener('click',()=>{
+        const item=staticPageCmsItems.find(row=>row.page_key===button.dataset.cmsEdit);
+        staticPageCmsForm.elements.namedItem('page_key').value=button.dataset.cmsEdit;
+        staticPageCmsForm.elements.namedItem('status').value=item?.status||'draft';
+        staticPageCmsForm.elements.namedItem('page_title').value=item?.page_title||'';
+        staticPageCmsForm.elements.namedItem('meta_description').value=item?.meta_description||'';
+        staticPageCmsForm.elements.namedItem('blocks').value=JSON.stringify(item?.blocks||[],null,2);
+        staticPageCmsForm.scrollIntoView({behavior:'smooth',block:'center'});
+      }));
+    }catch(error){staticPageCmsList.textContent=error.message;}
+  }
+  staticPageCmsForm?.addEventListener('submit',async event=>{
+    event.preventDefault();
+    const button=staticPageCmsForm.querySelector('button[type="submit"]');
+    button.disabled=true;staticPageCmsMessage.classList.remove('admin-error');
+    try{
+      let blocks;
+      try{blocks=JSON.parse(staticPageCmsForm.elements.namedItem('blocks').value);}catch{throw new Error('Content blocks must be valid JSON.');}
+      if(!Array.isArray(blocks))throw new Error('Content blocks must be a JSON array.');
+      const payload={page_key:staticPageCmsForm.elements.namedItem('page_key').value,status:staticPageCmsForm.elements.namedItem('status').value,page_title:staticPageCmsForm.elements.namedItem('page_title').value,meta_description:staticPageCmsForm.elements.namedItem('meta_description').value,blocks};
+      const result=await staticPageCmsRequest('PUT',payload);
+      staticPageCmsMessage.textContent='Saved. '+(result.auditLogged===false?'Warning: the activity log could not be saved.':'The public page will update when published.');
+      await loadStaticPageCms();
+    }catch(error){staticPageCmsMessage.textContent=error.message;staticPageCmsMessage.classList.add('admin-error');}
+    finally{button.disabled=false;}
+  });
+  document.querySelector('#static-page-cms-reset')?.addEventListener('click',resetStaticPageCmsForm);
+
   const softwareProductForm=document.querySelector('#software-product-form');
   const softwareProductList=document.querySelector('#software-product-list');
   const softwareProductMessage=document.querySelector('#software-product-message');
@@ -1169,6 +1228,7 @@
     await loadAdvertisingInquiries();
     await loadAdvertisingQuotes();
     await loadSiteContent();
+    await loadStaticPageCms();
     await loadSoftwareProducts();
     await loadMembers();
     await loadAdminCustomerRequests();
