@@ -1569,6 +1569,109 @@ async function handleCustomerSoftwareDownload(request, response) {
   return true;
 }
 
+
+const CENTRAL_STATIC_CMS_PAGES = Object.freeze({
+  about: { file:'about.html', label:'About' },
+  guides: { file:'guides.html', label:'Guides' },
+  vehicle_wiring: { file:'vehicle-ecu-wiring-diagnostic-guide.html', label:'Vehicle ECU Wiring & Diagnostic Guide' },
+  international_support: { file:'international-ecu-file-support.html', label:'International ECU File Support' },
+  fault_code_diagnosis: { file:'ecu-fault-code-diagnosis.html', label:'ECU Fault-Code Diagnosis' },
+  ecu_identification: { file:'ecu-file-identification-original-backup.html', label:'ECU File Identification & Original Backup' },
+  diagnostic_help: { file:'car-diagnostic-help.html', label:'Car Diagnostic Help' }
+});
+const CENTRAL_STATIC_CMS_PAGE_BY_FILE = Object.freeze(Object.fromEntries(Object.entries(CENTRAL_STATIC_CMS_PAGES).map(([key,value])=>[value.file,key])));
+function cmsText(value, max) {
+  const text = String(value ?? '').replace(/\u0000/g,'').trim();
+  if (text.length > max) throw new Error('A page field exceeds its allowed length.');
+  return text;
+}
+function cmsBlocks(value) {
+  if (!Array.isArray(value) || value.length > 30) throw new Error('Add between 0 and 30 valid content blocks.');
+  return value.map((block) => {
+    if (!block || typeof block !== 'object' || Array.isArray(block)) throw new Error('Invalid content block.');
+    const type = String(block.type || '');
+    if (type === 'heading' || type === 'paragraph') {
+      const text = cmsText(block.text, type === 'heading' ? 160 : 3000);
+      if (!text) throw new Error('Content blocks cannot be empty.');
+      return { type, text };
+    }
+    if (type === 'list') {
+      if (!Array.isArray(block.items) || block.items.length < 1 || block.items.length > 20) throw new Error('A list must contain 1 to 20 items.');
+      const items = block.items.map(item=>cmsText(item,500));
+      if (items.some(item=>!item)) throw new Error('List items cannot be empty.');
+      return { type, items };
+    }
+    if (type === 'link') {
+      const label = cmsText(block.label,120);
+      const url = cmsText(block.url,300);
+      if (!label || !/^\/(?!\/)[a-z0-9][a-z0-9/_-]*(?:\.html)?(?:#[a-z0-9_-]+)?$/i.test(url) || url.includes('..')) throw new Error('Links must point to a safe internal website page.');
+      return { type, label, url };
+    }
+    throw new Error('Unsupported content block type.');
+  });
+}
+function cmsPagePayload(body, editorId) {
+  const pageKey = String(body.page_key || '');
+  if (!CENTRAL_STATIC_CMS_PAGES[pageKey]) throw new Error('Choose an approved information page.');
+  const status = String(body.status || 'draft');
+  if (!['draft','published','hidden'].includes(status)) throw new Error('Invalid page content status.');
+  return {
+    page_key:pageKey,
+    page_title:cmsText(body.page_title,120),
+    meta_description:cmsText(body.meta_description,300),
+    blocks:cmsBlocks(body.blocks),
+    status,
+    updated_by:editorId
+  };
+}
+function escapeCmsHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+}
+function renderCmsBlocks(blocks) {
+  if (!Array.isArray(blocks)) return '';
+  const rendered = blocks.map(block=>{
+    if (block.type === 'heading') return '<h2>'+escapeCmsHtml(block.text)+'</h2>';
+    if (block.type === 'paragraph') return '<p>'+escapeCmsHtml(block.text)+'</p>';
+    if (block.type === 'list') return '<ul>'+block.items.map(item=>'<li>'+escapeCmsHtml(item)+'</li>').join('')+'</ul>';
+    if (block.type === 'link') return '<p><a href="'+escapeCmsHtml(block.url)+'">'+escapeCmsHtml(block.label)+'</a></p>';
+    return '';
+  }).join('');
+  return rendered ? '<section class="site-page-cms-content" aria-label="Additional page information">'+rendered+'</section>' : '';
+}
+async function getPublishedStaticCmsPage(pageKey) {
+  if (!supabaseServiceRoleKey || !CENTRAL_STATIC_CMS_PAGES[pageKey]) return null;
+  try {
+    const result=await supabaseRequest(serviceToken(),'rest/v1/site_page_content?select=page_key,page_title,meta_description,blocks,status& page_key=eq.'+encodeURIComponent(pageKey)+'&status=eq.published&limit=1'.replace('& ','&'),{timeoutMs:3500});
+    if (!result.ok) return null;
+    const rows=await result.json();
+    return Array.isArray(rows) ? rows[0] || null : null;
+  } catch { return null; }
+}
+async function handleAdminStaticPageContent(request,response) {
+  const admin=await requireAdmin(request);
+  if (!admin) { jsonResponse(response,403,{error:'Administrator role is required.'}); return true; }
+  if (!supabaseServiceRoleKey) { jsonResponse(response,503,{error:'Static page content management is unavailable.'}); return true; }
+  const token=serviceToken();
+  if (request.method==='GET') {
+    const result=await supabaseRequest(token,'rest/v1/site_page_content?select=page_key,page_title,meta_description,blocks,status,updated_by,updated_at&order=page_key.asc',{timeoutMs:12000});
+    if (!result.ok) { jsonResponse(response,502,{error:'Static page content could not be loaded.'}); return true; }
+    jsonResponse(response,200,{pages:CENTRAL_STATIC_CMS_PAGES,items:await result.json()}); return true;
+  }
+  if (request.method!=='PUT') { jsonResponse(response,405,{error:'Method Not Allowed'}); return true; }
+  try {
+    const body=await readJson(request,24000);
+    const payload=cmsPagePayload(body,admin.id);
+    const existing=await supabaseRequest(token,'rest/v1/site_page_content?select=page_key,status&page_key=eq.'+encodeURIComponent(payload.page_key)+'&limit=1',{timeoutMs:10000});
+    if (!existing.ok) { jsonResponse(response,502,{error:'Page content could not be checked before saving.'}); return true; }
+    const previous=(await existing.json())?.[0] || null;
+    const result=await supabaseRequest(token,'rest/v1/site_page_content?on_conflict=page_key&select=page_key,page_title,meta_description,blocks,status,updated_at',{method:'POST',prefer:'resolution=merge-duplicates,return=representation',body:payload,timeoutMs:12000});
+    if (!result.ok) { jsonResponse(response,502,{error:'Page content could not be saved.'}); return true; }
+    const item=(await result.json())?.[0] || null;
+    const auditLogged=await writeCentralAdminAudit(admin,previous?'update':'create','site_page_content',payload.page_key,{status:payload.status,block_count:payload.blocks.length});
+    jsonResponse(response,200,{item,auditLogged}); return true;
+  } catch(error) { jsonResponse(response,error.statusCode||400,{error:error.message||'Invalid page content.'}); return true; }
+}
+
 async function handleAdminSiteContent(request, response) {
   const admin = await requireAdmin(request);
   if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
@@ -2338,6 +2441,7 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/admin/software-products') return handleAdminSoftwareProducts(request, response);
   if (url.pathname === '/api/admin/users') return handleAdminUsers(request, response);
   if (url.pathname === '/api/admin/moderation') return handleAdminCentralModeration(request, response, url);
+  if (url.pathname === '/api/admin/site-pages') return handleAdminStaticPageContent(request,response);
   if (url.pathname === '/api/admin/advertising/quotes') return handleAdminAdvertisingQuotes(request, response);
   if (url.pathname === '/api/advertising/quote') return handlePublicAdvertisingQuote(request, response);
   if (url.pathname === '/api/advertising/payment/create-order') return handleCreateAdvertisingPayment(request, response);
@@ -2561,7 +2665,7 @@ function createHttpServer() {
     const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
     if (!publicFiles.has(relative)) { response.writeHead(404).end('Not found'); return; }
     const target = path.join(root, relative);
-    fs.readFile(target, (error, contents) => { if (error) { response.writeHead(error.code === 'ENOENT' ? 404 : 500, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found'); return; } const cacheControl = relative.endsWith('.html') ? 'no-store' : 'no-cache, must-revalidate'; response.writeHead(200, { 'Content-Type': mime[path.extname(target)] || 'application/octet-stream', 'Cache-Control': cacheControl, 'X-Content-Type-Options': 'nosniff' }); response.end(contents); });
+    fs.readFile(target, async (error, contents) => { if (error) { response.writeHead(error.code === 'ENOENT' ? 404 : 500, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found'); return; } let output=contents; const cmsPageKey=CENTRAL_STATIC_CMS_PAGE_BY_FILE[relative]; if(cmsPageKey){ const cms=await getPublishedStaticCmsPage(cmsPageKey); if(cms){ let html=output.toString('utf8'); const title=String(cms.page_title||'').trim(); const description=String(cms.meta_description||'').trim(); if(title) html=html.replace(/<title>[^<]*<\/title>/i,'<title>'+escapeCmsHtml(title)+'</title>'); if(description) html=html.replace(/(<meta\s+name=["']description["']\s+content=["'])[^"']*(["'][^>]*>)/i,'$1'+escapeCmsHtml(description)+'$2'); const section=renderCmsBlocks(cms.blocks); if(section && /<\/main>/i.test(html)) html=html.replace(/<\/main>/i,section+'</main>'); output=Buffer.from(html,'utf8'); } } const cacheControl = relative.endsWith('.html') ? 'no-store' : 'no-cache, must-revalidate'; response.writeHead(200, { 'Content-Type': mime[path.extname(target)] || 'application/octet-stream', 'Cache-Control': cacheControl, 'X-Content-Type-Options': 'nosniff' }); response.end(output); });
   });
   return server;
 }
