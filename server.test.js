@@ -38,7 +38,7 @@ const tokens = {
 const centralModerationTables = {
   forum_categories:new Map(), forum_topics:new Map(), forum_replies:new Map(), forum_chat_messages:new Map(),
   workshop_reviews:new Map(), workshops:new Map(), forum_reports:new Map(), workshop_reports:new Map(),
-  community_admin_audit:new Map()
+  community_admin_audit:new Map(), site_page_content:new Map()
 };
 const softwareSeoFixture = {
   id: '123e4567-e89b-42d3-a456-426614174000',
@@ -261,10 +261,11 @@ const upstream = async (urlValue, options = {}) => {
   }
 
 
-  const moderationTableMatch=url.pathname.match(/^\/rest\/v1\/(forum_categories|forum_topics|forum_replies|forum_chat_messages|workshop_reviews|workshops|forum_reports|workshop_reports|community_admin_audit)$/);
+  const moderationTableMatch=url.pathname.match(/^\/rest\/v1\/(forum_categories|forum_topics|forum_replies|forum_chat_messages|workshop_reviews|workshops|forum_reports|workshop_reports|community_admin_audit|site_page_content)$/);
   if(moderationTableMatch){
     const table=moderationTableMatch[1],rows=centralModerationTables[table],idFilter=url.searchParams.get('id');
     let selected=[...rows.values()].filter(row=>!idFilter||idFilter==='eq.'+row.id);
+    for(const key of ['page_key','status']){const filter=url.searchParams.get(key);if(filter?.startsWith('eq.'))selected=selected.filter(row=>String(row[key])===filter.slice(3));}
     if(method==='GET')return response(200,selected);
     if(method==='PATCH'){const body=JSON.parse(options.body||'{}');for(const row of selected)Object.assign(row,body);return response(200,selected.map(row=>({...row})));}
     if(method==='DELETE'){for(const row of selected)rows.delete(row.id);return response(200,selected.map(row=>({...row})));}
@@ -589,6 +590,47 @@ async function call(pathname, { method = 'GET', body, token } = {}) {
   return { response, payload };
 }
 
+
+
+
+test('static page CMS is administrator-only, uses a fixed page allowlist and validates safe structured blocks', async () => {
+  const denied=await call('/api/admin/site-pages',{token:tokens.moderator});
+  assert.equal(denied.response.status,403);
+  const loaded=await call('/api/admin/site-pages',{token:tokens.admin});
+  assert.equal(loaded.response.status,200);
+  assert.deepEqual(Object.keys(loaded.payload.pages).sort(),['about','diagnostic_help','ecu_identification','fault_code_diagnosis','guides','international_support','vehicle_wiring'].sort());
+  const invalidPage=await call('/api/admin/site-pages',{method:'PUT',token:tokens.admin,body:{page_key:'index',status:'published',blocks:[]}});
+  assert.equal(invalidPage.response.status,400);
+  const unsafeLink=await call('/api/admin/site-pages',{method:'PUT',token:tokens.admin,body:{page_key:'about',status:'published',blocks:[{type:'link',label:'Bad link',url:'https://evil.example'}]}});
+  assert.equal(unsafeLink.response.status,400);
+  const script=await call('/api/admin/site-pages',{method:'PUT',token:tokens.admin,body:{page_key:'about',status:'published',blocks:[{type:'paragraph',text:'<script>alert(1)</script>'}]}});
+  assert.equal(script.response.status,200);
+  assert.equal(centralModerationTables.site_page_content.size,1);
+  assert.equal(centralModerationTables.community_admin_audit.size,1);
+});
+
+test('published static CMS content is escaped and appended without replacing canonical or structured data', async () => {
+  centralModerationTables.site_page_content.set('about',{page_key:'about',page_title:'Updated About Title',meta_description:'Updated description for the about page with safe information.',blocks:[{type:'heading',text:'CMS heading <script>'},{type:'paragraph',text:'Safe paragraph & details.'},{type:'link',label:'Services',url:'/ecu-file-services.html'}],status:'published'});
+  const page=await call('/about.html');
+  assert.equal(page.response.status,200);
+  assert.match(page.payload,/Updated About Title/);
+  assert.match(page.payload,/Updated description for the about page/);
+  assert.match(page.payload,/<h2>CMS heading &lt;script&gt;<\\/h2>/);
+  assert.match(page.payload,/Safe paragraph &amp; details\\./);
+  assert.match(page.payload,/href="\\/ecu-file-services\\.html">Services<\\/a>/);
+  assert.match(page.payload,/rel="canonical"/);
+  assert.match(page.payload,/application\\/ld\\+json/);
+  assert.doesNotMatch(page.payload,/<script>alert\\(1\\)<\\/script>/);
+});
+
+test('draft and hidden static CMS content never appears on public information pages', async () => {
+  for(const status of ['draft','hidden']){
+    centralModerationTables.site_page_content.set('about',{page_key:'about',page_title:'Must Not Display',meta_description:'',blocks:[{type:'paragraph',text:'Private draft content'}],status});
+    const page=await call('/about.html');
+    assert.equal(page.response.status,200);
+    assert.doesNotMatch(page.payload,/Must Not Display|Private draft content/);
+  }
+});
 
 test('central moderation API is admin-only, supports reversible chat hiding and records activity', async () => {
   const id='123e4567-e89b-42d3-a456-426614174111';
