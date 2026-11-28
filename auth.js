@@ -405,7 +405,7 @@
     passwordInput.autocomplete = signingUp ? 'new-password' : 'current-password';
     confirmSignupPassword.hidden = !signingUp; confirmSignupPassword.disabled = !signingUp; confirmSignupPassword.required = signingUp; confirmSignupPassword.value = '';
     submit.innerHTML = signingUp ? 'Create account <span>→</span>' : 'Sign in <span>→</span>';
-    if (clearMessage) message.textContent = '';
+    if (clearMessage) { message.textContent = ''; message.classList.remove('is-warning'); }
   }
   function showSignIn(text = '') { authTabs.hidden = false; form.hidden = false; resetForm.hidden = true; document.querySelector('.auth-reset').hidden = false; accountTitle.textContent = 'Sign in to your account'; accountIntro.textContent = 'Save requests and access your private file history.'; setMode('signin', false); message.textContent = text; }
   function showPasswordReset(text = '') { authTabs.hidden = true; form.hidden = true; resetForm.hidden = false; document.querySelector('.auth-reset').hidden = true; accountTitle.textContent = 'Set a new password'; accountIntro.textContent = 'Choose a new password for your customer account.'; message.textContent = text; if (!dialog.open) dialog.showModal(); document.querySelector('#auth-new-password').focus(); }
@@ -699,8 +699,8 @@
     if (!configured) { message.textContent = 'Customer accounts are not connected yet.'; return; }
     const values = new FormData(form); const email = String(values.get('email') || '').trim();
     if (mode === 'signup' && values.get('password') !== values.get('confirmPassword')) { message.textContent = 'The passwords do not match.'; return; }
-    submit.disabled = true; message.textContent = 'Connecting securely…';
-    try { if (mode === 'signup') { const result = await api.signUp(email, values.get('password')); message.textContent = result.access_token ? 'Account created. You are signed in.' : 'Account request received. Check your inbox to confirm your email, then sign in.'; } else { await api.signIn(email, values.get('password')); message.textContent = `Signed in as ${session.user?.email || email}.`; } passwordInput.value = ''; confirmSignupPassword.value = ''; }
+    submit.disabled = true; message.classList.remove('is-warning'); message.textContent = 'Connecting securely…';
+    try { if (mode === 'signup') { const result = await api.signUp(email, values.get('password')); if (result.access_token) { message.textContent = 'Account created. You are signed in.'; } else { message.textContent = 'SECURE EMAIL VERIFICATION REQUIRED: Check your inbox (and spam folder) and confirm your email address before signing in.'; message.classList.add('is-warning'); } } else { await api.signIn(email, values.get('password')); message.textContent = `Signed in as ${session.user?.email || email}.`; } passwordInput.value = ''; confirmSignupPassword.value = ''; }
     catch (error) { message.textContent = error.message; } finally { submit.disabled = false; renderAccountState(); }
   });
   document.querySelector('.auth-reset').addEventListener('click', async () => {
