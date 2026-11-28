@@ -776,7 +776,7 @@
     requests.innerHTML='<div><span class="form-kicker">CUSTOMER INBOX</span><h2>Customer requirements</h2><p>Private requests from customers. Only authorized administrators can review and reply.</p></div><p id="admin-customer-requests-message" class="admin-message" role="status">Loading customer requirements…</p><div id="admin-customer-requests-list" class="admin-order-list"></div>';
     const notifications=document.createElement('section');notifications.className='admin-notifications-panel';
     notifications.innerHTML='<span class="form-kicker">WORK QUEUE</span><h2>Notifications & pending work</h2><p>Counts summarize current pending queues. Open a folder to review the actual records.</p><div id="admin-notifications-list" class="admin-notifications-list"></div>';
-    const defs=[{key:'notifications',title:'Overview & Alerts',nodes:[notifications]},{key:'orders',title:'Orders',nodes:[]},{key:'requirements',title:'Customer Inbox',nodes:[requests]},{key:'software',title:'Software Store',nodes:[]},{key:'members',title:'Members & Access',nodes:[]},{key:'advertising',title:'Announcements',nodes:[]},{key:'forum',title:'Forum Post Manager',nodes:[]},{key:'settings',title:'Settings',nodes:[]}];
+    const defs=[{key:'notifications',title:'Overview & Alerts',nodes:[notifications]},{key:'members',title:'Members & Access',nodes:[]},{key:'orders',title:'Orders',nodes:[]},{key:'requirements',title:'Customer Inbox',nodes:[requests]},{key:'software',title:'Software Store',nodes:[]},{key:'advertising',title:'Announcements',nodes:[]},{key:'forum',title:'Forum Post Manager',nodes:[]},{key:'settings',title:'Settings',nodes:[]}];
     defs.find(x=>x.key==='orders').nodes=[pick('.admin-dashboard-controls'),...Array.from(dashboard.querySelectorAll('.admin-analytics-section')),pick('#orders-message'),pick('#order-list')].filter(Boolean);
     defs.find(x=>x.key==='advertising').nodes=[pick('[aria-labelledby="site-content-title"]')].filter(Boolean);
     defs.find(x=>x.key==='software').nodes=[pick('[aria-labelledby="software-products-title"]')].filter(Boolean);
@@ -784,7 +784,7 @@
     defs.find(x=>x.key==='forum').nodes=[pick('#forum-post-manager-section')].filter(Boolean);
     defs.find(x=>x.key==='settings').nodes=[pick('[aria-labelledby="pricing-settings-title"]'),pick('[aria-labelledby="public-contact-title"]')].filter(Boolean);
     defs.forEach(function(def){
-      const details=document.createElement('details');details.className='admin-folder';details.dataset.adminFolder=def.key;details.open=def.key==='notifications';
+      const details=document.createElement('details');details.className='admin-folder';details.dataset.adminFolder=def.key;details.open=['notifications','members'].includes(def.key);
       const summary=document.createElement('summary');const label=document.createElement('span');label.className='admin-folder-title';label.textContent=def.title;
       const badge=document.createElement('span');badge.className='admin-folder-badge';badge.dataset.adminFolderBadge=def.key;badge.hidden=true;badge.textContent='0';summary.append(label,badge);details.append(summary);
       const content=document.createElement('div');content.className='admin-folder-content';details.append(content);def.nodes.forEach(function(node){content.append(node);});grid.append(details);
