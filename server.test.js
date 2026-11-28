@@ -83,7 +83,8 @@ const state = {
   razorOrderCurrency: 'INR',
   razorOrderNotes: null,
   paypalOrderStatus: 'CREATED',
-  brevoShouldFail: false
+  brevoShouldFail: false,
+  brevoFailOnCall: null
 };
 
 function resetState() {
@@ -105,6 +106,7 @@ function resetState() {
   state.razorOrderNotes = null;
   state.paypalOrderStatus = 'CREATED';
   state.brevoShouldFail = false;
+  state.brevoFailOnCall = null;
 }
 
 function uuidFor(prefix, n) {
@@ -248,7 +250,7 @@ const upstream = async (urlValue, options = {}) => {
     state.brevoCalls += 1;
     state.lastBrevoRequest = { headers: options.headers, body: JSON.parse(options.body) };
     state.brevoRequests.push(state.lastBrevoRequest);
-    if (state.brevoShouldFail) return response(500, { message: 'synthetic Brevo outage' });
+    if (state.brevoShouldFail || state.brevoFailOnCall === state.brevoCalls) return response(500, { message: 'synthetic Brevo outage' });
     return response(201, { messageId: '<email-local-1@relay.example.invalid>' });
   }
 
@@ -1219,6 +1221,7 @@ test('Brevo outbox sends event-specific email to Admin and customer idempotently
   await flushNotificationOutbox();
   assert.equal(state.brevoCalls, 4);
   assert.equal([...state.outbox.values()].every(row => row.status === 'SENT'), true);
+  assert.ok([...state.outbox.values()].every(row => row.payload?._brevo_delivery?.admin?.sent_at && row.payload?._brevo_delivery?.customer?.sent_at));
   assert.deepEqual(state.brevoRequests.map(item => item.body.to[0].email), [
     'admin@example.invalid','customer@example.invalid','admin@example.invalid','customer@example.invalid'
   ]);
@@ -1285,6 +1288,24 @@ test('status-change notification sends separate idempotent updates to Admin and 
   assert.ok(paid.verify.payload.orderId);
 });
 
+test('Brevo retry skips a recipient whose delivery was already confirmed', async () => {
+  await paidRazorpayIntent();
+  state.brevoFailOnCall = 2;
+  await flushNotificationOutbox();
+  const row = [...state.outbox.values()].find(item => item.event_type === 'new_order');
+  assert.equal(row.status, 'RETRY');
+  assert.ok(row.payload?._brevo_delivery?.admin?.sent_at);
+  assert.equal(row.payload?._brevo_delivery?.customer, undefined);
+  const adminDeliveriesBeforeRetry = state.brevoRequests.filter(item => item.body.to[0].email === 'admin@example.invalid').length;
+  state.brevoFailOnCall = null;
+  row.next_attempt_at = new Date(Date.now() - 1000).toISOString();
+  await flushNotificationOutbox();
+  assert.equal(row.status, 'SENT');
+  const adminDeliveriesAfterRetry = state.brevoRequests.filter(item => item.body.to[0].email === 'admin@example.invalid').length;
+  assert.equal(adminDeliveriesAfterRetry, adminDeliveriesBeforeRetry);
+  assert.ok(row.payload?._brevo_delivery?.customer?.sent_at);
+});
+
 test('Brevo failure moves an email event to RETRY instead of breaking the order', async () => {
   const paid = await paidRazorpayIntent();
   state.brevoShouldFail = true;
@@ -1339,7 +1360,7 @@ test('static source contains category field isolation, provider routes, Brevo, a
   assert.match(index,/class="[^"]*\becu-only\b[^"]*"/);
   assert.match(admin,/class="order-status-select"/);
   assert.match(serverSource,/PayPal is disabled\. Use Razorpay checkout instead\./);
-  assert.match(serverSource,/api\.brevo\.com\/emails/);
+  assert.match(serverSource,/api\\.brevo\\.com\\/v3\\/smtp\\/email/);
   assert.match(serverSource,/notification_outbox/);
 });
 
