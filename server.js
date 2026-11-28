@@ -57,7 +57,7 @@ function isUnsupportedElectricModel(brand, model) {
   });
 }
 
-const publicFiles = new Set(['index.html', 'manifest.json', 'sw.js', 'app-icon-192.svg', 'app-icon-512.svg', 'software-cover-ecu.svg', 'software-cover-diagnostics.svg', 'software-cover-immobilizer.svg', 'software-cover-airbag.svg', 'software-cover-emissions.svg', 'software-cover-adas.svg', 'software-cover-dashboard.svg', 'software-cover-electronics.svg', 'software-cover-workshop.svg', 'car-diagnostic-help.html', 'dtc-search.html', 'car-electrical-diagnostics.html', 'workshops.html', 'admin.html', 'advertising-quote.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'ecu-fault-code-diagnosis.html', 'ecu-file-identification-original-backup.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'terms.html', 'privacy.html', 'contact.html', 'about.html', 'international-ecu-file-support.html', 'vehicle-ecu-wiring-diagnostic-guide.html', 'googlea2bbe9d2fd8bede2.html', '9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d.txt']);
+const publicFiles = new Set(['index.html', 'manifest.json', 'sw.js', 'app-icon-192.svg', 'app-icon-512.svg', 'software-cover-ecu.svg', 'software-cover-diagnostics.svg', 'software-cover-immobilizer.svg', 'software-cover-airbag.svg', 'software-cover-emissions.svg', 'software-cover-adas.svg', 'software-cover-dashboard.svg', 'software-cover-electronics.svg', 'software-cover-workshop.svg', 'car-diagnostic-help.html', 'dtc-search.html', 'car-electrical-diagnostics.html', 'workshops.html', 'admin.html', 'moderation.html', 'moderation.js', 'advertising-quote.html', 'styles.css', 'admin.css', 'app.js', 'auth.js', 'supabase.js', 'admin.js', 'robots.txt', 'sitemap.xml', 'ecu-file-services.html', 'airbag-crash-clear.html', 'guides.html', 'ecu-fault-code-diagnosis.html', 'ecu-file-identification-original-backup.html', 'guides.css', 'forum.html', 'forum.css', 'forum.js', 'store.html', 'membership.html', 'announcements.html', 'advertise.html', 'terms.html', 'privacy.html', 'contact.html', 'about.html', 'international-ecu-file-support.html', 'vehicle-ecu-wiring-diagnostic-guide.html', 'googlea2bbe9d2fd8bede2.html', '9f6a3d1c8b7e4a2f9d0c6b5e1a8f3c7d.txt']);
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
@@ -245,6 +245,12 @@ async function requireAdmin(request) {
   const customer = await requireCustomer(request);
   if (!customer) return null;
   if (customer.user?.app_metadata?.role !== 'admin') return null;
+  return customer;
+}
+async function requireCommunityModerator(request) {
+  const customer = await requireCustomer(request);
+  if (!customer) return null;
+  if (!['admin','moderator'].includes(customer.user?.app_metadata?.role)) return null;
   return customer;
 }
 
@@ -784,7 +790,9 @@ async function handleAdminStatus(request, response) {
       const err = await updated.json().catch(() => null);
       jsonResponse(response, updated.status >= 500 ? 502 : 409, { error: err?.message || 'The order status could not be saved.' }); return true;
     }
-    jsonResponse(response, 200, { order: (await updated.json())?.[0] || null });
+    const updatedOrder = (await updated.json())?.[0] || null;
+    await writeCentralAdminAudit(admin, 'update_order_status', 'order', orderId, { from:current.status, to:body.status });
+    jsonResponse(response, 200, { order: updatedOrder });
   } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Admin status update failed.' }); }
   return true;
 }
@@ -1154,6 +1162,7 @@ async function handleAdminReply(request, response) {
       return true;
     }
     const inserted = await insertRes.json();
+    await writeCentralAdminAudit(admin, 'send_order_message', 'order', orderId, { message_length:cleanMessage.length });
     jsonResponse(response, 201, { message: inserted?.[0] || null });
   } catch (error) { jsonResponse(response, error.statusCode || 400, { error: error.message || 'Failed to send reply.' }); }
   return true;
@@ -1437,6 +1446,7 @@ async function handleAdminSiteSettings(request, response) {
       const payload={id:true,telegram_url:telegram,updated_at:new Date().toISOString(),updated_by:admin.id};
       const result=await supabaseRequest(token,'rest/v1/site_public_settings?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=representation',body:payload,timeoutMs:12000});
       if(!result.ok){jsonResponse(response,502,{error:'Telegram link could not be saved.'});return true;}
+      await writeCentralAdminAudit(admin,'update','site_public_settings',null,{setting:'telegram_url'});
       jsonResponse(response,200,{settings:{telegram_url:telegram}});return true;
     } catch(error) { jsonResponse(response,error.statusCode||400,{error:error.message||'Invalid Telegram link.'});return true; }
   }
@@ -1559,6 +1569,110 @@ async function handleCustomerSoftwareDownload(request, response) {
   return true;
 }
 
+
+const CENTRAL_STATIC_CMS_PAGES = Object.freeze({
+  about: { file:'about.html', label:'About' },
+  guides: { file:'guides.html', label:'Guides' },
+  vehicle_wiring: { file:'vehicle-ecu-wiring-diagnostic-guide.html', label:'Vehicle ECU Wiring & Diagnostic Guide' },
+  international_support: { file:'international-ecu-file-support.html', label:'International ECU File Support' },
+  fault_code_diagnosis: { file:'ecu-fault-code-diagnosis.html', label:'ECU Fault-Code Diagnosis' },
+  ecu_identification: { file:'ecu-file-identification-original-backup.html', label:'ECU File Identification & Original Backup' },
+  diagnostic_help: { file:'car-diagnostic-help.html', label:'Car Diagnostic Help' }
+});
+const CENTRAL_STATIC_CMS_PAGE_BY_FILE = Object.freeze(Object.fromEntries(Object.entries(CENTRAL_STATIC_CMS_PAGES).map(([key,value])=>[value.file,key])));
+function cmsText(value, max) {
+  const text = String(value ?? '').replace(/\u0000/g,'').trim();
+  if (text.length > max) throw new Error('A page field exceeds its allowed length.');
+  return text;
+}
+function cmsBlocks(value) {
+  if (!Array.isArray(value) || value.length > 30) throw new Error('Add between 0 and 30 valid content blocks.');
+  return value.map((block) => {
+    if (!block || typeof block !== 'object' || Array.isArray(block)) throw new Error('Invalid content block.');
+    const type = String(block.type || '');
+    if (type === 'heading' || type === 'paragraph') {
+      const text = cmsText(block.text, type === 'heading' ? 160 : 3000);
+      if (!text) throw new Error('Content blocks cannot be empty.');
+      return { type, text };
+    }
+    if (type === 'list') {
+      if (!Array.isArray(block.items) || block.items.length < 1 || block.items.length > 20) throw new Error('A list must contain 1 to 20 items.');
+      const items = block.items.map(item=>cmsText(item,500));
+      if (items.some(item=>!item)) throw new Error('List items cannot be empty.');
+      return { type, items };
+    }
+    if (type === 'link') {
+      const label = cmsText(block.label,120);
+      const url = cmsText(block.url,300);
+      if (!label || !/^\/(?!\/)[a-z0-9][a-z0-9/_-]*(?:\.html)?(?:#[a-z0-9_-]+)?$/i.test(url) || url.includes('..')) throw new Error('Links must point to a safe internal website page.');
+      return { type, label, url };
+    }
+    throw new Error('Unsupported content block type.');
+  });
+}
+function cmsPagePayload(body, editorId) {
+  const pageKey = String(body.page_key || '');
+  if (!CENTRAL_STATIC_CMS_PAGES[pageKey]) throw new Error('Choose an approved information page.');
+  const status = String(body.status || 'draft');
+  if (!['draft','published','hidden'].includes(status)) throw new Error('Invalid page content status.');
+  return {
+    page_key:pageKey,
+    page_title:cmsText(body.page_title,120),
+    meta_description:cmsText(body.meta_description,300),
+    blocks:cmsBlocks(body.blocks),
+    status,
+    updated_by:editorId,
+    updated_at:new Date().toISOString()
+  };
+}
+function escapeCmsHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+}
+function renderCmsBlocks(blocks) {
+  if (!Array.isArray(blocks)) return '';
+  const rendered = blocks.map(block=>{
+    if (block.type === 'heading') return '<h2>'+escapeCmsHtml(block.text)+'</h2>';
+    if (block.type === 'paragraph') return '<p>'+escapeCmsHtml(block.text)+'</p>';
+    if (block.type === 'list') return '<ul>'+block.items.map(item=>'<li>'+escapeCmsHtml(item)+'</li>').join('')+'</ul>';
+    if (block.type === 'link') return '<p><a href="'+escapeCmsHtml(block.url)+'">'+escapeCmsHtml(block.label)+'</a></p>';
+    return '';
+  }).join('');
+  return rendered ? '<section class="site-page-cms-content" aria-label="Additional page information">'+rendered+'</section>' : '';
+}
+async function getPublishedStaticCmsPage(pageKey) {
+  if (!supabaseServiceRoleKey || !CENTRAL_STATIC_CMS_PAGES[pageKey]) return null;
+  try {
+    const result=await supabaseRequest(serviceToken(),'rest/v1/site_page_content?select=page_key,page_title,meta_description,blocks,status&page_key=eq.'+encodeURIComponent(pageKey)+'&status=eq.published&limit=1',{timeoutMs:3500});
+    if (!result.ok) return null;
+    const rows=await result.json();
+    return Array.isArray(rows) ? rows[0] || null : null;
+  } catch { return null; }
+}
+async function handleAdminStaticPageContent(request,response) {
+  const admin=await requireAdmin(request);
+  if (!admin) { jsonResponse(response,403,{error:'Administrator role is required.'}); return true; }
+  if (!supabaseServiceRoleKey) { jsonResponse(response,503,{error:'Static page content management is unavailable.'}); return true; }
+  const token=serviceToken();
+  if (request.method==='GET') {
+    const result=await supabaseRequest(token,'rest/v1/site_page_content?select=page_key,page_title,meta_description,blocks,status,updated_by,updated_at&order=page_key.asc',{timeoutMs:12000});
+    if (!result.ok) { jsonResponse(response,502,{error:'Static page content could not be loaded.'}); return true; }
+    jsonResponse(response,200,{pages:CENTRAL_STATIC_CMS_PAGES,items:await result.json()}); return true;
+  }
+  if (request.method!=='PUT') { jsonResponse(response,405,{error:'Method Not Allowed'}); return true; }
+  try {
+    const body=await readJson(request,24000);
+    const payload=cmsPagePayload(body,admin.id);
+    const existing=await supabaseRequest(token,'rest/v1/site_page_content?select=page_key,status&page_key=eq.'+encodeURIComponent(payload.page_key)+'&limit=1',{timeoutMs:10000});
+    if (!existing.ok) { jsonResponse(response,502,{error:'Page content could not be checked before saving.'}); return true; }
+    const previous=(await existing.json())?.[0] || null;
+    const result=await supabaseRequest(token,'rest/v1/site_page_content?on_conflict=page_key&select=page_key,page_title,meta_description,blocks,status,updated_at',{method:'POST',prefer:'resolution=merge-duplicates,return=representation',body:payload,timeoutMs:12000});
+    if (!result.ok) { jsonResponse(response,502,{error:'Page content could not be saved.'}); return true; }
+    const item=(await result.json())?.[0] || null;
+    const auditLogged=await writeCentralAdminAudit(admin,previous?'update':'create','site_page_content',payload.page_key,{status:payload.status,block_count:payload.blocks.length});
+    jsonResponse(response,200,{item,auditLogged}); return true;
+  } catch(error) { jsonResponse(response,error.statusCode||400,{error:error.message||'Invalid page content.'}); return true; }
+}
+
 async function handleAdminSiteContent(request, response) {
   const admin = await requireAdmin(request);
   if (!admin) { jsonResponse(response, 403, { error: 'Administrator role is required.' }); return true; }
@@ -1575,7 +1689,9 @@ async function handleAdminSiteContent(request, response) {
       const payload = announcementPayload(body, admin.id);
       const result = await supabaseRequest(token, 'rest/v1/site_announcements?select=*', { method:'POST', prefer:'return=representation', body:payload, timeoutMs:12000 });
       if (!result.ok) { jsonResponse(response, 502, { error:'Announcement could not be saved.' }); return true; }
-      jsonResponse(response, 201, { item:(await result.json())?.[0] || null }); return true;
+      const item=(await result.json())?.[0] || null;
+      await writeCentralAdminAudit(admin,'create','site_announcement',item?.id,{kind:item?.kind||null,placement:item?.placement||null});
+      jsonResponse(response, 201, { item }); return true;
     } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Invalid content.' }); return true; }
   }
   if (request.method === 'DELETE') {
@@ -1587,6 +1703,7 @@ async function handleAdminSiteContent(request, response) {
       if (!result.ok) { jsonResponse(response, 502, { error:'Announcement could not be deleted.' }); return true; }
       const rows = await result.json();
       if (!rows || !rows.length) { jsonResponse(response, 404, { error:'Announcement not found.' }); return true; }
+      await writeCentralAdminAudit(admin,'delete','site_announcement',id);
       jsonResponse(response, 200, { deleted:true }); return true;
     } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Announcement could not be deleted.' }); return true; }
   }
@@ -1600,6 +1717,7 @@ async function handleAdminSiteContent(request, response) {
       if (!result.ok) { jsonResponse(response, 502, { error:'Announcement could not be updated.' }); return true; }
       const rows = await result.json();
       if (!rows?.length) { jsonResponse(response, 404, { error:'Announcement not found.' }); return true; }
+      await writeCentralAdminAudit(admin,'update','site_announcement',id,{kind:rows[0]?.kind||null,placement:rows[0]?.placement||null});
       jsonResponse(response, 200, { item:rows[0] }); return true;
     } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Invalid content.' }); return true; }
   }
@@ -1655,15 +1773,21 @@ async function handleAdminAdvertisingInquiries(request, response) {
     const removed = await supabaseRequest(token, 'rest/v1/advertising_inquiries?id=eq.'+encodeURIComponent(id)+'&select=id', { method:'DELETE', prefer:'return=representation', timeoutMs:12000 });
     if (!removed.ok) { jsonResponse(response, 502, { error:'Enquiry could not be deleted.' }); return true; }
     if (!(await removed.json())?.length) { jsonResponse(response, 404, { error:'Enquiry not found.' }); return true; }
+    await writeCentralAdminAudit(admin, 'delete_advertising_inquiry', 'advertising_inquiry', id, { previous_status:inquiry.status || null });
     jsonResponse(response, 200, { deleted:true }); return true;
   }
   if (request.method === 'PATCH') {
     const body = await readJson(request, 4096);
     if (!/^[0-9a-f-]{36}$/i.test(String(body.id || '')) || !['new','contacted','approved','declined','closed'].includes(body.status)) { jsonResponse(response, 400, { error:'Invalid enquiry reference or status.' }); return true; }
+    const beforeResult = await supabaseRequest(token, 'rest/v1/advertising_inquiries?id=eq.'+encodeURIComponent(body.id)+'&select=id,status&limit=1', { timeoutMs:12000 });
+    if (!beforeResult.ok) { jsonResponse(response, 502, { error:'Enquiry could not be checked before updating.' }); return true; }
+    const inquiryStatusBefore = (await beforeResult.json())?.[0]?.status || null;
+    if (inquiryStatusBefore === null) { jsonResponse(response, 404, { error:'Enquiry not found.' }); return true; }
     const result = await supabaseRequest(token, 'rest/v1/advertising_inquiries?id=eq.'+encodeURIComponent(body.id)+'&select=id,status', { method:'PATCH', prefer:'return=representation', body:{ status:body.status, updated_at:new Date().toISOString() }, timeoutMs:12000 });
     if (!result.ok) { jsonResponse(response, 502, { error:'Enquiry status could not be updated.' }); return true; }
     const rows = await result.json();
     if (!rows?.length) { jsonResponse(response, 404, { error:'Enquiry not found.' }); return true; }
+    await writeCentralAdminAudit(admin, 'update_advertising_inquiry_status', 'advertising_inquiry', body.id, { from:inquiryStatusBefore, to:body.status });
     jsonResponse(response, 200, { item:rows[0] }); return true;
   }
   jsonResponse(response, 405, { error:'Method Not Allowed' }); return true;
@@ -1725,6 +1849,7 @@ async function handleAdminAdvertisingQuotes(request, response) {
       if (!result.ok) { jsonResponse(response, result.status === 409 ? 409 : 502, { error:'Quote could not be saved. Refresh and retry; the enquiry may have changed.' }); return true; }
       const quote = (await result.json())?.[0];
       await writeAdvertisingAudit('quote_created', quote?.id, null, admin.id, { inquiry_id:inquiryId, quote_version:version });
+      await writeCentralAdminAudit(admin, 'create_advertising_quote', 'advertising_quote', quote?.id || null, { inquiry_id:inquiryId, quote_version:version });
       jsonResponse(response, 201, { item:quote, advertiser:{ businessName:inquiry.business_name, email:inquiry.email } }); return true;
     } catch (error) { jsonResponse(response, error.statusCode || 400, { error:error.message || 'Invalid advertising quote.' }); return true; }
   }
@@ -1763,6 +1888,7 @@ async function handleAdminAdvertisingQuotes(request, response) {
           jsonResponse(response, 502, { error:'Quote email could not be delivered. The quote was returned to draft.' }); return true;
         }
         await writeAdvertisingAudit('quote_issued', id, null, admin.id, { quote_version:quote.quote_version });
+        await writeCentralAdminAudit(admin, 'issue_advertising_quote', 'advertising_quote', id, { quote_version:quote.quote_version });
         jsonResponse(response, 200, { ok:true, status:'issued' }); return true;
       }
       if (body.action === 'decline' && ['draft','issued'].includes(current.status)) {
@@ -1770,6 +1896,7 @@ async function handleAdminAdvertisingQuotes(request, response) {
         const rows = await result.json().catch(()=>[]);
         if (!result.ok || !rows?.length) { jsonResponse(response, 409, { error:'Quote could not be declined.' }); return true; }
         await writeAdvertisingAudit('quote_declined', id, null, admin.id);
+        await writeCentralAdminAudit(admin, 'decline_advertising_quote', 'advertising_quote', id);
         jsonResponse(response, 200, { item:rows[0] }); return true;
       }
       jsonResponse(response, 400, { error:'Unsupported quote action.' }); return true;
@@ -1954,14 +2081,154 @@ async function handleAdminSoftwareProducts(request,response){
   const token=serviceToken();
   if(request.method==='GET'){const result=await supabaseRequest(token,'rest/v1/software_products?select=id,title,description,version,price_paise,price_visible,currency,image_url,sort_order,is_published,created_at,updated_at&order=sort_order.asc,created_at.desc&limit=1000',{timeoutMs:12000});if(!result.ok){jsonResponse(response,502,{error:'Software listings could not be loaded.'});return true;}jsonResponse(response,200,{items:(await result.json()).map(item=>({...item,image_url:softwareCoverUrl(item)}))});return true;}
   if(request.method==='DELETE'){try{const body=await readJson(request,12000),id=String(body.id||'');if(!/^[0-9a-f-]{36}$/i.test(id)){jsonResponse(response,400,{error:'Invalid software listing reference.'});return true;}
-    const removed=await supabaseRequest(token,'rest/v1/software_products?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=representation',timeoutMs:12000});if(!removed.ok){const detail=await removed.text().catch(()=> '');const linked= /foreign key|constraint|referenced/i.test(detail);jsonResponse(response,linked?409:502,{error:linked?'This software has customer request history and cannot be permanently deleted. Use Hide to remove it from the public store while preserving customer records.':'Software listing could not be deleted. Please retry.'});return true;}const rows=await removed.json().catch(()=>[]);if(!rows?.length){jsonResponse(response,404,{error:'Software listing not found.'});return true;}jsonResponse(response,200,{deleted:true});return true;
+    const removed=await supabaseRequest(token,'rest/v1/software_products?id=eq.'+encodeURIComponent(id),{method:'DELETE',prefer:'return=representation',timeoutMs:12000});if(!removed.ok){const detail=await removed.text().catch(()=> '');const linked= /foreign key|constraint|referenced/i.test(detail);jsonResponse(response,linked?409:502,{error:linked?'This software has customer request history and cannot be permanently deleted. Use Hide to remove it from the public store while preserving customer records.':'Software listing could not be deleted. Please retry.'});return true;}const rows=await removed.json().catch(()=>[]);if(!rows?.length){jsonResponse(response,404,{error:'Software listing not found.'});return true;}await writeCentralAdminAudit(admin,'delete','software_product',id);jsonResponse(response,200,{deleted:true});return true;
   }catch(error){jsonResponse(response,error.statusCode||400,{error:error.message||'Software listing could not be deleted.'});return true;}}
   if(request.method==='POST'||request.method==='PATCH'){try{const body=await readJson(request,12000),partial=request.method==='PATCH';let id='';if(partial){id=String(body.id||'');if(!/^[0-9a-f-]{36}$/i.test(id)){jsonResponse(response,400,{error:'Invalid software listing reference.'});return true;}}
     const payload=softwareProductPayload(body,admin.id,partial),fields='id,title,description,version,price_paise,price_visible,currency,image_url,sort_order,is_published,created_at,updated_at',endpoint=partial?'rest/v1/software_products?id=eq.'+encodeURIComponent(id)+'&select='+fields:'rest/v1/software_products?select='+fields;
     const result=await supabaseRequest(token,endpoint,{method:partial?'PATCH':'POST',prefer:'return=representation',body:payload,timeoutMs:12000});if(!result.ok){jsonResponse(response,502,{error:'Software listing could not be saved.'});return true;}
-    const rows=await result.json();if(partial&&!rows?.length){jsonResponse(response,404,{error:'Software listing not found.'});return true;}jsonResponse(response,partial?200:201,{item:rows?.[0]?{...rows[0],image_url:softwareCoverUrl(rows[0])}:null});return true;
+    const rows=await result.json();if(partial&&!rows?.length){jsonResponse(response,404,{error:'Software listing not found.'});return true;}const savedItem=rows?.[0]||null;await writeCentralAdminAudit(admin,partial?'update':'create','software_product',savedItem?.id||id,{is_published:savedItem?.is_published===true});jsonResponse(response,partial?200:201,{item:savedItem?{...savedItem,image_url:softwareCoverUrl(savedItem)}:null});return true;
   }catch(error){jsonResponse(response,error.statusCode||400,{error:error.message||'Invalid software listing.'});return true;}}
   jsonResponse(response,405,{error:'Method Not Allowed'});return true;
+}
+
+
+const CENTRAL_MODERATION_RESOURCES = {
+  forum_categories: { table:'forum_categories', fields:'id,slug,title,description,sort_order,is_active,created_at', order:'sort_order.asc' },
+  forum_topics: { table:'forum_topics', fields:'id,title,body,author_display_name,created_at,is_hidden,is_locked', order:'created_at.desc' },
+  forum_replies: { table:'forum_replies', fields:'id,topic_id,body,author_display_name,created_at,is_hidden', order:'created_at.desc' },
+  forum_chat_messages: { table:'forum_chat_messages', fields:'id,author_id,body,created_at,is_hidden,hidden_at', order:'created_at.desc' },
+  workshop_reviews: { table:'workshop_reviews', fields:'id,workshop_id,reviewer_id,rating,title,body,status,created_at,updated_at', order:'created_at.desc' },
+  workshops: { table:'workshops', fields:'id,name,description,services,address,city,state,pincode,opening_hours,status,is_verified,created_at,updated_at', order:'created_at.desc' },
+  forum_reports: { table:'forum_reports', fields:'id,reporter_id,topic_id,reply_id,reason,status,created_at,resolved_by,resolved_at', order:'created_at.desc' },
+  workshop_reports: { table:'workshop_reports', fields:'id,reporter_id,workshop_id,review_id,reason,status,admin_note,created_at,resolved_by,resolved_at', order:'created_at.desc' }
+};
+const CENTRAL_MODERATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function writeCentralAdminAudit(admin, action, targetType, targetId, details = {}) {
+  try {
+    const result = await supabaseRequest(serviceToken(), 'rest/v1/community_admin_audit', {
+      method:'POST', prefer:'return=minimal',
+      body:{ actor_id:admin.id, action, target_type:targetType, target_id:targetId || null, details },
+      timeoutMs:12000
+    });
+    if (!result.ok) {
+      const detail = await result.text().catch(()=>'');
+      console.warn('[admin-audit] Activity could not be recorded.', { action, targetType, status:result.status, detail:detail.slice(0,300) });
+      return false;
+    }
+    return true;
+  } catch(error) {
+    console.warn('[admin-audit] Activity request failed.', { action, targetType, message:error.message });
+    return false;
+  }
+}
+
+async function handleAdminCentralModeration(request, response, url) {
+  const admin = await requireCommunityModerator(request);
+  if (!admin) { jsonResponse(response,403,{error:'Administrator or authorized moderator role is required.'}); return true; }
+  if (!supabaseServiceRoleKey) { jsonResponse(response,503,{error:'Central moderation is not configured.'}); return true; }
+  const token = serviceToken();
+  if (request.method === 'GET') {
+    const type = String(url.searchParams.get('type') || 'all');
+    const requestedLimit = Number(url.searchParams.get('limit') || 50);
+    const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, Math.floor(requestedLimit))) : 50;
+    const selected = type === 'all' ? Object.keys(CENTRAL_MODERATION_RESOURCES) : [type];
+    if (selected.some(key => !CENTRAL_MODERATION_RESOURCES[key])) { jsonResponse(response,400,{error:'Unknown moderation content type.'}); return true; }
+    const items = [];
+    for (const key of selected) {
+      const resource = CENTRAL_MODERATION_RESOURCES[key];
+      const result = await supabaseRequest(token,'rest/v1/'+resource.table+'?select='+resource.fields+'&order='+resource.order+'&limit='+limit,{timeoutMs:15000});
+      if (!result.ok) { jsonResponse(response,502,{error:'Could not load '+key.replaceAll('_',' ')+'.'}); return true; }
+      const rows = await result.json();
+      for (const item of rows) items.push({ ...item, content_type:key });
+    }
+    items.sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+    const auditResult = await supabaseRequest(token,'rest/v1/community_admin_audit?select=id,actor_id,action,target_type,target_id,details,created_at&order=created_at.desc&limit=50',{timeoutMs:12000});
+    if (!auditResult.ok) { jsonResponse(response,502,{error:'Admin activity log could not be loaded.'}); return true; }
+    jsonResponse(response,200,{items,audit:await auditResult.json(),limit});
+    return true;
+  }
+  if (request.method !== 'POST') { jsonResponse(response,405,{error:'Method Not Allowed'}); return true; }
+  try {
+    const body = await readJson(request,16000);
+    const type = String(body.type || '');
+    const action = String(body.action || '');
+    const id = String(body.id || '');
+    const resource = CENTRAL_MODERATION_RESOURCES[type];
+    if (!resource || !CENTRAL_MODERATION_ID.test(id)) { jsonResponse(response,400,{error:'Choose valid content and a valid item.'}); return true; }
+    const supported = ['hide','restore','delete','edit','resolve','dismiss','investigate','publish'];
+    if (!supported.includes(action)) { jsonResponse(response,400,{error:'Unsupported moderation action.'}); return true; }
+
+    const endpoint = 'rest/v1/'+resource.table+'?id=eq.'+encodeURIComponent(id);
+    let method = 'PATCH', payload = {};
+    if (action === 'delete') {
+      if (admin.user?.app_metadata?.role !== 'admin') { jsonResponse(response,403,{error:'Only an administrator can permanently delete content.'}); return true; }
+      if (type === 'workshops') { jsonResponse(response,409,{error:'Workshop records are retained to preserve reviews and reports. Suspend the listing to remove it from public view.'}); return true; }
+      if (type === 'forum_categories') { jsonResponse(response,409,{error:'Forum categories are retained to protect existing discussions. Deactivate the category instead.'}); return true; }
+      if (body.confirmPermanentDelete !== true) { jsonResponse(response,400,{error:'Permanent deletion requires explicit confirmation.'}); return true; }
+      method = 'DELETE';
+    } else if (type === 'forum_topics' || type === 'forum_replies') {
+      if (action === 'hide') payload = { is_hidden:true };
+      else if (action === 'restore') payload = { is_hidden:false };
+      else if (action === 'edit') {
+        if (type === 'forum_topics') {
+          const title=cleanSiteText(body.title,160), text=cleanSiteText(body.body,12000);
+          if (title.length<8 || !text) { jsonResponse(response,400,{error:'Enter a valid topic title and content.'}); return true; }
+          payload={title,body:text};
+        } else {
+          const text=cleanSiteText(body.body,8000);
+          if (!text) { jsonResponse(response,400,{error:'Reply content cannot be empty.'}); return true; }
+          payload={body:text};
+        }
+      } else { jsonResponse(response,400,{error:'This action is not available for this content type.'}); return true; }
+    } else if (type === 'forum_categories') {
+      if (action === 'hide') payload={is_active:false};
+      else if (action === 'restore' || action === 'publish') payload={is_active:true};
+      else if (action === 'edit') {
+        const title=cleanSiteText(body.title,100), description=cleanSiteText(body.body,500);
+        if (title.length<3 || !description) { jsonResponse(response,400,{error:'Enter a category title and description.'}); return true; }
+        payload={title,description};
+      } else { jsonResponse(response,400,{error:'Forum categories can only be edited, deactivated or restored here.'}); return true; }
+    } else if (type === 'forum_chat_messages') {
+      if (action === 'hide') payload={is_hidden:true,hidden_at:new Date().toISOString(),hidden_by:admin.id};
+      else if (action === 'restore') payload={is_hidden:false,hidden_at:null,hidden_by:null};
+      else { jsonResponse(response,400,{error:'Chat messages can only be hidden, restored or permanently deleted.'}); return true; }
+    } else if (type === 'workshops') {
+      if (action === 'hide') payload={status:'suspended',updated_at:new Date().toISOString()};
+      else if (action === 'restore' || action === 'publish') payload={status:'approved',updated_at:new Date().toISOString()};
+      else { jsonResponse(response,400,{error:'Workshop listings can only be suspended or restored here.'}); return true; }
+    } else if (type === 'workshop_reviews') {
+      if (action === 'hide') payload={status:'hidden'};
+      else if (action === 'restore' || action === 'publish') payload={status:'published'};
+      else if (action === 'edit') {
+        const title=cleanSiteText(body.title,120), text=cleanSiteText(body.body,2000);
+        if (title.length<3 || text.length<10) { jsonResponse(response,400,{error:'Enter a valid review title and content.'}); return true; }
+        payload={title,body:text};
+      } else { jsonResponse(response,400,{error:'This action is not available for reviews.'}); return true; }
+    } else {
+      if (action === 'investigate' && type !== 'workshop_reports') { jsonResponse(response,400,{error:'Forum reports do not support an investigating status.'}); return true; }
+      if (action === 'resolve' || action === 'dismiss' || action === 'investigate') {
+        payload={status:action==='resolve'?'resolved':action==='dismiss'?'dismissed':'investigating',resolved_by:action==='investigate'?null:admin.id,resolved_at:action==='investigate'?null:new Date().toISOString()};
+        if (type === 'workshop_reports' && body.admin_note !== undefined) payload.admin_note=cleanSiteText(body.admin_note,2000);
+      } else { jsonResponse(response,400,{error:'Reports can only be reviewed, resolved, dismissed or deleted.'}); return true; }
+    }
+
+    const result = await supabaseRequest(token,endpoint,{method,body:method==='PATCH'?payload:undefined,prefer:'return=representation',timeoutMs:15000});
+    if (!result.ok) {
+      const detail=await result.text().catch(()=>'');
+      jsonResponse(response,result.status===404?404:502,{error:result.status===404?'Content not found.':'Moderation action failed. Check the database policy and retry.'});
+      console.warn('[central-moderation] Update failed',{type,action,status:result.status,detail:detail.slice(0,300)});
+      return true;
+    }
+    const rows=method==='DELETE'?await result.json().catch(()=>[]):await result.json().catch(()=>[]);
+    if (!rows?.length) { jsonResponse(response,404,{error:'Content not found or no change was applied.'}); return true; }
+    const auditLogged = await writeCentralAdminAudit(admin,action,type,id,{content_type:type,action});
+    jsonResponse(response,200,{success:true,auditLogged,action,type,id,item:rows[0]||null});
+    return true;
+  } catch(error) {
+    jsonResponse(response,error.statusCode||502,{error:error.message||'Moderation action could not be completed.'});
+    return true;
+  }
 }
 
 
@@ -1989,6 +2256,7 @@ async function handleAdminUsers(request,response){
       const invited=await supabaseRequest(token,'auth/v1/invite',{method:'POST',body:{email,data:{}} ,timeoutMs:20000});
       if(!invited.ok){const detail=await invited.json().catch(()=>({}));jsonResponse(response,invited.status===422?409:502,{error:detail.msg||detail.message||detail.error_description||'Invitation could not be sent. Check whether the account already exists.'});return true;}
       const user=await invited.json().catch(()=>({}));
+      await writeCentralAdminAudit(admin,'invite_member','member_account',user.id||null);
       jsonResponse(response,201,{invited:true,user:{id:user.id,email:user.email||email,created_at:user.created_at||null,banned_until:user.banned_until||null,role:'member'}});
       return true;
     }
@@ -2004,12 +2272,14 @@ async function handleAdminUsers(request,response){
       const update=await supabaseRequest(token,'auth/v1/admin/users/'+encodeURIComponent(id),{method:'PUT',body:{ban_duration:action==='ban'?'876000h':'none'},timeoutMs:15000});
       if(!update.ok){jsonResponse(response,502,{error:'Member access could not be updated.'});return true;}
       const updated=await update.json().catch(()=>({}));
+      await writeCentralAdminAudit(admin,action==='ban'?'suspend_member':'restore_member','member_account',id);
       jsonResponse(response,200,{updated:true,user:{id:updated.id||id,email:updated.email||targetUser.email,banned_until:updated.banned_until||null}});
       return true;
     }
     if(request.method==='DELETE'){
       const removed=await supabaseRequest(token,'auth/v1/admin/users/'+encodeURIComponent(id),{method:'DELETE',timeoutMs:15000});
       if(!removed.ok){jsonResponse(response,502,{error:'Member account could not be deleted. Related customer records may need to be retained.'});return true;}
+      await writeCentralAdminAudit(admin,'delete_member','member_account',id);
       jsonResponse(response,200,{deleted:true,id});
       return true;
     }
@@ -2171,6 +2441,8 @@ async function handleApi(request, response, url) {
   if (url.pathname === '/api/software-products') return handlePublicSoftwareProducts(request, response);
   if (url.pathname === '/api/admin/software-products') return handleAdminSoftwareProducts(request, response);
   if (url.pathname === '/api/admin/users') return handleAdminUsers(request, response);
+  if (url.pathname === '/api/admin/moderation') return handleAdminCentralModeration(request, response, url);
+  if (url.pathname === '/api/admin/site-pages') return handleAdminStaticPageContent(request,response);
   if (url.pathname === '/api/admin/advertising/quotes') return handleAdminAdvertisingQuotes(request, response);
   if (url.pathname === '/api/advertising/quote') return handlePublicAdvertisingQuote(request, response);
   if (url.pathname === '/api/advertising/payment/create-order') return handleCreateAdvertisingPayment(request, response);
@@ -2394,7 +2666,7 @@ function createHttpServer() {
     const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
     if (!publicFiles.has(relative)) { response.writeHead(404).end('Not found'); return; }
     const target = path.join(root, relative);
-    fs.readFile(target, (error, contents) => { if (error) { response.writeHead(error.code === 'ENOENT' ? 404 : 500, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found'); return; } const cacheControl = relative.endsWith('.html') ? 'no-store' : 'no-cache, must-revalidate'; response.writeHead(200, { 'Content-Type': mime[path.extname(target)] || 'application/octet-stream', 'Cache-Control': cacheControl, 'X-Content-Type-Options': 'nosniff' }); response.end(contents); });
+    fs.readFile(target, async (error, contents) => { if (error) { response.writeHead(error.code === 'ENOENT' ? 404 : 500, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found'); return; } let output=contents; const cmsPageKey=CENTRAL_STATIC_CMS_PAGE_BY_FILE[relative]; if(cmsPageKey){ const cms=await getPublishedStaticCmsPage(cmsPageKey); if(cms){ let html=output.toString('utf8'); const title=String(cms.page_title||'').trim(); const description=String(cms.meta_description||'').trim(); if(title) html=html.replace(/<title>[^<]*<\/title>/i,'<title>'+escapeCmsHtml(title)+'</title>'); if(description) html=html.replace(/(<meta\s+name=["']description["']\s+content=["'])[^"']*(["'][^>]*>)/i,'$1'+escapeCmsHtml(description)+'$2'); const section=renderCmsBlocks(cms.blocks); if(section && /<\/main>/i.test(html)) html=html.replace(/<\/main>/i,section+'</main>'); output=Buffer.from(html,'utf8'); } } const cacheControl = relative.endsWith('.html') ? 'no-store' : 'no-cache, must-revalidate'; response.writeHead(200, { 'Content-Type': mime[path.extname(target)] || 'application/octet-stream', 'Cache-Control': cacheControl, 'X-Content-Type-Options': 'nosniff' }); response.end(output); });
   });
   return server;
 }

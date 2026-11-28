@@ -28,10 +28,17 @@ const { createHttpServer, flushNotificationOutbox, cleanupExpiredCheckoutIntents
 const customerId = '10000000-0000-4000-8000-000000000001';
 const adminId = '20000000-0000-4000-8000-000000000001';
 const otherCustomerId = '30000000-0000-4000-8000-000000000001';
+const moderatorId = '40000000-0000-4000-8000-000000000001';
 const tokens = {
   customer: 'test-customer-token',
   admin: 'test-admin-token',
-  other: 'test-other-customer-token'
+  other: 'test-other-customer-token',
+  moderator: 'test-moderator-token'
+};
+const centralModerationTables = {
+  forum_categories:new Map(), forum_topics:new Map(), forum_replies:new Map(), forum_chat_messages:new Map(),
+  workshop_reviews:new Map(), workshops:new Map(), forum_reports:new Map(), workshop_reports:new Map(),
+  community_admin_audit:new Map(), site_page_content:new Map()
 };
 const softwareSeoFixture = {
   id: '123e4567-e89b-42d3-a456-426614174000',
@@ -104,6 +111,7 @@ function resetState() {
   state.razorOrderNotes = null;
   state.paypalOrderStatus = 'CREATED';
   state.resendShouldFail = false;
+  for(const table of Object.values(centralModerationTables))table.clear();
 }
 
 function uuidFor(prefix, n) {
@@ -132,6 +140,7 @@ function identity(options) {
   if (token === tokens.customer) return { id: customerId, role: 'customer' };
   if (token === tokens.admin) return { id: adminId, role: 'admin' };
   if (token === tokens.other) return { id: otherCustomerId, role: 'customer' };
+  if (token === tokens.moderator) return { id: moderatorId, role: 'moderator' };
   if (token === 'service_test_key') return { id: 'service-role', role: 'service' };
   return null;
 }
@@ -179,7 +188,7 @@ const upstream = async (urlValue, options = {}) => {
   const method = options.method || 'GET';
   if (url.pathname === '/auth/v1/user') {
     const user = identity(options);
-    return user ? response(200, { id: user.id, email: user.role === 'admin' ? 'admin@example.invalid' : 'customer@example.invalid', app_metadata: user.role === 'admin' ? { role: 'admin' } : {} }) : response(401, { message: 'Invalid test session.' });
+    return user ? response(200, { id: user.id, email: user.role === 'admin' ? 'admin@example.invalid' : 'customer@example.invalid', app_metadata: ['admin','moderator'].includes(user.role) ? { role: user.role } : {} }) : response(401, { message: 'Invalid test session.' });
   }
 
   if (url.hostname === 'api.razorpay.com') {
@@ -249,6 +258,18 @@ const upstream = async (urlValue, options = {}) => {
     state.resendRequests.push(state.lastResendRequest);
     if (state.resendShouldFail) return response(500, { message: 'synthetic Resend outage' });
     return response(200, { id: 'email-local-1' });
+  }
+
+
+  const moderationTableMatch=url.pathname.match(/^\/rest\/v1\/(forum_categories|forum_topics|forum_replies|forum_chat_messages|workshop_reviews|workshops|forum_reports|workshop_reports|community_admin_audit|site_page_content)$/);
+  if(moderationTableMatch){
+    const table=moderationTableMatch[1],rows=centralModerationTables[table],idFilter=url.searchParams.get('id');
+    let selected=[...rows.values()].filter(row=>!idFilter||idFilter==='eq.'+row.id);
+    for(const key of ['page_key','status']){const filter=url.searchParams.get(key);if(filter?.startsWith('eq.'))selected=selected.filter(row=>String(row[key])===filter.slice(3));}
+    if(method==='GET')return response(200,selected);
+    if(method==='PATCH'){const body=JSON.parse(options.body||'{}');for(const row of selected)Object.assign(row,body);return response(200,selected.map(row=>({...row})));}
+    if(method==='DELETE'){for(const row of selected)rows.delete(row.id);return response(200,selected.map(row=>({...row})));}
+    if(method==='POST'){const body=JSON.parse(options.body||'{}'),id=crypto.randomUUID(),row={id,created_at:new Date().toISOString(),...body};rows.set(id,row);return response(201,[{...row}]);}
   }
 
   if (url.pathname === '/rest/v1/software_products' && method === 'GET') return response(200, [softwareSeoFixture]);
@@ -568,6 +589,146 @@ async function call(pathname, { method = 'GET', body, token } = {}) {
   try { payload = text ? JSON.parse(text) : null; } catch { payload = text; }
   return { response, payload };
 }
+
+
+
+
+test('static page CMS is administrator-only, uses a fixed page allowlist and validates safe structured blocks', async () => {
+  const denied=await call('/api/admin/site-pages',{token:tokens.moderator});
+  assert.equal(denied.response.status,403);
+  const loaded=await call('/api/admin/site-pages',{token:tokens.admin});
+  assert.equal(loaded.response.status,200);
+  assert.deepEqual(Object.keys(loaded.payload.pages).sort(),['about','diagnostic_help','ecu_identification','fault_code_diagnosis','guides','international_support','vehicle_wiring'].sort());
+  const invalidPage=await call('/api/admin/site-pages',{method:'PUT',token:tokens.admin,body:{page_key:'index',status:'published',blocks:[]}});
+  assert.equal(invalidPage.response.status,400);
+  const unsafeLink=await call('/api/admin/site-pages',{method:'PUT',token:tokens.admin,body:{page_key:'about',status:'published',blocks:[{type:'link',label:'Bad link',url:'https://evil.example'}]}});
+  assert.equal(unsafeLink.response.status,400);
+  const script=await call('/api/admin/site-pages',{method:'PUT',token:tokens.admin,body:{page_key:'about',status:'published',blocks:[{type:'paragraph',text:'<script>alert(1)</script>'}]}});
+  assert.equal(script.response.status,200);
+  assert.equal(centralModerationTables.site_page_content.size,1);
+  assert.equal(centralModerationTables.community_admin_audit.size,1);
+});
+
+test('published static CMS content is escaped and appended without replacing canonical or structured data', async () => {
+  centralModerationTables.site_page_content.set('about',{page_key:'about',page_title:'Updated About Title',meta_description:'Updated description for the about page with safe information.',blocks:[{type:'heading',text:'CMS heading <script>'},{type:'paragraph',text:'Safe paragraph & details.'},{type:'link',label:'Services',url:'/ecu-file-services.html'}],status:'published'});
+  const page=await call('/about.html');
+  assert.equal(page.response.status,200);
+  assert.match(page.payload,/Updated About Title/);
+  assert.match(page.payload,/Updated description for the about page/);
+  assert.ok(page.payload.includes('<h2>CMS heading &lt;script&gt;</h2>'));
+  assert.ok(page.payload.includes('Safe paragraph &amp; details.'));
+  assert.ok(page.payload.includes('href="/ecu-file-services.html">Services</a>'));
+  assert.match(page.payload,/rel="canonical"/);
+  assert.ok(page.payload.includes('application/ld+json'));
+  assert.ok(!page.payload.includes('<script>alert(1)</script>'));
+});
+
+test('draft and hidden static CMS content never appears on public information pages', async () => {
+  for(const status of ['draft','hidden']){
+    centralModerationTables.site_page_content.set('about',{page_key:'about',page_title:'Must Not Display',meta_description:'',blocks:[{type:'paragraph',text:'Private draft content'}],status});
+    const page=await call('/about.html');
+    assert.equal(page.response.status,200);
+    assert.doesNotMatch(page.payload,/Must Not Display|Private draft content/);
+  }
+});
+
+test('central moderation API is admin-only, supports reversible chat hiding and records activity', async () => {
+  const id='123e4567-e89b-42d3-a456-426614174111';
+  centralModerationTables.forum_chat_messages.set(id,{id,author_id:customerId,body:'Unsafe test message',created_at:new Date().toISOString(),is_hidden:false});
+  const denied=await call('/api/admin/moderation?type=all',{token:tokens.customer});
+  assert.equal(denied.response.status,403);
+  const loaded=await call('/api/admin/moderation?type=forum_chat_messages',{token:tokens.admin});
+  assert.equal(loaded.response.status,200);
+  assert.equal(loaded.payload.items.length,1);
+  const hidden=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_chat_messages',id,action:'hide'}});
+  assert.equal(hidden.response.status,200);
+  assert.equal(centralModerationTables.forum_chat_messages.get(id).is_hidden,true);
+  assert.equal(centralModerationTables.community_admin_audit.size,1);
+  const restored=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_chat_messages',id,action:'restore'}});
+  assert.equal(restored.response.status,200);
+  assert.equal(centralModerationTables.forum_chat_messages.get(id).is_hidden,false);
+  assert.equal(centralModerationTables.community_admin_audit.size,2);
+});
+
+test('central moderation accepts an authorized moderator but does not grant admin account-management access', async () => {
+  const id='123e4567-e89b-42d3-a456-426614174116';
+  centralModerationTables.forum_chat_messages.set(id,{id,author_id:customerId,body:'Moderation test',is_hidden:false});
+  const loaded=await call('/api/admin/moderation?type=forum_chat_messages',{token:tokens.moderator});
+  assert.equal(loaded.response.status,200);
+  const hidden=await call('/api/admin/moderation',{method:'POST',token:tokens.moderator,body:{type:'forum_chat_messages',id,action:'hide'}});
+  assert.equal(hidden.response.status,200);
+  const members=await call('/api/admin/users',{token:tokens.moderator});
+  assert.equal(members.response.status,403);
+  const permanentDelete=await call('/api/admin/moderation',{method:'POST',token:tokens.moderator,body:{type:'forum_chat_messages',id,action:'delete',confirmPermanentDelete:true}});
+  assert.equal(permanentDelete.response.status,403);
+  assert.ok(centralModerationTables.forum_chat_messages.has(id));
+});
+
+test('central moderation preserves forum report status constraints and chat migration visibility rules', async () => {
+  const id='123e4567-e89b-42d3-a456-426614174113';
+  centralModerationTables.forum_reports.set(id,{id,reporter_id:customerId,reason:'Test report reason',status:'open'});
+  const invalid=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_reports',id,action:'investigate'}});
+  assert.equal(invalid.response.status,400);
+  assert.equal(centralModerationTables.forum_reports.get(id).status,'open');
+  const migration=fs.readFileSync(path.join(__dirname,'supabase/migrations/20261127_central_chat_moderation_and_admin_audit.sql'),'utf8');
+  assert.match(migration,/drop policy if exists forum_chat_read_public/i);
+  assert.match(migration,/is_hidden = false/);
+  assert.match(migration,/grant update on public\.forum_chat_messages to authenticated/i);
+});
+
+test('central moderation can edit and deactivate forum categories but cannot delete linked categories', async () => {
+  const id='123e4567-e89b-42d3-a456-426614174115';
+  centralModerationTables.forum_categories.set(id,{id,slug:'diagnostics',title:'Diagnostics',description:'Vehicle diagnostic discussions',sort_order:1,is_active:true});
+  const loaded=await call('/api/admin/moderation?type=forum_categories',{token:tokens.admin});
+  assert.equal(loaded.response.status,200);
+  const edited=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_categories',id,action:'edit',title:'ECU Diagnostics',body:'ECU diagnostic discussions and repair guidance'}});
+  assert.equal(edited.response.status,200);
+  assert.equal(centralModerationTables.forum_categories.get(id).title,'ECU Diagnostics');
+  const hidden=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_categories',id,action:'hide'}});
+  assert.equal(hidden.response.status,200);
+  assert.equal(centralModerationTables.forum_categories.get(id).is_active,false);
+  const removed=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_categories',id,action:'delete',confirmPermanentDelete:true}});
+  assert.equal(removed.response.status,409);
+  assert.ok(centralModerationTables.forum_categories.has(id));
+});
+
+test('central moderation can suspend and restore workshop listings without exposing contact fields or deleting linked records', async () => {
+  const id='123e4567-e89b-42d3-a456-426614174114';
+  centralModerationTables.workshops.set(id,{id,name:'Test Workshop',description:'Workshop listing',status:'approved',is_verified:false});
+  const loaded=await call('/api/admin/moderation?type=workshops',{token:tokens.admin});
+  assert.equal(loaded.response.status,200);
+  assert.equal(loaded.payload.items[0].name,'Test Workshop');
+  const hidden=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'workshops',id,action:'hide'}});
+  assert.equal(hidden.response.status,200);
+  assert.equal(centralModerationTables.workshops.get(id).status,'suspended');
+  const restored=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'workshops',id,action:'restore'}});
+  assert.equal(restored.response.status,200);
+  assert.equal(centralModerationTables.workshops.get(id).status,'approved');
+  assert.equal(centralModerationTables.community_admin_audit.size,2);
+  const removed=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'workshops',id,action:'delete',confirmPermanentDelete:true}});
+  assert.equal(removed.response.status,409);
+  assert.ok(centralModerationTables.workshops.has(id));
+  const serverSource=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
+  assert.match(serverSource,/fields:'id,name,description,services,address,city,state,pincode,opening_hours,status,is_verified,created_at,updated_at'/);
+  assert.doesNotMatch(serverSource,/workshops: \{[^}]*phone,whatsapp/);
+});
+
+test('central moderation edit cards retain the current title and body for safe prefilled editing', () => {
+  const adminSource=fs.readFileSync(path.join(__dirname,'admin.js'),'utf8');
+  assert.ok(adminSource.includes("data-current-title=\"'+escape(item.title||item.name||'')+'\""));
+  assert.ok(adminSource.includes("data-current-body=\"'+escape(item.body||item.description||'')+'\""));
+  assert.match(adminSource,/card\?\.dataset\.currentBody/);
+  assert.match(adminSource,/card\?\.dataset\.currentTitle/);
+});
+
+test('central moderation refuses permanent deletion without explicit confirmation', async () => {
+  const id='123e4567-e89b-42d3-a456-426614174112';
+  centralModerationTables.forum_topics.set(id,{id,title:'Test topic',body:'Test content',is_hidden:false});
+  const result=await call('/api/admin/moderation',{method:'POST',token:tokens.admin,body:{type:'forum_topics',id,action:'delete'}});
+  assert.equal(result.response.status,400);
+  assert.ok(centralModerationTables.forum_topics.has(id));
+});
+
 
 test('dynamic DTC landing pages render known generic codes and return 404 for unknown codes', async () => {
   const fixture = [
@@ -1174,6 +1335,11 @@ test('admin can explicitly set Possible status', async () => {
   const result = await call('/api/admin/orders/status', { method:'POST', token:tokens.admin, body:{ orderId, status:'Possible' } });
   assert.equal(result.response.status,200);
   assert.equal(result.payload.order.status,'Possible');
+  assert.equal(centralModerationTables.community_admin_audit.size,1);
+  const audit=[...centralModerationTables.community_admin_audit.values()][0];
+  assert.equal(audit.action,'update_order_status');
+  assert.equal(audit.target_type,'order');
+  assert.deepEqual(audit.details,{from:'New',to:'Possible'});
 });
 
 test('admin cannot mark an order Completed before a processed file exists', async () => {
@@ -2235,6 +2401,13 @@ test('customer session refresh preserves stored login on temporary HTTP failures
   assert.doesNotMatch(auth, /if \(!response\.ok\) \{ saveSession\(null\); return null; \}/);
 });
 
+test('isolated moderation page loads with noindex and its own moderation script', () => {
+  const moderationHtml=fs.readFileSync(path.join(__dirname,'moderation.html'),'utf8');
+  assert.match(moderationHtml, /noindex, nofollow, noarchive/);
+  assert.ok(moderationHtml.includes('moderation.js?v=20261127-3'));
+  assert.match(moderationHtml, /authorized moderator account/i);
+});
+
 test('admin controls enforce readable contrast and cache-busted current assets', () => {
   const adminCss = fs.readFileSync(path.join(__dirname, 'admin.css'), 'utf8');
   const adminHtml = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
@@ -2243,7 +2416,7 @@ test('admin controls enforce readable contrast and cache-busted current assets',
   assert.match(adminCss, /#site-content-list \.button-ghost[\s\S]*?opacity:1 !important/);
   assert.match(adminCss, /button:disabled[\s\S]*?opacity:1 !important/);
   assert.match(adminHtml, /admin\.css\?v=20261118-sticky-folders/);
-  assert.match(adminHtml, /admin\.js\?v=20261119-forum-post-manager/);
+  assert.match(adminHtml, /admin\.js\?v=20261127-central-moderation-categories3/);
   assert.match(adminJs, /<details class=\"admin-order-detail\">/);
   assert.match(adminJs, /admin-order-summary-meta/);
   assert.match(adminCss, /\.admin-order-detail>summary/);
@@ -2577,3 +2750,36 @@ test('public software catalogue API loads up to 1000 published products in admin
   for (const item of items) assert.doesNotMatch(String(item.description || ''), /licen[cs]e|licensing/i);
 });
 
+
+
+test('moderator moderation page hides permanent-delete controls while admins retain them', () => {
+  const moderation = fs.readFileSync(path.join(__dirname, 'moderation.js'), 'utf8');
+  const page = fs.readFileSync(path.join(__dirname, 'moderation.html'), 'utf8');
+  assert.match(moderation, /currentRole==='admin'&&!\['workshops','forum_categories'\]\.includes\(type\)/);
+  assert.match(moderation, /currentRole=role/);
+  assert.match(page, /moderation\.js\?v=20261127-3/);
+});
+
+
+test('authorized moderation page and script are included in the public static allowlist', async () => {
+  const page = await call('/moderation.html');
+  const script = await call('/moderation.js');
+  assert.equal(page.response.status, 200);
+  assert.match(page.payload, /Authorized staff access|AUTHORIZED STAFF ACCESS/i);
+  assert.equal(script.response.status, 200);
+  assert.match(script.payload, /currentRole==='admin'/);
+});
+
+
+test('admin activity log records advertising review and order replies without copying private content', () => {
+  const server = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  assert.match(server, /delete_advertising_inquiry'[\s\S]*?previous_status:inquiry\.status/);
+  assert.match(server, /update_advertising_inquiry_status'[\s\S]*?from:inquiryStatusBefore, to:body\.status/);
+  assert.match(server, /create_advertising_quote'[\s\S]*?inquiry_id:inquiryId, quote_version:version/);
+  assert.match(server, /issue_advertising_quote'[\s\S]*?quote_version:quote\.quote_version/);
+  assert.match(server, /decline_advertising_quote/);
+  assert.match(server, /send_order_message'[\s\S]*?message_length:cleanMessage\.length/);
+  const replyHandler = server.slice(server.indexOf('async function handleAdminReply('), server.indexOf('\nasync function ', server.indexOf('async function handleAdminReply(') + 1));
+  assert.doesNotMatch(replyHandler, /writeCentralAdminAudit\([^;]*cleanMessage\s*[,}]/);
+  assert.doesNotMatch(replyHandler, /writeCentralAdminAudit\([^;]*contact(?:Name|Phone|Email)/i);
+});

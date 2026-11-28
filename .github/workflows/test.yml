@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "codex/**"
+      - "feature/central-admin-content-moderation"
   pull_request:
     branches:
       - main
@@ -42,5 +43,6 @@ jobs:
           node --check app.js
           node --check auth.js
           node --check admin.js
+          node --check moderation.js
           node --check dev-checkout.js
           node --check forum.js

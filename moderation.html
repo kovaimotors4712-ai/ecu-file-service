@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#101a19">
+  <title>Content Moderation — ECU File Service India</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="admin.css?v=20261127-moderator">
+</head>
+<body class="admin-body">
+  <header class="site-header admin-header">
+    <a class="brand" href="/"><span class="brand-name">ECU FILE SERVICE <b>INDIA</b></span></a>
+    <span class="admin-label">SECURE MODERATION</span>
+    <button id="moderator-signout" class="account-trigger" type="button" hidden>Sign out</button>
+  </header>
+  <main class="admin-main">
+    <section id="moderator-login" class="admin-login">
+      <span class="form-kicker">AUTHORIZED STAFF ACCESS</span>
+      <h1>Content moderation</h1>
+      <p>Sign in with an administrator or authorized moderator account.</p>
+      <form id="moderator-auth">
+        <label for="moderator-email">Email</label>
+        <input id="moderator-email" type="email" autocomplete="username" required>
+        <label for="moderator-password">Password</label>
+        <input id="moderator-password" type="password" autocomplete="current-password" required>
+        <button class="button button-dark" type="submit">Sign in</button>
+      </form>
+      <p id="moderator-auth-message" class="admin-message" role="status"></p>
+    </section>
+    <section id="moderator-denied" class="admin-login" hidden>
+      <h1>Access restricted</h1>
+      <p>This page is available only to administrators and authorized moderators.</p>
+      <p id="moderator-denied-message" class="admin-message admin-error"></p>
+    </section>
+    <section id="moderator-dashboard" hidden>
+      <div class="admin-section-heading">
+        <div><span class="form-kicker">PUBLIC CONTENT SAFETY</span><h1>Moderation queue</h1><p>Hide unsafe content immediately, review reports, and restore content when appropriate.</p></div>
+      </div>
+      <div class="admin-panel">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <select id="moderation-filter" aria-label="Content type">
+            <option value="all">All content types</option>
+            <option value="forum_categories">Forum categories</option>
+            <option value="forum_topics">Forum topics</option>
+            <option value="forum_replies">Forum replies</option>
+            <option value="forum_chat_messages">Live Chat messages</option>
+            <option value="workshop_reviews">Workshop reviews</option>
+            <option value="workshops">Workshop directory listings</option>
+            <option value="forum_reports">Forum reports</option>
+            <option value="workshop_reports">Workshop reports</option>
+          </select>
+          <input id="moderation-search" type="search" placeholder="Search content or report…" style="flex:1;min-width:220px">
+          <button id="moderation-refresh" class="button button-ghost" type="button">Refresh</button>
+        </div>
+        <p id="moderation-message" class="admin-message" role="status">Loading moderation records…</p>
+        <div id="moderation-list" class="admin-order-list">Moderation records will appear here.</div>
+      </div>
+      <div class="admin-panel" style="margin-top:20px">
+        <h2>Admin Activity Log</h2>
+        <p>Recent recorded moderation and administrative actions. Read-only.</p>
+        <div id="moderation-audit-list"></div>
+      </div>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <script src="auth.js?v=20261025-admin-actions"></script>
+  <script src="moderation.js?v=20261127-3"></script>
+</body>
+</html>

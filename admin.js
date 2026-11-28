@@ -633,6 +633,65 @@
     finally { button.disabled=false; }
   });
 
+
+  const staticPageCmsForm=document.querySelector('#static-page-cms-form');
+  const staticPageCmsList=document.querySelector('#static-page-cms-list');
+  const staticPageCmsMessage=document.querySelector('#static-page-cms-message');
+  let staticPageCmsItems=[];
+  async function staticPageCmsRequest(method='GET',body=null){
+    const token=backend.getSession()?.access_token;
+    if(!token)throw new Error('Admin sign-in expired. Please sign in again.');
+    const response=await fetch('/api/admin/site-pages',{method,headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
+    const result=await parseJson(response);
+    if(!response.ok)throw new Error(result.error||'Page content request failed.');
+    return result;
+  }
+  function resetStaticPageCmsForm(){
+    staticPageCmsForm.reset();
+    staticPageCmsForm.elements.namedItem('page_title').value='';
+    staticPageCmsForm.elements.namedItem('meta_description').value='';
+    staticPageCmsForm.elements.namedItem('blocks').value='[]';
+    staticPageCmsForm.elements.namedItem('status').value='draft';
+  }
+  async function loadStaticPageCms(){
+    if(!staticPageCmsList)return;
+    staticPageCmsList.textContent='Loading page content…';
+    try{
+      const result=await staticPageCmsRequest('GET');
+      staticPageCmsItems=Array.isArray(result.items)?result.items:[];
+      const labels={about:'About',guides:'Guides',vehicle_wiring:'Vehicle ECU Wiring & Diagnostic Guide',international_support:'International ECU File Support',fault_code_diagnosis:'ECU Fault-Code Diagnosis',ecu_identification:'ECU File Identification & Original Backup',diagnostic_help:'Car Diagnostic Help'};
+      staticPageCmsList.innerHTML=Object.entries(labels).map(([key,label])=>{
+        const item=staticPageCmsItems.find(row=>row.page_key===key);
+        return '<article class="admin-order-card" style="padding:12px;margin-bottom:8px"><strong>'+escape(label)+'</strong><p>Status: '+escape(item?.status||'Not configured')+' · '+(item?.blocks?.length||0)+' blocks</p><button type="button" class="button button-ghost" data-cms-edit="'+escape(key)+'">Edit page content</button></article>';
+      }).join('');
+      staticPageCmsList.querySelectorAll('[data-cms-edit]').forEach(button=>button.addEventListener('click',()=>{
+        const item=staticPageCmsItems.find(row=>row.page_key===button.dataset.cmsEdit);
+        staticPageCmsForm.elements.namedItem('page_key').value=button.dataset.cmsEdit;
+        staticPageCmsForm.elements.namedItem('status').value=item?.status||'draft';
+        staticPageCmsForm.elements.namedItem('page_title').value=item?.page_title||'';
+        staticPageCmsForm.elements.namedItem('meta_description').value=item?.meta_description||'';
+        staticPageCmsForm.elements.namedItem('blocks').value=JSON.stringify(item?.blocks||[],null,2);
+        staticPageCmsForm.scrollIntoView({behavior:'smooth',block:'center'});
+      }));
+    }catch(error){staticPageCmsList.textContent=error.message;}
+  }
+  staticPageCmsForm?.addEventListener('submit',async event=>{
+    event.preventDefault();
+    const button=staticPageCmsForm.querySelector('button[type="submit"]');
+    button.disabled=true;staticPageCmsMessage.classList.remove('admin-error');
+    try{
+      let blocks;
+      try{blocks=JSON.parse(staticPageCmsForm.elements.namedItem('blocks').value);}catch{throw new Error('Content blocks must be valid JSON.');}
+      if(!Array.isArray(blocks))throw new Error('Content blocks must be a JSON array.');
+      const payload={page_key:staticPageCmsForm.elements.namedItem('page_key').value,status:staticPageCmsForm.elements.namedItem('status').value,page_title:staticPageCmsForm.elements.namedItem('page_title').value,meta_description:staticPageCmsForm.elements.namedItem('meta_description').value,blocks};
+      const result=await staticPageCmsRequest('PUT',payload);
+      staticPageCmsMessage.textContent='Saved. '+(result.auditLogged===false?'Warning: the activity log could not be saved.':'The public page will update when published.');
+      await loadStaticPageCms();
+    }catch(error){staticPageCmsMessage.textContent=error.message;staticPageCmsMessage.classList.add('admin-error');}
+    finally{button.disabled=false;}
+  });
+  document.querySelector('#static-page-cms-reset')?.addEventListener('click',resetStaticPageCmsForm);
+
   const softwareProductForm=document.querySelector('#software-product-form');
   const softwareProductList=document.querySelector('#software-product-list');
   const softwareProductMessage=document.querySelector('#software-product-message');
@@ -897,7 +956,7 @@
       const status=memberStatus(u),safeId=escape(u.id),safeEmail=escape(u.email||'(no email)');
       const created=u.created_at?new Date(u.created_at).toLocaleDateString():'—';
       const last=u.last_sign_in_at?new Date(u.last_sign_in_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'Never signed in';
-      return '<article style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="overflow-wrap:anywhere">'+safeEmail+'</strong><span>'+status+' · '+(u.role==='admin'?'Administrator':'Member')+'</span></div><small>Created '+created+' · Last sign-in '+last+'</small><small style="overflow-wrap:anywhere;color:#68756f">ID: '+safeId+'</small>'+(u.role==='admin'?'<p>Protected administrator account</p>':'<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="button button-ghost" data-member-action="'+(status==='Suspended'?'unban':'ban')+'" data-member-id="'+safeId+'">'+(status==='Suspended'?'Restore access':'Suspend access')+'</button><button type="button" class="button button-ghost" data-member-action="delete" data-member-id="'+safeId+'" style="border-color:#b91c1c;color:#b91c1c">Delete account</button></div>')+'</article>';
+      return '<article data-central-id="'+safeId+'" style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="overflow-wrap:anywhere">'+safeEmail+'</strong><span>'+status+' · '+(u.role==='admin'?'Administrator':'Member')+'</span></div><small>Created '+created+' · Last sign-in '+last+'</small><small style="overflow-wrap:anywhere;color:#68756f">ID: '+safeId+'</small>'+(u.role==='admin'?'<p>Protected administrator account</p>':'<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="button button-ghost" data-member-action="'+(status==='Suspended'?'unban':'ban')+'" data-member-id="'+safeId+'">'+(status==='Suspended'?'Restore access':'Suspend access')+'</button><button type="button" class="button button-ghost" data-member-action="delete" data-member-id="'+safeId+'" style="border-color:#b91c1c;color:#b91c1c">Delete account</button></div>')+'</article>';
     }).join('');
     memberPrev.disabled=memberPage<=1;
     memberNext.disabled=memberPage>=pageCount;
@@ -946,6 +1005,128 @@
   });
   if(memberSearch)memberSearch.addEventListener('input',renderMembers);
   document.querySelector('#refresh-members').addEventListener('click',loadMembers);
+
+
+  const moderationList = document.querySelector('#central-moderation-list');
+  const moderationMessage = document.querySelector('#central-moderation-message');
+  const moderationFilter = document.querySelector('#central-moderation-filter');
+  const auditList = document.querySelector('#central-admin-audit-list');
+  const moderationSearch = document.querySelector('#central-moderation-search');
+  let centralModerationItems = [];
+
+  async function centralModerationRequest(method='GET', body=null) {
+    const session=backend.getSession();
+    const token=session?.access_token;
+    if(!token)throw new Error('Admin sign-in expired. Please sign in again.');
+    const url='/api/admin/moderation'+(method==='GET'?'?type='+encodeURIComponent(moderationFilter?.value||'all')+'&limit=60':'');
+    const response=await fetch(url,{method,headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
+    const result=await parseJson(response);
+    if(!response.ok)throw new Error(result.error||'Moderation request failed.');
+    return result;
+  }
+  function moderationPreview(item) {
+    return [item.title,item.name,item.body,item.description,item.reason,item.admin_note,item.city,item.state].filter(Boolean).join(' — ').slice(0,520);
+  }
+  function moderationStatus(item) {
+    if(item.is_hidden===true)return 'Hidden';
+    if(item.content_type==='forum_categories')return item.is_active===false?'Inactive':'Active';
+    return String(item.status||'Visible').replaceAll('_',' ');
+  }
+  function renderCentralModeration(items) {
+    if(!moderationList)return;
+    const query=(moderationSearch?.value||'').trim().toLowerCase();
+    const filtered=items.filter(item=>!query||[item.title,item.name,item.body,item.description,item.reason,item.admin_note,item.author_display_name,item.city,item.state,item.id].some(value=>String(value||'').toLowerCase().includes(query)));
+    if(!filtered.length){moderationList.textContent='No matching moderation records found.';return;}
+    moderationList.innerHTML=filtered.map(item=>{
+      const type=escape(item.content_type||'');
+      const id=escape(item.id||'');
+      const preview=escape(moderationPreview(item));
+      const label=escape((item.content_type||'').replaceAll('_',' '));
+      const status=escape(moderationStatus(item));
+      const date=item.created_at?new Date(item.created_at).toLocaleString():'';
+      const isReport=type==='forum_reports'||type==='workshop_reports';
+      const hidden=item.is_hidden===true||item.status==='hidden'||(type==='forum_categories'&&item.is_active===false)||(type==='workshops'&&['suspended','rejected'].includes(item.status));
+      const isResolved=['resolved','dismissed'].includes(item.status);
+      const canHide=['forum_categories','forum_topics','forum_replies','forum_chat_messages','workshop_reviews','workshops'].includes(type);
+      const canEdit=['forum_categories','forum_topics','forum_replies','workshop_reviews'].includes(type);
+      const reportActions=isReport&&!isResolved?((type==='workshop_reports'?'<button type="button" class="button button-ghost" data-central-action="investigate" data-central-type="'+type+'" data-central-id="'+id+'">Investigate</button>':'')+'<button type="button" class="button button-ghost" data-central-action="resolve" data-central-type="'+type+'" data-central-id="'+id+'">Resolve</button><button type="button" class="button button-ghost" data-central-action="dismiss" data-central-type="'+type+'" data-central-id="'+id+'">Dismiss</button>'):'';
+      const visibilityAction=type==='workshop_reviews'?(item.status==='pending'?'publish':hidden?'restore':'hide'):type==='workshops'?(item.status==='approved'?'hide':hidden?'restore':'publish'):(hidden?'restore':'hide');
+      const visibilityLabel=type==='workshops'&&visibilityAction==='publish'?'Approve':visibilityAction==='publish'?'Publish':visibilityAction==='restore'?'Restore':'Hide';
+      const visibilityActions=canHide?'<button type="button" class="button button-ghost" data-central-action="'+visibilityAction+'" data-central-type="'+type+'" data-central-id="'+id+'">'+visibilityLabel+'</button>':'';
+      const editAction=canEdit?'<button type="button" class="button button-ghost" data-central-action="edit" data-central-type="'+type+'" data-central-id="'+id+'">Edit</button>':'';
+      const removeAction=['workshops','forum_categories'].includes(type)?'':'<button type="button" class="button button-ghost" style="border-color:#b91c1c;color:#b91c1c" data-central-action="delete" data-central-type="'+type+'" data-central-id="'+id+'">Delete</button>';
+      return '<article data-central-id="'+id+'" data-current-title="'+escape(item.title||item.name||'')+'" data-current-body="'+escape(item.body||item.description||'')+'" style="border:1px solid #dce3df;border-radius:10px;padding:14px;margin:10px 0;display:grid;gap:8px"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap"><strong>'+label+'</strong><span>'+status+'</span></div><p style="margin:0;white-space:pre-wrap;overflow-wrap:anywhere">'+preview+'</p><small>'+escape(date)+' · ID: '+id+'</small><div style="display:flex;gap:8px;flex-wrap:wrap">'+visibilityActions+editAction+reportActions+removeAction+'</div></article>';
+    }).join('');
+  }
+  function renderCentralAudit(items) {
+    if(!auditList)return;
+    if(!items?.length){auditList.textContent='No recorded admin activity yet.';return;}
+    auditList.innerHTML=items.map(item=>{
+      const details=item.details&&typeof item.details==='object'?JSON.stringify(item.details):'';
+      return '<article style="border-bottom:1px solid #e2e8e4;padding:10px 4px;display:grid;gap:4px"><strong>'+escape(String(item.action||'Action').replaceAll('_',' '))+' · '+escape(String(item.target_type||'content').replaceAll('_',' '))+'</strong><small>'+escape(item.created_at?new Date(item.created_at).toLocaleString():'')+' · Admin ID: '+escape(item.actor_id||'')+'</small><small style="overflow-wrap:anywhere">'+escape(details.slice(0,300))+'</small></article>';
+    }).join('');
+  }
+  async function loadCentralModeration() {
+    if(!moderationList)return;
+    moderationList.textContent='Loading moderation records…';
+    moderationMessage.textContent='';
+    moderationMessage.classList.remove('admin-error');
+    try {
+      const result=await centralModerationRequest('GET');
+      centralModerationItems=Array.isArray(result.items)?result.items:[];
+      renderCentralModeration(centralModerationItems);
+      renderCentralAudit(result.audit||[]);
+      moderationMessage.textContent='Loaded '+(result.items?.length||0)+' records. Hidden content remains stored and can be restored.';
+    } catch(error) {
+      moderationList.textContent='Moderation records could not be loaded.';
+      moderationMessage.textContent=error.message;
+      moderationMessage.classList.add('admin-error');
+    }
+  }
+  async function runCentralModerationAction(type,id,action) {
+    const itemType=type;
+    let body={type:itemType,id,action};
+    if(action==='delete') {
+      if(!confirm('Permanently delete this content? This cannot be undone. Related replies or reports may also be removed.'))return;
+      body.confirmPermanentDelete=true;
+    }
+    if(action==='hide'&&!confirm('Hide this content from public visitors? You can restore it later.'))return;
+    if(action==='restore'&&!confirm('Restore this content to public view?'))return;
+    if(action==='edit') {
+      const card=moderationList.querySelector('[data-central-id="'+CSS.escape(id)+'"]')?.closest('article');
+      const current=card?.dataset.currentBody||'';
+      const next=prompt('Edit the content:',current);
+      if(next===null)return;
+      if(itemType==='forum_categories'||itemType==='forum_topics'||itemType==='workshop_reviews') {
+        const currentTitle=card?.dataset.currentTitle||'';
+        const title=prompt('Edit the title:',currentTitle);
+        if(title===null)return;
+        body.title=title;body.body=next;
+      } else body.body=next;
+    }
+    if(type==='workshop_reports'&&(action==='resolve'||action==='dismiss'||action==='investigate')) {
+      const note=prompt('Optional moderation note (leave blank if not needed):','');
+      if(note===null)return;
+      body.admin_note=note;
+    }
+    try {
+      const result=await centralModerationRequest('POST',body);
+      moderationMessage.textContent=action.charAt(0).toUpperCase()+action.slice(1)+' completed.'+(result.auditLogged===false?' Warning: activity log could not be saved.':'');
+      await loadCentralModeration();
+    } catch(error) {
+      moderationMessage.textContent=error.message;
+      moderationMessage.classList.add('admin-error');
+    }
+  }
+  moderationList?.addEventListener('click',event=>{
+    const button=event.target.closest('button[data-central-action]');
+    if(!button)return;
+    button.disabled=true;
+    runCentralModerationAction(button.dataset.centralType,button.dataset.centralId,button.dataset.centralAction).finally(()=>{button.disabled=false;});
+  });
+  document.querySelector('#central-moderation-refresh')?.addEventListener('click',loadCentralModeration);
+  moderationFilter?.addEventListener('change',loadCentralModeration);
+  moderationSearch?.addEventListener('input',()=>renderCentralModeration(centralModerationItems));
 
   const adminForumForm = document.querySelector('#admin-forum-post-form');
   const adminForumCategory = document.querySelector('#admin-forum-category');
@@ -1041,11 +1222,13 @@
     document.querySelector('#admin-signout').hidden = false;
     setupAdminFolders();
     await loadAdminForumCategories();
+    await loadCentralModeration();
     await loadPricing();
     await loadOrders();
     await loadAdvertisingInquiries();
     await loadAdvertisingQuotes();
     await loadSiteContent();
+    await loadStaticPageCms();
     await loadSoftwareProducts();
     await loadMembers();
     await loadAdminCustomerRequests();
