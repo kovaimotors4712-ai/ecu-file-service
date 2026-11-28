@@ -16,7 +16,7 @@ process.env.RAZORPAY_KEY_SECRET = 'test-razorpay-secret-1234567890';
 process.env.PAYPAL_CLIENT_ID = 'paypal_client_test_12345';
 process.env.PAYPAL_CLIENT_SECRET = 'paypal_secret_test_12345';
 process.env.PAYPAL_BASE_URL = 'https://api-m.sandbox.paypal.com';
-process.env.BREVO_API_KEY = 're_test_123456789012';
+process.env.BREVO_API_KEY = 'xkeysib_test_123456789012';
 process.env.BREVO_EMAIL_FROM = 'noreply@example.invalid';
 process.env.BREVO_SENDER_NAME = 'ECU File Service India';
 process.env.ADMIN_NOTIFICATION_EMAIL = 'admin@example.invalid';
@@ -1360,7 +1360,8 @@ test('static source contains category field isolation, provider routes, Brevo, a
   assert.match(index,/class="[^"]*\becu-only\b[^"]*"/);
   assert.match(admin,/class="order-status-select"/);
   assert.match(serverSource,/PayPal is disabled\. Use Razorpay checkout instead\./);
-  assert.match(serverSource,/api\\.brevo\\.com\\/v3\\/smtp\\/email/);
+  assert.match(serverSource,/api\.brevo\.com\/v3\/smtp\/email/);
+  assert.doesNotMatch(serverSource,/api\.resend\.com\/emails/);
   assert.match(serverSource,/notification_outbox/);
 });
 
