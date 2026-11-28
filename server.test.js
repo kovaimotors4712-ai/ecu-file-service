@@ -16,8 +16,9 @@ process.env.RAZORPAY_KEY_SECRET = 'test-razorpay-secret-1234567890';
 process.env.PAYPAL_CLIENT_ID = 'paypal_client_test_12345';
 process.env.PAYPAL_CLIENT_SECRET = 'paypal_secret_test_12345';
 process.env.PAYPAL_BASE_URL = 'https://api-m.sandbox.paypal.com';
-process.env.RESEND_API_KEY = 're_test_123456789012';
-process.env.EMAIL_FROM = 'ECU FILE SERVICE INDIA <noreply@example.invalid>';
+process.env.BREVO_API_KEY = 're_test_123456789012';
+process.env.BREVO_EMAIL_FROM = 'noreply@example.invalid';
+process.env.BREVO_SENDER_NAME = 'ECU File Service India';
 process.env.ADMIN_NOTIFICATION_EMAIL = 'admin@example.invalid';
 process.env.PAYMENT_GATE_PROOF_SECRET = 'test-only-proof-secret-value-at-least-32-chars-long';
 process.env.PAYMENT_GATE_SCHEMA_READY = 'true';
@@ -69,9 +70,9 @@ const state = {
   razorOrderCalls: 0,
   paypalOrderCalls: 0,
   paypalCaptureCalls: 0,
-  resendCalls: 0,
-  lastResendRequest: null,
-  resendRequests: [],
+  brevoCalls: 0,
+  lastBrevoRequest: null,
+  brevoRequests: [],
   nextOrderSequence: 1,
   nextIntentSequence: 1,
   razorPaymentStatus: 'captured',
@@ -82,7 +83,7 @@ const state = {
   razorOrderCurrency: 'INR',
   razorOrderNotes: null,
   paypalOrderStatus: 'CREATED',
-  resendShouldFail: false
+  brevoShouldFail: false
 };
 
 function resetState() {
@@ -90,9 +91,9 @@ function resetState() {
   state.razorOrderCalls = 0;
   state.paypalOrderCalls = 0;
   state.paypalCaptureCalls = 0;
-  state.resendCalls = 0;
-  state.lastResendRequest = null;
-  state.resendRequests = [];
+  state.brevoCalls = 0;
+  state.lastBrevoRequest = null;
+  state.brevoRequests = [];
   state.nextOrderSequence = 1;
   state.nextIntentSequence = 1;
   state.razorPaymentStatus = 'captured';
@@ -103,7 +104,7 @@ function resetState() {
   state.razorOrderCurrency = 'INR';
   state.razorOrderNotes = null;
   state.paypalOrderStatus = 'CREATED';
-  state.resendShouldFail = false;
+  state.brevoShouldFail = false;
 }
 
 function uuidFor(prefix, n) {
@@ -243,12 +244,12 @@ const upstream = async (urlValue, options = {}) => {
     }
   }
 
-  if (url.hostname === 'api.resend.com' && url.pathname === '/emails' && method === 'POST') {
-    state.resendCalls += 1;
-    state.lastResendRequest = { headers: options.headers, body: JSON.parse(options.body) };
-    state.resendRequests.push(state.lastResendRequest);
-    if (state.resendShouldFail) return response(500, { message: 'synthetic Resend outage' });
-    return response(200, { id: 'email-local-1' });
+  if (url.hostname === 'api.brevo.com' && url.pathname === '/v3/smtp/email' && method === 'POST') {
+    state.brevoCalls += 1;
+    state.lastBrevoRequest = { headers: options.headers, body: JSON.parse(options.body) };
+    state.brevoRequests.push(state.lastBrevoRequest);
+    if (state.brevoShouldFail) return response(500, { message: 'synthetic Brevo outage' });
+    return response(201, { messageId: '<email-local-1@relay.example.invalid>' });
   }
 
   if (url.pathname === '/rest/v1/software_products' && method === 'GET') return response(200, [softwareSeoFixture]);
@@ -999,7 +1000,7 @@ test('health reports provider and email readiness', async () => {
   assert.equal(result.payload.paymentConfigured, true);
   assert.equal(result.payload.paymentReadiness.razorpay, true);
   assert.equal(result.payload.paymentReadiness.paypal, false);
-  assert.equal(result.payload.paymentReadiness.resend, true);
+  assert.equal(result.payload.paymentReadiness.brevo, true);
   assert.equal(result.payload.paymentReadiness.serviceRoleAvailable, true);
 });
 
@@ -1212,21 +1213,21 @@ test('a different customer cannot read the paid order through the server-side or
   assert.equal(result.payload.length,0);
 });
 
-test('Resend outbox sends event-specific email to Admin and customer idempotently', async () => {
+test('Brevo outbox sends event-specific email to Admin and customer idempotently', async () => {
   const paid = await paidRazorpayIntent();
   await new Promise(resolve => setTimeout(resolve, 10));
   await flushNotificationOutbox();
-  assert.equal(state.resendCalls, 4);
+  assert.equal(state.brevoCalls, 4);
   assert.equal([...state.outbox.values()].every(row => row.status === 'SENT'), true);
-  assert.deepEqual(state.resendRequests.map(item => item.body.to[0]), [
+  assert.deepEqual(state.brevoRequests.map(item => item.body.to[0].email), [
     'admin@example.invalid','customer@example.invalid','admin@example.invalid','customer@example.invalid'
   ]);
-  assert.deepEqual(state.resendRequests.map(item => item.body.subject), [
+  assert.deepEqual(state.brevoRequests.map(item => item.body.subject), [
     'New Order Received – ECU File Service India','We received your order – ECU File Service India',
     'Payment Confirmed – ECU File Service India','Payment received – ECU File Service India'
   ]);
-  assert.ok(state.resendRequests.every(item => /^efsi\/.+\/(?:admin|customer)$/.test(item.headers['Idempotency-Key'])));
-  const bodies = state.resendRequests.map(item => item.body.html).join('\n');
+  assert.ok(state.brevoRequests.every(item => /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(item.body.headers.idempotencyKey)));
+  const bodies = state.brevoRequests.map(item => item.body.htmlContent).join('\n');
   assert.match(bodies, new RegExp(paid.verify.payload.orderId));
   assert.match(bodies, /PAID/);
   assert.match(bodies, /₹99\.00/);
@@ -1255,8 +1256,8 @@ test('Airbag Crash Clear order captures module details and sends event emails to
   const order = [...state.orders.values()][0];
   assert.equal(order.module_details,'Autoliv SRS module, P/N 123456789');
   await flushNotificationOutbox();
-  assert.equal(state.resendCalls,4);
-  const html = state.resendRequests.map(item=>item.body.html).join('\n');
+  assert.equal(state.brevoCalls,4);
+  const html = state.brevoRequests.map(item=>item.body.htmlContent).join('\n');
   assert.match(html,/AIRBAG/);
   assert.match(html,/Autoliv SRS module, P\/N 123456789/);
   assert.doesNotMatch(html,/undefined|null/);
@@ -1273,20 +1274,20 @@ test('status-change notification sends separate idempotent updates to Admin and 
     payload:{ previous_status:'New', status:'Processing' }, status:'PENDING', attempts:0, next_attempt_at:now, created_at:now
   });
   await flushNotificationOutbox();
-  const statusEmails = state.resendRequests.filter(item => item.headers['Idempotency-Key'].includes(`${eventKey}/`));
+  const statusEmails = state.brevoRequests.filter(item => item.body.subject.includes('Order Status Updated:') || item.body.subject.includes('Your order status is now'));
   assert.equal(statusEmails.length,2);
-  assert.deepEqual(statusEmails.map(item => item.body.to[0]),['admin@example.invalid','customer@example.invalid']);
+  assert.deepEqual(statusEmails.map(item => item.body.to[0].email),['admin@example.invalid','customer@example.invalid']);
   assert.deepEqual(statusEmails.map(item => item.body.subject),[
     'Order Status Updated: Processing – ECU File Service India',
     'Your order status is now Processing – ECU File Service India'
   ]);
-  assert.ok(statusEmails.every(item => item.body.html.includes('New') && item.body.html.includes('Processing')));
+  assert.ok(statusEmails.every(item => item.body.htmlContent.includes('New') && item.body.htmlContent.includes('Processing')));
   assert.ok(paid.verify.payload.orderId);
 });
 
-test('Resend failure moves an email event to RETRY instead of breaking the order', async () => {
+test('Brevo failure moves an email event to RETRY instead of breaking the order', async () => {
   const paid = await paidRazorpayIntent();
-  state.resendShouldFail = true;
+  state.brevoShouldFail = true;
   await flushNotificationOutbox();
   const rows = [...state.outbox.values()];
   assert.equal(rows.every(row => ['RETRY','FAILED'].includes(row.status)),true);
@@ -1322,7 +1323,7 @@ test('static source contains real Realtime subscriptions and no polling/deprecat
   assert.match(files,/postgres_changes/);
 });
 
-test('static source contains category field isolation, provider routes, Resend, and explicit status selector', () => {
+test('static source contains category field isolation, provider routes, Brevo, and explicit status selector', () => {
   const app = fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
   const index = fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
   const admin = fs.readFileSync(path.join(__dirname,'admin.js'),'utf8');
@@ -1338,7 +1339,7 @@ test('static source contains category field isolation, provider routes, Resend, 
   assert.match(index,/class="[^"]*\becu-only\b[^"]*"/);
   assert.match(admin,/class="order-status-select"/);
   assert.match(serverSource,/PayPal is disabled\. Use Razorpay checkout instead\./);
-  assert.match(serverSource,/api\.resend\.com\/emails/);
+  assert.match(serverSource,/api\.brevo\.com\/emails/);
   assert.match(serverSource,/notification_outbox/);
 });
 
@@ -1433,7 +1434,7 @@ test('new migrations preserve payment proof while adding private Airbag photos a
 test('production environment templates contain both payment gateways and email secrets', () => {
   const env = fs.readFileSync(path.join(__dirname,'.env.production.example'),'utf8');
   const render = fs.readFileSync(path.join(__dirname,'render.yaml'),'utf8');
-  for (const key of ['PAYPAL_CLIENT_ID','PAYPAL_CLIENT_SECRET','PAYPAL_BASE_URL','RESEND_API_KEY','EMAIL_FROM','ADMIN_NOTIFICATION_EMAIL','SUPABASE_SERVICE_ROLE_KEY','PAYMENT_GATE_PROOF_SECRET']) {
+  for (const key of ['PAYPAL_CLIENT_ID','PAYPAL_CLIENT_SECRET','PAYPAL_BASE_URL','BREVO_API_KEY','BREVO_EMAIL_FROM','BREVO_SENDER_NAME','ADMIN_NOTIFICATION_EMAIL','SUPABASE_SERVICE_ROLE_KEY','PAYMENT_GATE_PROOF_SECRET']) {
     assert.match(env,new RegExp(key));
     assert.match(render,new RegExp(key));
   }
@@ -2029,8 +2030,8 @@ test('advertising quote acceptance, Razorpay verification, mismatch rejection, a
 
   const issued=await call('/api/admin/advertising/quotes',{method:'PATCH',token:tokens.admin,body:{id:quoteId,action:'issue'}});
   assert.equal(issued.response.status,200,JSON.stringify(issued.payload));
-  assert.equal(state.resendCalls,1);
-  const token=state.lastResendRequest.body.html.match(/advertising-quote\.html#([A-Za-z0-9_-]{43})/)?.[1];
+  assert.equal(state.brevoCalls,1);
+  const token=state.lastBrevoRequest.body.htmlContent.match(/advertising-quote\.html#([A-Za-z0-9_-]{43})/)?.[1];
   assert.ok(token,'quote email must contain the one-time token in the URL fragment');
   assert.equal([...state.advertisingQuotes.values()][0].acceptance_token_hash,hash(token));
   assert.equal([...state.advertisingQuotes.values()][0].status,'issued');
