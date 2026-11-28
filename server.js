@@ -113,7 +113,7 @@ function hasPayPalConfig() {
   return hostOk && paypalClientId.length >= 10 && paypalClientSecret.length >= 10;
 }
 function hasBrevoConfig() {
-  return brevoApiKey.length >= 20 && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(brevoEmailFrom) && Boolean(brevoSenderName.trim()) && adminNotificationEmail.includes('@');
+  return brevoApiKey.length >= 20 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(brevoEmailFrom) && Boolean(brevoSenderName.trim()) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminNotificationEmail);
 }
 function brevoIdempotencyKey(value) {
   const digest = crypto.createHash('sha256').update(`ECU_FILE_SERVICE_BREVO:${value}`).digest();
@@ -1273,6 +1273,14 @@ async function flushNotificationOutbox() {
       const customerHtml = `<div style="font-family:sans-serif;line-height:1.5"><h2>${esc(eventTitle)} – ECU File Service India</h2><p>Hi ${esc(order.contact_name || 'Customer')},</p><p>${eventType === 'status_change' ? `Your order status has changed from ${esc(previousStatus)} to <strong>${esc(currentStatus)}</strong>.` : eventType === 'paid_order' ? 'We have verified your payment successfully. Your order is confirmed.' : 'We have received your order successfully. Our team will review it and update you as it progresses.'}</p>${detailHtml}<p>Sign in to your account at <a href="${esc(appUrl)}/">${esc(appUrl)}</a> to review your order.</p><p>Regards,<br>ECU File Service India · ECU File Service India</p></div>`;
       const eventKey = String(row.event_key || `${row.order_id}:${eventType}`).replace(/[^a-zA-Z0-9._:/-]/g, '_').slice(0, 180);
       try {
+        const deliveryState = rowPayload._brevo_delivery && typeof rowPayload._brevo_delivery === 'object' ? { ...rowPayload._brevo_delivery } : {};
+        const persistRecipientSent = async recipientLabel => {
+          const nextDeliveryState = { ...deliveryState, [recipientLabel]: { sent_at: new Date().toISOString() } };
+          const saved = await supabaseRequest(token, `rest/v1/notification_outbox?id=eq.${encodeURIComponent(row.id)}`, { method:'PATCH', prefer:'return=minimal', body:{ payload:{ ...rowPayload, _brevo_delivery:nextDeliveryState }, updated_at:new Date().toISOString() }, timeoutMs:15000 });
+          if (!saved.ok) throw new Error('Email delivery state could not be saved after provider acceptance.');
+          deliveryState[recipientLabel] = nextDeliveryState[recipientLabel];
+          rowPayload._brevo_delivery = nextDeliveryState;
+        };
         const sendEmail = async (recipient, subject, html, recipientLabel) => {
           const emailResponse = await requestHttps('https://api.brevo.com/v3/smtp/email', {
             method: 'POST',
@@ -1285,10 +1293,14 @@ async function flushNotificationOutbox() {
           });
           if (!emailResponse.ok) throw new Error((await emailResponse.text()).slice(0, 300));
         };
-        // Recipient-scoped idempotency keys allow a retry to safely resume if one send succeeded.
-        await sendEmail(adminNotificationEmail, adminSubject, adminHtml, 'admin');
-        if (order.contact_email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(order.contact_email))) {
+        // Persist each accepted recipient separately so a later retry never resends a confirmed delivery.
+        if (!deliveryState.admin?.sent_at) {
+          await sendEmail(adminNotificationEmail, adminSubject, adminHtml, 'admin');
+          await persistRecipientSent('admin');
+        }
+        if (order.contact_email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(order.contact_email)) && !deliveryState.customer?.sent_at) {
           await sendEmail(order.contact_email, customerSubject, customerHtml, 'customer');
+          await persistRecipientSent('customer');
         }
         await supabaseRequest(token, `rest/v1/notification_outbox?id=eq.${encodeURIComponent(row.id)}`, { method: 'PATCH', prefer: 'return=minimal', body: { status: 'SENT', sent_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }, timeoutMs: 15000 });
       } catch (error) {
@@ -1766,7 +1778,7 @@ async function handleAdminAdvertisingQuotes(request, response) {
         if (!update.ok || !(await update.json())?.length) { jsonResponse(response, 409, { error:'Quote changed while issuing. Refresh and retry.' }); return true; }
         const quoteUrl = 'https://ecufileservice.in/advertising-quote.html#' + rawToken;
         const htmlEscape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        const emailBody = { sender:{ name:brevoSenderName, email:brevoEmailFrom }, to:[{ email:inquiry.email }], subject:'Advertising quote from ECU File Service India', htmlContent:'<p>Hello '+htmlEscape(inquiry.business_name)+',</p><p>Your advertising quote is ready for review.</p><p><strong>Amount:</strong> ₹'+(Number(quote.amount_paise)/100).toFixed(2)+' INR<br><strong>Placement:</strong> '+htmlEscape(quote.placement)+'<br><strong>Schedule:</strong> '+htmlEscape(quote.starts_at)+' to '+htmlEscape(quote.ends_at)+'<br><strong>Quote expiry:</strong> '+htmlEscape(quote.expires_at)+'</p><p><a href="'+quoteUrl+'">Review quote and accept</a></p><p>'+htmlEscape(quote.terms_snapshot)+'</p><p>Payment does not automatically publish the advertisement; creative approval is separate.</p>', headers:{ idempotencyKey:brevoIdempotencyKey(`advertising-quote/${id}/issue`) } };
+        const emailBody = { sender:{ name:brevoSenderName, email:brevoEmailFrom }, to:[{ email:inquiry.email }], subject:'Advertising quote from ECU File Service India', htmlContent:'<p>Hello '+htmlEscape(inquiry.business_name)+',</p><p>Your advertising quote is ready for review.</p><p><strong>Amount:</strong> ₹'+(Number(quote.amount_paise)/100).toFixed(2)+' INR<br><strong>Placement:</strong> '+htmlEscape(quote.placement)+'<br><strong>Schedule:</strong> '+htmlEscape(quote.starts_at)+' to '+htmlEscape(quote.ends_at)+'<br><strong>Quote expiry:</strong> '+htmlEscape(quote.expires_at)+'</p><p><a href="'+quoteUrl+'">Review quote and accept</a></p><p>'+htmlEscape(quote.terms_snapshot)+'</p><p>Payment does not automatically publish the advertisement; creative approval is separate.</p>', headers:{ idempotencyKey:brevoIdempotencyKey(`advertising-quote/${id}/${digest}`) } };
         let mail;
         try { mail = await requestHttps('https://api.brevo.com/v3/smtp/email', { method:'POST', headers:{ 'api-key':brevoApiKey, Accept:'application/json', 'Content-Type':'application/json' }, body:JSON.stringify(emailBody), timeoutMs:15000 }); }
         catch { mail = null; }
