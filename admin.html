@@ -126,6 +126,27 @@
         <div style="margin-top:24px"><h3>Advertiser enquiries</h3><p>Review incoming advertising requests and update their status. Publishing an ad remains a separate approval step.</p><div id="advertising-inquiry-list" class="admin-order-list">Loading advertiser enquiries…</div><p id="advertising-inquiry-message" class="admin-message" role="status"></p></div>
       </section>
 
+
+      <section class="pricing-settings" aria-labelledby="static-page-cms-title" style="margin-top:28px;display:block">
+        <div><span class="form-kicker">STATIC PAGE CMS · ADMIN ONLY</span><h2 id="static-page-cms-title">Information Page Content</h2><p class="admin-section-help">Manage additional structured information on approved pages. Only headings, paragraphs, lists and internal links are accepted. Existing page layout, forms, scripts, canonical URLs and payment features remain unchanged. Draft and Hidden content is not shown publicly.</p></div>
+        <form id="static-page-cms-form" class="pricing-form" style="margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+          <label>Page<select name="page_key" required>
+            <option value="about">About</option><option value="guides">Guides</option><option value="vehicle_wiring">Vehicle ECU Wiring &amp; Diagnostic Guide</option><option value="international_support">International ECU File Support</option><option value="fault_code_diagnosis">ECU Fault-Code Diagnosis</option><option value="ecu_identification">ECU File Identification &amp; Original Backup</option><option value="diagnostic_help">Car Diagnostic Help</option>
+          </select></label>
+          <label>Publishing status<select name="status"><option value="draft">Draft</option><option value="published">Published</option><option value="hidden">Hidden</option></select></label>
+          <label style="grid-column:1/-1">SEO page title<input name="page_title" maxlength="120" placeholder="Optional — leave blank to keep existing title"></label>
+          <label style="grid-column:1/-1">SEO description<input name="meta_description" maxlength="300" placeholder="Optional — leave blank to keep existing description"></label>
+          <label style="grid-column:1/-1">Structured content blocks (JSON)<textarea name="blocks" rows="10" maxlength="18000" required spellcheck="false">[
+  {"type":"heading","text":"Additional information"},
+  {"type":"paragraph","text":"Write a clear, useful paragraph here."},
+  {"type":"list","items":["First point","Second point"]},
+  {"type":"link","label":"View ECU file services","url":"/ecu-file-services.html"}
+]</textarea><small>Allowed block types: heading, paragraph, list, link. Link URLs must be internal paths beginning with /.</small></label>
+          <div style="grid-column:1/-1"><button class="button button-dark" type="submit">Save page content →</button><button id="static-page-cms-reset" class="button button-ghost" type="button">Reset editor</button><p id="static-page-cms-message" class="admin-message" role="status"></p></div>
+        </form>
+        <div style="margin-top:20px"><h3>Saved information pages</h3><div id="static-page-cms-list" class="admin-order-list">Loading page content…</div></div>
+      </section>
+
 <section class="pricing-settings" aria-labelledby="software-products-title" style="margin-top:28px;display:block">
 <div class="admin-software-heading"><span class="form-kicker">SOFTWARE STORE</span><h2 id="software-products-title">Software Store</h2><p>Add, edit and manage software listings.</p></div>
 <details class="admin-software-form-details"><summary>＋ Add / edit software</summary>
