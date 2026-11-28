@@ -6,6 +6,7 @@
   let session = readSession();
   let configured = false;
   let authEvent = null;
+  let emailVerificationPending = false;
   let ordersRequest = 0;
   let showHiddenOrders = false;
   let showHiddenPrivateRequests = false;
@@ -173,6 +174,7 @@
     const signout = document.querySelector('.account-signout');
     const email = session?.user?.email;
     const signedIn = Boolean(email);
+    const showEmailVerification = !signedIn && emailVerificationPending;
     const isAdmin = session?.user?.app_metadata?.role === 'admin';
     const adminShortcut = document.querySelector('.admin-shortcut');
     if (adminShortcut) adminShortcut.hidden = !isAdmin;
@@ -180,16 +182,18 @@
     if (triggerLabel) triggerLabel.textContent = signedIn ? 'My account · Signed in' : 'My account';
     else if (trigger) trigger.textContent = signedIn ? 'My account · Signed in' : 'My account';
     if (signout) signout.hidden = !signedIn;
-    if (authTabs) authTabs.hidden = signedIn;
-    if (form) form.hidden = signedIn;
-    if (resetForm && signedIn) resetForm.hidden = true;
+    if (authTabs) authTabs.hidden = signedIn || showEmailVerification;
+    if (form) form.hidden = signedIn || showEmailVerification;
+    if (resetForm && (signedIn || showEmailVerification)) resetForm.hidden = true;
     const resetLink = document.querySelector('.auth-reset');
-    if (resetLink) resetLink.hidden = signedIn;
+    if (resetLink) resetLink.hidden = signedIn || showEmailVerification;
     if (accountTitle && signedIn) accountTitle.textContent = 'You’re signed in';
     if (accountIntro && signedIn) accountIntro.textContent = 'Your account is active. Check your orders, payment status, saved checkouts and updates from our team below.';
-    if (accountTitle && !signedIn && !resetForm?.hidden && authEvent === 'PASSWORD_RECOVERY') accountTitle.textContent = 'Set a new password';
-    if (!signedIn && accountTitle && !authEvent) accountTitle.textContent = 'Sign in to your account';
-    if (!signedIn && accountIntro && !authEvent) accountIntro.textContent = 'Sign in to view your orders, payment status and messages. New here? Create an account.';
+    if (showEmailVerification && accountTitle) accountTitle.textContent = 'Confirm your email';
+    if (showEmailVerification && accountIntro) accountIntro.textContent = 'Your account request has been received. One more step is required before you can sign in.';
+    if (accountTitle && !signedIn && !showEmailVerification && !resetForm?.hidden && authEvent === 'PASSWORD_RECOVERY') accountTitle.textContent = 'Set a new password';
+    if (!signedIn && accountTitle && !authEvent && !showEmailVerification) accountTitle.textContent = 'Sign in to your account';
+    if (!signedIn && accountIntro && !authEvent && !showEmailVerification) accountIntro.textContent = 'Sign in to view your orders, payment status and messages. New here? Create an account.';
     const ordersPanel = document.querySelector('#customer-orders');
     const pendingPanel = document.querySelector('#pending-checkouts');
     const notificationPanel = document.querySelector('#customer-notifications');
@@ -410,8 +414,10 @@
     submit.innerHTML = signingUp ? 'Create account <span>→</span>' : 'Sign in <span>→</span>';
     if (clearMessage) { message.textContent = ''; message.classList.remove('account-message-warning'); }
   }
-  function showSignIn(text = '') { authTabs.hidden = false; form.hidden = false; resetForm.hidden = true; document.querySelector('.auth-reset').hidden = false; accountTitle.textContent = 'Sign in to your account'; accountIntro.textContent = 'Save requests and access your private file history.'; setMode('signin', false); message.textContent = text; message.classList.remove('account-message-warning'); message.setAttribute('role', 'status'); }
+  function showSignIn(text = '') { emailVerificationPending = false; authTabs.hidden = false; form.hidden = false; resetForm.hidden = true; document.querySelector('.auth-reset').hidden = false; accountTitle.textContent = 'Sign in to your account'; accountIntro.textContent = 'Save requests and access your private file history.'; setMode('signin', false); message.textContent = text; message.classList.remove('account-message-warning'); message.setAttribute('role', 'status'); }
   function showEmailVerification(email) {
+    emailVerificationPending = true;
+    if (!dialog.open) dialog.showModal();
     authTabs.hidden = true; form.hidden = true; resetForm.hidden = true; document.querySelector('.auth-reset').hidden = true;
     accountTitle.textContent = 'Confirm your email';
     accountIntro.textContent = 'Your account request has been received. One more step is required before you can sign in.';
