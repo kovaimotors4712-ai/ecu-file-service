@@ -1997,6 +1997,30 @@ async function handleAdminUsers(request,response){
     const target=await supabaseRequest(token,'auth/v1/admin/users/'+encodeURIComponent(id),{timeoutMs:15000});
     if(!target.ok){jsonResponse(response,target.status===404?404:502,{error:'Member account could not be verified.'});return true;}
     const targetUser=await target.json();
+    if(request.method==='PATCH' && String(body.action||'')==='grant_admin'){
+      const actorEmail=String(admin.email||'').trim().toLowerCase();
+      const targetEmail=String(targetUser.email||'').trim().toLowerCase();
+      if(actorEmail!=='thoufiqrahman4711@gmail.com'){
+        jsonResponse(response,403,{error:'Only the existing primary administrator can grant this administrator access.'});return true;
+      }
+      if(targetEmail!=='kovaimotors4712@gmail.com'){
+        jsonResponse(response,403,{error:'Administrator promotion is restricted to the approved account.'});return true;
+      }
+      if(!(targetUser.email_confirmed_at||targetUser.confirmed_at)){
+        jsonResponse(response,409,{error:'The target account email must be confirmed before administrator access can be granted.'});return true;
+      }
+      if(targetUser.app_metadata?.role==='admin'){
+        jsonResponse(response,200,{updated:true,alreadyAdmin:true,user:{id:targetUser.id,email:targetEmail,role:'admin'}});return true;
+      }
+      const appMetadata=targetUser.app_metadata&&typeof targetUser.app_metadata==='object'?targetUser.app_metadata:{};
+      const update=await supabaseRequest(token,'auth/v1/admin/users/'+encodeURIComponent(id),{method:'PUT',body:{app_metadata:{...appMetadata,role:'admin'}},timeoutMs:15000});
+      if(!update.ok){jsonResponse(response,502,{error:'Administrator access could not be granted. No existing administrator account was changed.'});return true;}
+      const updated=await update.json().catch(()=>({}));
+      if(updated?.app_metadata?.role!=='admin'){
+        jsonResponse(response,502,{error:'The role update could not be verified. Please refresh the member list before retrying.'});return true;
+      }
+      jsonResponse(response,200,{updated:true,user:{id:updated.id||id,email:updated.email||targetEmail,role:'admin'}});return true;
+    }
     if(targetUser?.app_metadata?.role==='admin'){jsonResponse(response,403,{error:'Administrator accounts are protected from member-management actions.'});return true;}
     if(request.method==='PATCH'){
       const action=String(body.action||'');
