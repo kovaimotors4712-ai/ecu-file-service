@@ -171,8 +171,11 @@
     const accountIntro = document.querySelector('.account-intro');
     const trigger = document.querySelector('#account-trigger');
     const signout = document.querySelector('.account-signout');
+    const adminShortcut = document.querySelector('.admin-shortcut');
     const email = session?.user?.email;
     const signedIn = Boolean(email);
+    const isAdmin = signedIn && session?.user?.app_metadata?.role === 'admin';
+    if (adminShortcut) adminShortcut.hidden = !isAdmin;
     const triggerLabel = trigger?.querySelector('#account-trigger-label');
     if (triggerLabel) triggerLabel.textContent = signedIn ? 'My account · Signed in' : 'My account';
     else if (trigger) trigger.textContent = signedIn ? 'My account · Signed in' : 'My account';
