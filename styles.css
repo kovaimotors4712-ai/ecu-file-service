@@ -216,3 +216,12 @@ body{line-height:1.55}h1,h2,h3,p,label,button,a{overflow-wrap:break-word}button,
 .pwa-install-button[hidden]{display:none!important}
 @media(max-width:740px){.pwa-install-button{padding:8px 7px;font-size:8px}}
 @media(max-width:400px){.pwa-install-button{padding:7px 5px;font-size:7px}}
+
+
+/* Mobile-only fix: keep the two links in the DTC & SOFTWARE card on separate rows. */
+@media (max-width: 740px) {
+  #automotive-ecu-help .service-card:nth-child(3) > .text-link + .text-link {
+    grid-row: 5;
+    margin-top: 8px;
+  }
+}
