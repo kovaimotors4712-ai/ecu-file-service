@@ -615,12 +615,12 @@ test('published static CMS content is escaped and appended without replacing can
   assert.equal(page.response.status,200);
   assert.match(page.payload,/Updated About Title/);
   assert.match(page.payload,/Updated description for the about page/);
-  assert.match(page.payload,/<h2>CMS heading &lt;script&gt;<\\/h2>/);
-  assert.match(page.payload,/Safe paragraph &amp; details\\./);
-  assert.match(page.payload,/href="\\/ecu-file-services\\.html">Services<\\/a>/);
+  assert.ok(page.payload.includes('<h2>CMS heading &lt;script&gt;</h2>'));
+  assert.ok(page.payload.includes('Safe paragraph &amp; details.'));
+  assert.ok(page.payload.includes('href="/ecu-file-services.html">Services</a>'));
   assert.match(page.payload,/rel="canonical"/);
-  assert.match(page.payload,/application\\/ld\\+json/);
-  assert.doesNotMatch(page.payload,/<script>alert\\(1\\)<\\/script>/);
+  assert.ok(page.payload.includes('application/ld+json'));
+  assert.ok(!page.payload.includes('<script>alert(1)</script>'));
 });
 
 test('draft and hidden static CMS content never appears on public information pages', async () => {
