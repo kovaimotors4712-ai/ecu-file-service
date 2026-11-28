@@ -1621,7 +1621,8 @@ function cmsPagePayload(body, editorId) {
     meta_description:cmsText(body.meta_description,300),
     blocks:cmsBlocks(body.blocks),
     status,
-    updated_by:editorId
+    updated_by:editorId,
+    updated_at:new Date().toISOString()
   };
 }
 function escapeCmsHtml(value) {
@@ -1641,7 +1642,7 @@ function renderCmsBlocks(blocks) {
 async function getPublishedStaticCmsPage(pageKey) {
   if (!supabaseServiceRoleKey || !CENTRAL_STATIC_CMS_PAGES[pageKey]) return null;
   try {
-    const result=await supabaseRequest(serviceToken(),'rest/v1/site_page_content?select=page_key,page_title,meta_description,blocks,status& page_key=eq.'+encodeURIComponent(pageKey)+'&status=eq.published&limit=1'.replace('& ','&'),{timeoutMs:3500});
+    const result=await supabaseRequest(serviceToken(),'rest/v1/site_page_content?select=page_key,page_title,meta_description,blocks,status&page_key=eq.'+encodeURIComponent(pageKey)+'&status=eq.published&limit=1',{timeoutMs:3500});
     if (!result.ok) return null;
     const rows=await result.json();
     return Array.isArray(rows) ? rows[0] || null : null;
